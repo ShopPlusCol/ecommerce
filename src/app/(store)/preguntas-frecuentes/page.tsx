@@ -3,12 +3,18 @@ import { PageHeader } from "@/components/store/page-header";
 import { Container } from "@/components/ui/container";
 import { Section } from "@/components/ui/section";
 import { demoFaqs } from "@/lib/demo-data";
+import { faqJsonLd } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Preguntas frecuentes" };
+export const metadata: Metadata = {
+  title: "Preguntas frecuentes",
+  alternates: { canonical: "/preguntas-frecuentes" },
+};
 
 export default function FaqPage() {
+  const jsonLd = faqJsonLd(demoFaqs);
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <PageHeader title="Preguntas frecuentes" />
       <Section spacing="sm">
         <Container narrow>

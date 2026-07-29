@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { ShieldCheck, Truck } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Section } from "@/components/ui/section";
 import { PageHeader } from "@/components/store/page-header";
@@ -48,6 +49,10 @@ export default async function ProductPage({ params }: Params) {
 
   const cover = product.media[0];
   const jsonLd = productJsonLd(product);
+  const discount =
+    product.compareAtPrice && product.compareAtPrice.amount > product.price.amount
+      ? Math.round(((product.compareAtPrice.amount - product.price.amount) / product.compareAtPrice.amount) * 100)
+      : null;
 
   return (
     <>
@@ -61,34 +66,63 @@ export default async function ProductPage({ params }: Params) {
       />
 
       <Section spacing="sm">
-        <Container className="grid gap-10 lg:grid-cols-2">
-          <div className="flex flex-col gap-3">
-            <div className="relative aspect-square overflow-hidden rounded-xl bg-surface-sunken">
+        <Container className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
+          <div className="lg:sticky lg:top-28 lg:self-start">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-[24px] bg-surface-sunken shadow-sm">
               {cover ? (
                 <Image src={cover.url} alt={cover.altText} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
+              ) : null}
+              {discount ? (
+                <span className="absolute left-4 top-4 rounded-full bg-brand px-2.5 py-1 text-xs font-semibold text-brand-contrast shadow-brand">
+                  −{discount}%
+                </span>
               ) : null}
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 pb-20 md:pb-0">
+          <div className="flex flex-col gap-5 pb-24 md:pb-0">
             {product.colorFamily ? (
-              <span className="text-xs font-medium uppercase tracking-wide text-text-subtle">
+              <span className="text-xs font-medium uppercase tracking-[0.14em] text-text-subtle">
                 {product.colorFamily.name}
               </span>
             ) : null}
 
-            <div className="flex items-baseline gap-3">
-              <span className="text-2xl font-semibold text-text">{formatMoney(product.price)}</span>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span className="font-display text-3xl font-semibold text-text">{formatMoney(product.price)}</span>
               {product.compareAtPrice ? (
-                <span className="text-md text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
+                <>
+                  <span className="text-md text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
+                  {discount ? <span className="text-sm font-medium text-brand">Ahorras {discount}%</span> : null}
+                </>
               ) : null}
             </div>
 
             <ProductPurchasePanel product={product} />
 
-            <p className="text-text-muted">{product.description}</p>
+            {/* Envío y pagos, fácil de comprender (sección 9) */}
+            <div className="grid gap-3 rounded-xl border border-border p-4 text-sm sm:grid-cols-2">
+              <div className="flex items-start gap-2.5">
+                <Truck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+                <div>
+                  <p className="font-medium text-text">Envío el mismo día en Medellín</p>
+                  <p className="text-text-muted">A otras ciudades pagas el envío por anticipado.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+                <div>
+                  <p className="font-medium text-text">Paga contra entrega</p>
+                  <p className="text-text-muted">En Medellín y Área Metropolitana, en efectivo o datáfono.</p>
+                </div>
+              </div>
+            </div>
 
-            <div className="rounded-lg bg-surface-sunken p-4 text-sm text-text-muted">
+            <div className="border-t border-border pt-5">
+              <h2 className="font-display text-md font-semibold text-text">Descripción</h2>
+              <p className="mt-2 text-text-muted">{product.description}</p>
+            </div>
+
+            <div className="rounded-xl bg-surface-sunken p-4 text-sm text-text-muted">
               <p className="font-medium text-text">Antes de comprar, ten en cuenta:</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>Lente cosmético sin fórmula ni aumento.</li>
@@ -105,8 +139,8 @@ export default async function ProductPage({ params }: Params) {
       {related.length > 0 ? (
         <Section spacing="sm" tone="sunken">
           <Container>
-            <h2 className="text-xl text-text">También te puede gustar</h2>
-            <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <h2 className="text-2xl text-text">También te puede gustar</h2>
+            <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
               {related.map((item) => (
                 <ProductCard key={item.id} product={item} />
               ))}

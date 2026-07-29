@@ -45,6 +45,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       const raw = window.localStorage.getItem(CONSENT_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { analytics: boolean; marketing: boolean };
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación del consentimiento desde almacenamiento del navegador
         setConsentState({ necessary: true, analytics: !!parsed.analytics, marketing: !!parsed.marketing });
         setConsentDecided(true);
       }
@@ -79,7 +80,6 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       };
       setRecentEvents((prev) => [event, ...prev].slice(0, 25));
       if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
         console.debug("[analytics]", event.name, event);
       }
     },

@@ -1,0 +1,516 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader2, ShoppingBag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { OrderFinancialSummary } from "@/components/store/checkout/order-financial-summary";
+import { useCart } from "@/modules/cart/cart-context";
+import { useAnalytics } from "@/modules/analytics/analytics-context";
+import { computeOrderSummary, computeSubtotal } from "@/domain/services/cart-pricing";
+import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
+import { formatMoney } from "@/domain/value-objects/money";
+import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
+import { DEPARTMENTS, MEDELLIN_NEIGHBORHOODS, citiesForDepartment, isMedellin } from "@/lib/colombia-locations";
+import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
+import { LAST_ORDER_KEY } from "@/modules/checkout/last-order";
+
+type Contact = { fullName: string; phone: string; email: string };
+type LocationForm = {
+  department: string;
+  city: string;
+  neighborhood: string;
+  addressLine: string;
+  addressComplement: string;
+  deliveryInstructions: string;
+};
+
+const EMPTY_LOCATION: LocationForm = {
+  department: "",
+  city: "",
+  neighborhood: "",
+  addressLine: "",
+  addressComplement: "",
+  deliveryInstructions: "",
+};
+
+export function CheckoutClient() {
+  const router = useRouter();
+  const { cart, lines, coupon, rewards, totals, clearCart, isHydrated } = useCart();
+  const { track } = useAnalytics();
+
+  const [contact, setContact] = React.useState<Contact>({ fullName: "", phone: "", email: "" });
+  const [location, setLocation] = React.useState<LocationForm>(EMPTY_LOCATION);
+  const [quote, setQuote] = React.useState<ShippingQuote | null>(null);
+  const [methods, setMethods] = React.useState<PaymentMethodId[]>([]);
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
+  const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [quoteError, setQuoteError] = React.useState<string | null>(null);
+  const [consent, setConsent] = React.useState({ terms: false, marketing: false });
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+
+  const initiatedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (initiatedRef.current || lines.length === 0) return;
+    initiatedRef.current = true;
+    track("InitiateCheckout", {
+      value: totals.productsTotal.amount,
+      currency: "COP",
+      contentIds: lines.map((l) => l.productId),
+      contentType: "product",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines.length]);
+
+  // Cotización de envío cuando hay departamento + ciudad (sección 17).
+  const subtotalAmount = computeSubtotal(cart).amount;
+  React.useEffect(() => {
+    // Efecto de obtención de datos: cotiza el envío en el servidor (sistema
+    // externo) y refleja los estados de carga/resultado. El "setState" en el
+    // cuerpo es intencional para el estado de carga inmediato.
+    if (!location.department || !location.city) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset del estado de cotización externa
+      setQuote(null);
+      setQuoteStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    setQuoteStatus("loading");
+    setQuoteError(null);
+    quoteShippingAction({
+      destination: {
+        country: "CO",
+        department: location.department,
+        city: location.city,
+        neighborhood: location.neighborhood || null,
+      },
+      productsTotal: subtotalAmount,
+    }).then((result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        setQuote(result.quote);
+        setMethods(result.methods);
+        setPaymentMethod((prev) => (prev && result.methods.includes(prev) ? prev : result.methods[0] ?? null));
+        setQuoteStatus("ready");
+      } else {
+        setQuote(null);
+        setMethods([]);
+        setPaymentMethod(null);
+        setQuoteStatus("error");
+        setQuoteError(result.reason);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.department, location.city, location.neighborhood, subtotalAmount]);
+
+  const summary = React.useMemo(() => {
+    if (!quote || !paymentMethod) return null;
+    return computeOrderSummary(cart, { coupon, rewards, shippingQuote: quote, paymentMethod });
+  }, [cart, coupon, rewards, quote, paymentMethod]);
+
+  if (!isHydrated) {
+    return <p className="text-sm text-text-muted">Cargando…</p>;
+  }
+
+  if (lines.length === 0) {
+    return (
+      <EmptyState
+        icon={<ShoppingBag className="h-8 w-8" />}
+        title="Tu carrito está vacío"
+        description="Agrega productos antes de continuar al pago."
+        action={
+          <Link href="/catalogo">
+            <Button>Ir al catálogo</Button>
+          </Link>
+        }
+      />
+    );
+  }
+
+  const cities = citiesForDepartment(location.department);
+  const showMedellinNeighborhoods = isMedellin(location.city);
+
+  const validate = (): boolean => {
+    const next: Record<string, string> = {};
+    if (contact.fullName.trim().length < 2) next.fullName = "Ingresa tu nombre completo.";
+    if (contact.phone.replace(/\D/g, "").length < 7) next.phone = "Ingresa un teléfono válido.";
+    if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
+    if (!location.department) next.department = "Selecciona el departamento.";
+    if (!location.city) next.city = "Selecciona la ciudad o municipio.";
+    if (location.addressLine.trim().length < 3) next.addressLine = "Ingresa la dirección.";
+    if (!quote) next.quote = "Necesitamos una dirección con cobertura para calcular el envío.";
+    if (!paymentMethod) next.paymentMethod = "Selecciona un método de pago.";
+    if (!consent.terms) next.terms = "Debes aceptar los términos y la política de privacidad.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const onSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitError(null);
+    if (!validate() || !paymentMethod) return;
+
+    setSubmitting(true);
+    const result = await createDemoOrderAction({
+      items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+      couponCode: coupon?.code ?? null,
+      destination: {
+        country: "CO",
+        department: location.department,
+        city: location.city,
+        neighborhood: location.neighborhood || null,
+      },
+      paymentMethod,
+      contact: {
+        fullName: contact.fullName.trim(),
+        phone: contact.phone.trim(),
+        email: contact.email.trim(),
+        addressLine: location.addressLine.trim(),
+        addressComplement: location.addressComplement.trim(),
+        deliveryInstructions: location.deliveryInstructions.trim(),
+      },
+      consent,
+    });
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setSubmitError(result.error);
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem(LAST_ORDER_KEY, JSON.stringify(result.order));
+    } catch {
+      // Si no hay sessionStorage, la confirmación mostrará un estado genérico.
+    }
+    clearCart();
+    router.push("/checkout/confirmacion");
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1fr_360px]">
+      <div className="flex flex-col gap-6">
+        {/* Contacto */}
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <StepHeading step={1} title="Contacto" />
+            <Input
+              label="Nombre completo"
+              required
+              value={contact.fullName}
+              onChange={(e) => setContact((c) => ({ ...c, fullName: e.target.value }))}
+              error={errors.fullName}
+              autoComplete="name"
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Teléfono"
+                required
+                type="tel"
+                inputMode="tel"
+                value={contact.phone}
+                onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                error={errors.phone}
+                autoComplete="tel"
+              />
+              <Input
+                label="Correo (opcional)"
+                type="email"
+                inputMode="email"
+                value={contact.email}
+                onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                error={errors.email}
+                helperText="Para enviarte la confirmación."
+                autoComplete="email"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ubicación y entrega */}
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <StepHeading step={2} title="Ubicación y entrega" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Departamento"
+                required
+                value={location.department}
+                error={errors.department}
+                onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
+                options={DEPARTMENTS.map((d) => d.name)}
+                placeholder="Selecciona…"
+              />
+              <SelectField
+                label="Ciudad o municipio"
+                required
+                value={location.city}
+                error={errors.city}
+                disabled={!location.department}
+                onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
+                options={cities}
+                placeholder="Selecciona…"
+              />
+            </div>
+
+            {showMedellinNeighborhoods ? (
+              <SelectField
+                label="Barrio o sector"
+                value={location.neighborhood}
+                onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
+                options={MEDELLIN_NEIGHBORHOODS}
+                placeholder="Selecciona…"
+              />
+            ) : (
+              <Input
+                label="Barrio o sector (opcional)"
+                value={location.neighborhood}
+                onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
+              />
+            )}
+
+            <Input
+              label="Dirección"
+              required
+              placeholder="Calle 10 # 20-30"
+              value={location.addressLine}
+              onChange={(e) => setLocation((l) => ({ ...l, addressLine: e.target.value }))}
+              error={errors.addressLine}
+              autoComplete="street-address"
+            />
+            <Input
+              label="Apartamento, torre, bloque (opcional)"
+              value={location.addressComplement}
+              onChange={(e) => setLocation((l) => ({ ...l, addressComplement: e.target.value }))}
+            />
+            <Input
+              label="Indicaciones de entrega (opcional)"
+              value={location.deliveryInstructions}
+              onChange={(e) => setLocation((l) => ({ ...l, deliveryInstructions: e.target.value }))}
+            />
+
+            {quoteStatus === "loading" ? (
+              <p className="flex items-center gap-2 text-sm text-text-muted">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Calculando envío…
+              </p>
+            ) : null}
+            {quoteStatus === "error" ? (
+              <p className="rounded-md bg-warning-soft p-3 text-sm text-warning" role="alert">
+                {quoteError}
+              </p>
+            ) : null}
+            {quote ? (
+              <div className="rounded-md bg-surface-sunken p-3 text-sm text-text-muted">
+                <p className="font-medium text-text">
+                  Envío: {quote.fee.amount === 0 ? "Gratis" : formatMoney(quote.fee)}
+                </p>
+                <p>{quote.customerMessage}</p>
+                <p className="text-xs text-text-subtle">
+                  Entrega estimada: {quote.estimatedBusinessDaysMin === 0 ? "hoy" : `${quote.estimatedBusinessDaysMin}`}
+                  {quote.estimatedBusinessDaysMax > quote.estimatedBusinessDaysMin
+                    ? ` a ${quote.estimatedBusinessDaysMax} días hábiles`
+                    : quote.estimatedBusinessDaysMin === 0
+                      ? ""
+                      : " día(s) hábil(es)"}
+                </p>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Pago */}
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <StepHeading step={3} title="Método de pago" />
+            {methods.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                Completa tu dirección para ver los métodos de pago disponibles en tu zona.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Método de pago">
+                {methods.map((method) => (
+                  <label
+                    key={method}
+                    className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition-colors ${
+                      paymentMethod === method ? "border-brand bg-brand-soft/50" : "border-border-strong hover:bg-surface-sunken"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value={method}
+                      checked={paymentMethod === method}
+                      onChange={() => {
+                        setPaymentMethod(method);
+                        track("AddPaymentInfo", { extra: { method } });
+                      }}
+                      className="mt-0.5 accent-[var(--tk-cherry-500)]"
+                    />
+                    <span className="text-text">{PAYMENT_METHOD_LABELS[method]}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {errors.paymentMethod ? (
+              <p className="text-sm text-danger" role="alert">
+                {errors.paymentMethod}
+              </p>
+            ) : null}
+            <p className="rounded-md bg-info-soft p-3 text-xs text-info">
+              El cobro real con Mercado Pago y la verificación de transferencias se activan en la
+              siguiente fase. Este checkout genera un pedido de demostración con el estado financiero
+              correcto.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Consentimiento */}
+        <Card>
+          <CardContent className="flex flex-col gap-3">
+            <label className="flex items-start gap-3 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={consent.terms}
+                onChange={(e) => setConsent((c) => ({ ...c, terms: e.target.checked }))}
+                className="mt-0.5 accent-[var(--tk-cherry-500)]"
+              />
+              <span>
+                Acepto los{" "}
+                <Link href="/terminos" className="text-brand hover:text-brand-hover">
+                  términos y condiciones
+                </Link>{" "}
+                y la{" "}
+                <Link href="/privacidad" className="text-brand hover:text-brand-hover">
+                  política de privacidad
+                </Link>
+                .
+              </span>
+            </label>
+            {errors.terms ? (
+              <p className="text-sm text-danger" role="alert">
+                {errors.terms}
+              </p>
+            ) : null}
+            <label className="flex items-start gap-3 text-sm text-text-muted">
+              <input
+                type="checkbox"
+                checked={consent.marketing}
+                onChange={(e) => setConsent((c) => ({ ...c, marketing: e.target.checked }))}
+                className="mt-0.5 accent-[var(--tk-cherry-500)]"
+              />
+              <span>Quiero recibir novedades y promociones (opcional).</span>
+            </label>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Resumen */}
+      <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <h2 className="font-display text-md font-semibold text-text">Resumen del pedido</h2>
+            <ul className="flex flex-col gap-2 text-sm">
+              {lines.map((line) => (
+                <li key={`${line.productId}:${line.variantId ?? ""}`} className="flex justify-between gap-2">
+                  <span className="text-text-muted">
+                    {line.quantity} × {line.name}
+                  </span>
+                  <span className="tabular-nums text-text">{formatMoney({ amount: line.unitPrice.amount * line.quantity, currency: "COP" })}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t border-border pt-3">
+              {summary ? (
+                <OrderFinancialSummary summary={summary} />
+              ) : (
+                <p className="text-sm text-text-muted">
+                  Completa tu dirección y método de pago para ver qué pagas ahora y qué pagas al recibir.
+                </p>
+              )}
+            </div>
+            {submitError ? (
+              <p className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
+                {submitError}
+              </p>
+            ) : null}
+            <Button type="submit" size="lg" fullWidth isLoading={submitting} disabled={!summary}>
+              Confirmar pedido
+            </Button>
+            <p className="text-center text-xs text-text-subtle">
+              Pedido de demostración — no se realiza ningún cobro real todavía.
+            </p>
+          </CardContent>
+        </Card>
+      </aside>
+    </form>
+  );
+}
+
+function StepHeading({ step, title }: { step: number; title: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-semibold text-brand-contrast tabular-nums">
+        {step}
+      </span>
+      <h2 className="font-display text-md font-semibold text-text">{title}</h2>
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  required,
+  disabled,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+}) {
+  const id = React.useId();
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-text">
+        {label}
+        {required ? <span className="text-brand"> *</span> : null}
+      </label>
+      <select
+        id={id}
+        value={value}
+        disabled={disabled}
+        aria-invalid={Boolean(error) || undefined}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-control-md rounded-md border border-border-strong bg-surface-raised px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
+      >
+        <option value="">{placeholder ?? "Selecciona…"}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      {error ? (
+        <p className="text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}

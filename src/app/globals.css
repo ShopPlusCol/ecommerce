@@ -87,11 +87,16 @@
   --tk-radius-xl: 22px;
   --tk-radius-full: 9999px;
 
-  /* Sombras (sutiles, sin abusar) */
-  --tk-shadow-xs: 0 1px 2px rgba(19, 17, 16, 0.05);
-  --tk-shadow-sm: 0 2px 8px rgba(19, 17, 16, 0.06);
-  --tk-shadow-md: 0 8px 24px rgba(19, 17, 16, 0.08);
-  --tk-shadow-lg: 0 16px 40px rgba(19, 17, 16, 0.12);
+  /* Sombras (sutiles y en capas, para percepción premium sin abusar) */
+  --tk-shadow-xs: 0 1px 2px rgba(19, 17, 16, 0.04);
+  --tk-shadow-sm: 0 1px 2px rgba(19, 17, 16, 0.04), 0 4px 12px rgba(19, 17, 16, 0.05);
+  --tk-shadow-md: 0 2px 6px rgba(19, 17, 16, 0.05), 0 12px 28px rgba(19, 17, 16, 0.08);
+  --tk-shadow-lg: 0 6px 16px rgba(19, 17, 16, 0.08), 0 24px 48px rgba(19, 17, 16, 0.12);
+  --tk-shadow-brand: 0 8px 24px rgba(135, 35, 61, 0.18);
+
+  /* Gradientes de marca para heros y acentos */
+  --tk-gradient-warm: linear-gradient(135deg, #f7e4e6 0%, #fbeef0 38%, #f3ece3 100%);
+  --tk-gradient-iris: radial-gradient(circle at 50% 42%, #cf6e83 0%, #87233d 46%, #551426 100%);
 
   /* Controles (alturas táctiles) */
   --tk-control-sm: 36px;
@@ -186,6 +191,7 @@
   --shadow-sm: var(--tk-shadow-sm);
   --shadow-md: var(--tk-shadow-md);
   --shadow-lg: var(--tk-shadow-lg);
+  --shadow-brand: var(--tk-shadow-brand);
 
   /* Alturas de control como escala de espaciado: h-control-md, w-control-md, p-control-md */
   --spacing-control-sm: var(--tk-control-sm);
@@ -240,8 +246,13 @@ h3,
 h4 {
   font-family: var(--font-display);
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.1;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 :focus-visible {
@@ -252,4 +263,144 @@ h4 {
 ::selection {
   background: var(--color-brand-soft);
   color: var(--color-text);
+}
+
+/* ---------------------------------------------------------------------------
+ * Sistema de movimiento (sección 5.3): transform + opacity, 150–450 ms.
+ * Todo se neutraliza bajo prefers-reduced-motion (regla más arriba).
+ * ------------------------------------------------------------------------ */
+@keyframes tk-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tk-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tk-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tk-badge-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes tk-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-hero-in {
+  animation: tk-fade-up 520ms var(--ease-emphasized) both;
+}
+
+.animate-fade-in {
+  animation: tk-fade-in 320ms var(--ease-standard) both;
+}
+
+.animate-badge-pop {
+  animation: tk-badge-pop 260ms var(--ease-emphasized);
+}
+
+/* Aparición progresiva al entrar al viewport: estado inicial + estado visible.
+   Lo activa el componente <Reveal> agregando data-visible. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 450ms var(--ease-standard),
+    transform 450ms var(--ease-standard);
+  will-change: opacity, transform;
+}
+
+[data-reveal][data-visible="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Placeholder elegante para fotografía pendiente (brillo sutil sobre gradiente). */
+.tk-photo-placeholder {
+  position: relative;
+  overflow: hidden;
+  background: var(--tk-gradient-warm);
+}
+
+.tk-photo-placeholder::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  animation: tk-shimmer 2600ms var(--ease-standard) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-photo-placeholder::after {
+    animation: none;
+  }
+}
+
+/* Fila con desplazamiento horizontal sin barra visible (categorías en móvil). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Gradiente de marca reutilizable */
+.bg-gradient-warm {
+  background: var(--tk-gradient-warm);
+}
+.bg-gradient-iris {
+  background: var(--tk-gradient-iris);
+}
+
+/* En móvil, si hay CTA fijo inferior (página de producto), oculta el botón
+   flotante de WhatsApp para que no se solapen. En escritorio siempre visible. */
+@media (max-width: 767px) {
+  body[data-mobile-cta="1"] .tk-whatsapp-float {
+    display: none;
+  }
 }

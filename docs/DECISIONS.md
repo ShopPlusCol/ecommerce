@@ -43,3 +43,31 @@ Se fijó una fecha conocida y estable (`2024-09-23`, con `nodejs_compat` + `glob
 ## Vulnerabilidades de `npm audit` en dependencias de build
 
 `npm audit` reporta CVEs altos en `postcss`/`sharp` (bundleados por Next.js 16, aún sin parche corriente) y en `minimatch`/ESLint tooling (dev-only). Todas son herramientas de build/tiempo de desarrollo, no código que procese entrada de usuarios no confiable en producción; forzar el "fix" propuesto por `npm audit fix --force` degradaría Next.js a una versión antigua (9.x), lo cual es peor. Se deja documentado para revisar cuando Next.js publique un patch.
+
+---
+
+# Decisiones de la Fase 2
+
+## Datos de desarrollo detrás de puertos, no en las páginas
+
+El catálogo, cupones, recompensas, zonas de envío y la página de inicio se sirven mediante adaptadores de datos de desarrollo (`infrastructure/demo/`, `infrastructure/catalog|promotions|shipping|pages/`) que implementan puertos (`CatalogRepository`, `PromotionsRepository`, `ShippingRateResolver`, `PageRepository`). La tienda importa solo desde `lib/container.ts`. Esto cumple "toda interacción debe seguir los contratos definitivos; evita crear una segunda lógica que luego haya que eliminar": en la Fase 3 se sustituye el adaptador demo por uno Drizzle/D1 sin tocar componentes de la tienda.
+
+## Cálculo de precios único para cliente y servidor
+
+La lógica de totales, cupones, recompensas, envío y división de pago vive en `domain/services/` como funciones puras. El cliente la usa para respuesta inmediata (drawer, checkout) y las Server Actions la reutilizan para el cálculo autoritativo. No hay una segunda implementación en el frontend (sección 1.3). Las Server Actions reconstruyen el carrito desde el catálogo por ID, ignorando los precios enviados por el cliente (sección 29).
+
+## Pedido de checkout de demostración, sin persistir ni cobrar
+
+La Server Action `createDemoOrderAction` calcula el resumen financiero autoritativo y genera un número de pedido, pero **no** escribe en la base de datos ni cobra: la persistencia de pedidos, Mercado Pago y las transferencias son entregables de la Fase 3. El pedido resultante se pasa a la confirmación vía `sessionStorage`. Esto evita fingir una integración de pago activa (sección 1.3) manteniendo un recorrido completo evaluable.
+
+## Editor visual: modelo de bloques renderizado ya en la tienda
+
+La página de inicio se define como un arreglo de bloques tipados (`modules/page-builder/blocks.ts`) que coincide con la tabla `page_sections`. La tienda ya renderiza ese contrato (`components/store/page-builder/`). En la Fase 2 la definición vive en un adaptador demo; en la Fase 3 el editor administrativo producirá exactamente esta estructura y se leerá la versión publicada desde la base de datos. Así el trabajo de render no se rehace.
+
+## Analítica con gate de consentimiento; `Purchase` en el servidor
+
+La capa de analítica (`modules/analytics`) registra eventos solo tras el consentimiento (banner de cookies, sección 32). Genera `event_id` para deduplicación navegador/servidor. `Purchase` **no** se dispara desde el navegador como verdad definitiva (sección 21.3): se reserva para la confirmación del backend en la Fase 3. En la Fase 2 los eventos se registran en un buffer en memoria y en consola (desarrollo), detrás del mismo contrato que despachará a Meta.
+
+## `set-state-in-effect`: hidratación desde almacenamiento del navegador
+
+Los proveedores de carrito, favoritos, consentimiento y la confirmación hidratan su estado desde `localStorage`/`sessionStorage` dentro de un `useEffect` de montaje. Esto es intencional para que el HTML del servidor y el primer render del cliente coincidan (evita desajustes de hidratación); el estado guardado se aplica después. La regla `react-hooks/set-state-in-effect` marca este patrón como falso positivo y se desactiva puntualmente con justificación en cada punto. El efecto de cotización de envío del checkout es un efecto de obtención de datos (sistema externo) y sigue el mismo criterio.

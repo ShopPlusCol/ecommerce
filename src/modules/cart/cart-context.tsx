@@ -3,7 +3,6 @@
 import * as React from "react";
 import type { Product } from "@/domain/entities/catalog";
 import type { Cart, CartLine } from "@/domain/entities/cart";
-import { EMPTY_CART } from "@/domain/entities/cart";
 import type { Coupon, RewardRule } from "@/domain/entities/promotions";
 import {
   computeCartTotals,
@@ -61,12 +60,16 @@ export function CartProvider({
   const removedRef = React.useRef<RemovedSnapshot>(null);
   const [canUndo, setCanUndo] = React.useState(false);
 
-  // Hidratación desde localStorage (persistencia entre sesiones, sección 11.1).
+  // Hidratación desde localStorage tras el montaje (persistencia entre
+  // sesiones, sección 11.1). Debe correr en un efecto —no en el render— para
+  // que el HTML del servidor y el primer render del cliente coincidan; recién
+  // después se aplica el estado guardado.
   React.useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as PersistedCart;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación desde almacenamiento del navegador
         if (Array.isArray(parsed.lines)) setLines(parsed.lines);
         if (parsed.coupon) setCoupon(parsed.coupon);
       }

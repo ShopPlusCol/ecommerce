@@ -3,22 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-fast ease-standard disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-base ease-standard active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
   {
     variants: {
       variant: {
         primary:
-          "bg-brand text-brand-contrast hover:bg-brand-hover active:bg-brand-active shadow-xs",
+          "bg-brand text-brand-contrast shadow-xs hover:bg-brand-hover hover:shadow-brand active:bg-brand-active",
         secondary:
-          "border border-border-strong bg-surface-raised text-text hover:bg-surface-sunken",
+          "border border-border-strong bg-surface-raised text-text hover:border-brand hover:text-brand",
         ghost: "text-text hover:bg-surface-sunken",
         soft: "bg-brand-soft text-brand hover:bg-accent-rose-soft",
         danger: "bg-danger text-white hover:opacity-90",
       },
       size: {
-        sm: "h-control-sm px-3 text-xs",
-        md: "h-control-md px-4",
-        lg: "h-control-lg px-6 text-base",
+        sm: "h-control-sm px-4 text-xs",
+        md: "h-control-md px-5 text-sm",
+        lg: "h-control-lg px-7 text-base",
         icon: "h-control-md w-control-md p-0",
       },
       fullWidth: {

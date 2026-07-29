@@ -19,21 +19,21 @@ export function RewardProgress({ rewards }: { rewards: RewardEvaluation }) {
       formatRemaining(rule.conditionType, remaining),
     );
     return (
-      <div className="rounded-md bg-brand-soft/60 p-3">
-        <div className="flex items-center gap-2 text-sm text-text">
-          <Gift className="h-4 w-4 text-brand" aria-hidden="true" />
+      <div className="rounded-xl bg-brand-soft/60 p-3.5">
+        <div className="flex items-center gap-2 text-sm font-medium text-text">
+          <Gift className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
           <span>{message}</span>
         </div>
         <div
-          className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken"
+          className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-surface-raised"
           role="progressbar"
           aria-valuenow={Math.round(progress * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
         >
           <div
-            className="h-full rounded-full bg-brand transition-[width] duration-slow ease-standard"
-            style={{ width: `${Math.max(4, Math.round(progress * 100))}%` }}
+            className="h-full rounded-full bg-linear-to-r from-brand to-accent-rose transition-[width] duration-slow ease-emphasized"
+            style={{ width: `${Math.max(6, Math.round(progress * 100))}%` }}
           />
         </div>
       </div>
@@ -42,8 +42,8 @@ export function RewardProgress({ rewards }: { rewards: RewardEvaluation }) {
 
   if (unlockedFreeShipping) {
     return (
-      <div className="flex items-center gap-2 rounded-md bg-success-soft p-3 text-sm text-success">
-        <Check className="h-4 w-4" aria-hidden="true" />
+      <div className="flex items-center gap-2 rounded-xl bg-success-soft p-3.5 text-sm font-medium text-success">
+        <Check className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span>{unlockedFreeShipping.rule.unlockedMessage}</span>
       </div>
     );

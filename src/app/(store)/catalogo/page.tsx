@@ -44,7 +44,11 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
 
           {result.products.length > 0 ? (
             <>
-              <ProductGrid products={result.products} />
+              <ProductGrid
+                key={JSON.stringify(query.filters) + query.sort + result.page}
+                products={result.products}
+                className="animate-fade-in"
+              />
               <CatalogPagination page={result.page} totalPages={totalPages} />
             </>
           ) : (

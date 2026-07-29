@@ -27,6 +27,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as string[];
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación desde almacenamiento del navegador
         if (Array.isArray(parsed)) setFavorites(parsed);
       }
     } catch {

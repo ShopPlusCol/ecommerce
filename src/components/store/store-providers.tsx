@@ -5,6 +5,7 @@ import { CartProvider } from "@/modules/cart/cart-context";
 import { FavoritesProvider } from "@/modules/favorites/favorites-context";
 import { AnalyticsProvider } from "@/modules/analytics/analytics-context";
 import { CartDrawer } from "@/components/store/cart/cart-drawer";
+import { PageViewTracker } from "@/components/store/page-view-tracker";
 
 /**
  * Raíz de proveedores de la tienda pública. Recibe las reglas de recompensa
@@ -24,6 +25,7 @@ export function StoreProviders({
         <CartProvider rewardRules={rewardRules}>
           {children}
           <CartDrawer />
+          <PageViewTracker />
         </CartProvider>
       </FavoritesProvider>
     </AnalyticsProvider>
