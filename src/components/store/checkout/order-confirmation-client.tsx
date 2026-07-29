@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,21 @@ import { OrderFinancialSummary } from "@/components/store/checkout/order-financi
 import { formatMoney } from "@/domain/value-objects/money";
 import { readLastOrder } from "@/modules/checkout/last-order";
 import type { DemoOrder } from "@/modules/checkout/order-types";
-import { uploadTransferProofAction } from "@/app/(store)/checkout/transfer-actions";
+import {
+  uploadTransferProofAction,
+  type UploadTransferProofState,
+} from "@/app/(store)/checkout/transfer-actions";
+
+const INITIAL_PROOF_STATE: UploadTransferProofState = { status: "idle" };
 
 export function OrderConfirmationClient() {
   const [order, setOrder] = React.useState<DemoOrder | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [proofState, proofAction, proofPending] = useActionState(
+    uploadTransferProofAction,
+    INITIAL_PROOF_STATE,
+  );
+  const proofReceived = proofState.status === "success";
 
   React.useEffect(() => {
     // Lee la instantánea de confirmación desde sessionStorage tras el montaje.
@@ -84,11 +95,30 @@ export function OrderConfirmationClient() {
             <p className="mt-1 text-xs text-text-muted">{order.manualTransfer.instructions}</p>
           </div> : null}
           <p className="my-2 text-xs text-text-muted">La carga deja el pago pendiente de revisión; no lo aprueba automáticamente.</p>
-          <form action={uploadTransferProofAction} className="flex flex-wrap gap-2">
+          <form action={proofAction} className="flex flex-wrap gap-2">
             <input type="hidden" name="orderNumber" value={order.orderNumber} />
             <input type="hidden" name="lookupToken" value={order.lookupToken} />
-            <input type="file" name="proof" accept="image/png,image/jpeg,image/webp" required />
-            <Button type="submit" variant="secondary">Enviar comprobante</Button>
+            <input
+              type="file"
+              name="proof"
+              accept="image/png,image/jpeg,image/webp"
+              required
+              disabled={proofPending || proofReceived}
+            />
+            <Button
+              type="submit"
+              variant="secondary"
+              isLoading={proofPending}
+              disabled={proofPending || proofReceived}
+            >
+              {proofReceived ? "Comprobante recibido" : proofPending ? "Enviando…" : "Enviar comprobante"}
+            </Button>
+            {proofState.status === "error" ? (
+              <p className="basis-full text-sm text-danger" role="alert">{proofState.message}</p>
+            ) : null}
+            {proofState.status === "success" ? (
+              <p className="basis-full text-sm text-success" role="status">{proofState.message}</p>
+            ) : null}
           </form>
         </CardContent></Card>
       ) : null}

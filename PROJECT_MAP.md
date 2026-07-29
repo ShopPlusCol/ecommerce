@@ -1,6 +1,6 @@
 # PROJECT_MAP.md — Índice del proyecto (GENERADO, no editar a mano)
 
-> Generado: 2026-07-29 19:29 UTC · 220 archivos (3 parseados, 217 caché) · motor: **integrado** *(instala `tree-sitter-language-pack` para precisión máxima)*
+> Generado: 2026-07-29 19:38 UTC · 222 archivos (2 parseados, 220 caché) · motor: **integrado** *(instala `tree-sitter-language-pack` para precisión máxima)*
 > Cómo usarlo: localiza el símbolo y ve directo a `archivo:línea`. No leas archivos completos para explorar.
 
 ## ⭐ Archivos núcleo (ranking PageRank — máxima precaución al cambiarlos)
@@ -16,10 +16,10 @@
 - `src/infrastructure/db/schema/customers.ts` — importancia ██ (2 importador(es))
 - `src/infrastructure/db/schema/catalog.ts` — importancia ██ (3 importador(es))
 - `src/infrastructure/db/schema/orders.ts` — importancia ██ (3 importador(es))
+- `next.config.ts` — importancia ██ (1 importador(es))
 - `src/components/admin/admin-page-header.tsx` — importancia ██ (1 importador(es))
 - `src/app/admin/configuracion/actions.ts` — importancia ██ (1 importador(es))
 - `src/app/acceso-admin/login-form.tsx` — importancia ██ (1 importador(es))
-- `src/app/(store)/pedidos/consultar/lookup-form.tsx` — importancia ██ (1 importador(es))
 
 ## 1. Estructura de carpetas
 
@@ -107,13 +107,13 @@
 - `src/modules/csv/` — 1 archivo(s) de código
 - `src/modules/favorites/` — 1 archivo(s) de código
 - `src/modules/inventory/` — 1 archivo(s) de código
-- `src/modules/media/` — 1 archivo(s) de código
+- `src/modules/media/` — 2 archivo(s) de código
 - `src/modules/page-builder/` — 1 archivo(s) de código
 - `src/modules/settings/` — 2 archivo(s) de código
 - `src/modules/whatsapp/` — 1 archivo(s) de código
 - `tests/e2e/` — 1 archivo(s) de código
 - `tests/integration/` — 1 archivo(s) de código
-- `tests/unit/` — 5 archivo(s) de código
+- `tests/unit/` — 6 archivo(s) de código
 
 ## 2. Archivos de configuración y datos
 
@@ -174,6 +174,9 @@
 ### `src/infrastructure/db/schema/orders.ts` (147 líneas) ⭐
 - (sin símbolos públicos detectados)
 
+### `next.config.ts` (22 líneas) ⭐
+- (sin símbolos públicos detectados)
+
 ### `src/components/admin/admin-page-header.tsx` (9 líneas) ⭐
 - `function AdminPageHeader({ title, description }: { title: string; description?: string })` → `src/components/admin/admin-page-header.tsx:1`
 
@@ -184,16 +187,10 @@
 ### `src/app/acceso-admin/login-form.tsx` (38 líneas) ⭐
 - `function LoginForm()` → `src/app/acceso-admin/login-form.tsx:9`
 
-### `src/app/(store)/pedidos/consultar/lookup-form.tsx` (17 líneas) ⭐
-- `function LookupForm()` → `src/app/(store)/pedidos/consultar/lookup-form.tsx:7`
-
 ### `drizzle.config.ts` (14 líneas)
 - (sin símbolos públicos detectados)
 
 ### `eslint.config.mjs` (19 líneas)
-- (sin símbolos públicos detectados)
-
-### `next.config.ts` (15 líneas)
 - (sin símbolos públicos detectados)
 
 ### `open-next.config.ts` (10 líneas)
@@ -238,8 +235,8 @@
 ### `src/app/(store)/checkout/page.tsx` (24 líneas)
 - `function CheckoutPage()` → `src/app/(store)/checkout/page.tsx:9`
 
-### `src/app/(store)/checkout/transfer-actions.ts` (32 líneas)
-- `function uploadTransferProofAction(formData: FormData)` → `src/app/(store)/checkout/transfer-actions.ts:10`
+### `src/app/(store)/checkout/transfer-actions.ts` (111 líneas)
+- `type UploadTransferProofState` → `src/app/(store)/checkout/transfer-actions.ts:14`
 
 ### `src/app/(store)/coleccion/[slug]/page.tsx` (47 líneas)
 - `type Params` → `src/app/(store)/coleccion/[slug]/page.tsx:10`
@@ -280,6 +277,9 @@
 - `type Params` → `src/app/(store)/paginas/[slug]/page.tsx:20`
 - `function generateMetadata({ params }: Params)` → `src/app/(store)/paginas/[slug]/page.tsx:22`
 - `function EditorialPage({ params }: Params)` → `src/app/(store)/paginas/[slug]/page.tsx:27`
+
+### `src/app/(store)/pedidos/consultar/lookup-form.tsx` (17 líneas)
+- `function LookupForm()` → `src/app/(store)/pedidos/consultar/lookup-form.tsx:7`
 
 ### `src/app/(store)/pedidos/consultar/page.tsx` (14 líneas)
 - `function TrackOrderPage()` → `src/app/(store)/pedidos/consultar/page.tsx:8`
@@ -493,8 +493,8 @@
 - `function CheckoutClient()` → `src/components/store/checkout/checkout-client.tsx:40`
 - `function StepHeading({ step, title }: { step: number; title: string })` → `src/components/store/checkout/checkout-client.tsx:456`
 
-### `src/components/store/checkout/order-confirmation-client.tsx` (120 líneas)
-- `function OrderConfirmationClient()` → `src/components/store/checkout/order-confirmation-client.tsx:14`
+### `src/components/store/checkout/order-confirmation-client.tsx` (150 líneas)
+- `function OrderConfirmationClient()` → `src/components/store/checkout/order-confirmation-client.tsx:20`
 
 ### `src/components/store/checkout/order-financial-summary.tsx` (61 líneas)
 - `function OrderFinancialSummary({ summary }: { summary: OrderSummary })` → `src/components/store/checkout/order-financial-summary.tsx:10`
@@ -968,6 +968,9 @@
 ### `src/modules/inventory/reservations.ts` (35 líneas)
 - `function releaseExpiredReservations(now = new Date()` → `src/modules/inventory/reservations.ts:6`
 
+### `src/modules/media/transfer-proof.ts` (16 líneas)
+- `function validateTransferProof(bytes: Uint8Array, declaredType: string)` → `src/modules/media/transfer-proof.ts:7`
+
 ### `src/modules/media/validation.ts` (60 líneas)
 - `type ValidatedMedia` → `src/modules/media/validation.ts:4`
 - `function pngSize(bytes: Uint8Array)` → `src/modules/media/validation.ts:11`
@@ -1025,6 +1028,9 @@
 ### `tests/unit/shipping.test.ts` (136 líneas)
 - `function rule(overrides: Partial<ShippingRuleWithZone> & { ruleId: string })` → `tests/unit/shipping.test.ts:5`
 
+### `tests/unit/transfer-proof.test.ts` (42 líneas)
+- `function validPng()` → `tests/unit/transfer-proof.test.ts:8`
+
 ### `vitest.config.ts` (15 líneas)
 - (sin símbolos públicos detectados)
 
@@ -1043,10 +1049,10 @@
 - `src/infrastructure/db/schema/customers.ts` ← `src/infrastructure/db/schema/cart.ts`, `src/infrastructure/db/schema/orders.ts`
 - `src/infrastructure/db/schema/catalog.ts` ← `src/infrastructure/db/schema/cart.ts`, `src/infrastructure/db/schema/inventory.ts`, `src/infrastructure/db/schema/try-on.ts`
 - `src/infrastructure/db/schema/orders.ts` ← `src/infrastructure/db/schema/marketing.ts`, `src/infrastructure/db/schema/payments.ts`, `src/infrastructure/db/schema/shipping.ts`
+- `next.config.ts` ← `tests/unit/transfer-proof.test.ts`
 - `src/components/admin/admin-page-header.tsx` ← `src/components/admin/admin-record-list.tsx`
 - `src/app/admin/configuracion/actions.ts` ← `src/app/admin/configuracion/page.tsx`
 - `src/app/acceso-admin/login-form.tsx` ← `src/app/acceso-admin/page.tsx`
-- `src/app/(store)/pedidos/consultar/lookup-form.tsx` ← `src/app/(store)/pedidos/consultar/page.tsx`
 
 ## 5. Grafo de dependencias locales (Python + JS/TS)
 
@@ -1081,3 +1087,4 @@
 - `src/infrastructure/db/seed.ts` importa: `src/infrastructure/db/client.ts`, `src/infrastructure/db/schema/index.ts`
 - `src/infrastructure/storage/index.ts` importa: `src/infrastructure/storage/local-storage-provider.ts`, `src/infrastructure/storage/r2-storage-provider.ts`
 - `src/modules/auth/session.ts` importa: `src/modules/auth/auth.ts`, `src/modules/auth/authorization.ts`
+- `tests/unit/transfer-proof.test.ts` importa: `next.config.ts`
