@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { desc } from "drizzle-orm";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { requirePermission } from "@/modules/auth/session";
@@ -30,7 +31,7 @@ export default async function AdminProductsPage() {
       <div className="overflow-x-auto rounded-lg border border-border bg-surface-raised">
         <table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="p-3">Producto</th><th>SKU</th><th>Precio</th><th>Estado</th><th>Acción</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={row.id} className="border-b border-border">
-            <td className="p-3 font-medium">{row.name}</td><td>{row.sku}</td><td>${row.price.toLocaleString("es-CO")}</td><td>{row.status}</td>
+            <td className="p-3 font-medium"><Link href={`/admin/productos/${row.id}`} className="text-brand hover:underline">{row.name}</Link></td><td>{row.sku}</td><td>${row.price.toLocaleString("es-CO")}</td><td>{row.status}</td>
             <td><form action={updateProductStatusAction} className="flex gap-2 p-2">
               <input type="hidden" name="id" value={row.id} /><input type="hidden" name="updatedAt" value={row.updatedAt.toISOString()} />
               <select name="status" defaultValue={row.status} className="rounded border p-1"><option value="draft">Borrador</option><option value="active">Activo</option><option value="archived">Archivado</option></select>

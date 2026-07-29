@@ -1,25 +1,25 @@
 # PROJECT_MAP.md — Índice del proyecto (GENERADO, no editar a mano)
 
-> Generado: 2026-07-29 21:15 UTC · 253 archivos (55 parseados, 198 caché) · motor: **integrado** *(instala `tree-sitter-language-pack` para precisión máxima)*
+> Generado: 2026-07-29 22:03 UTC · 270 archivos (35 parseados, 235 caché) · motor: **integrado** *(instala `tree-sitter-language-pack` para precisión máxima)*
 > Cómo usarlo: localiza el símbolo y ve directo a `archivo:línea`. No leas archivos completos para explorar.
 
 ## ⭐ Archivos núcleo (ranking PageRank — máxima precaución al cambiarlos)
 
 - `src/infrastructure/db/schema/_helpers.ts` — importancia ██████████ (12 importador(es))
-- `src/app/admin/actions.ts` — importancia █████ (5 importador(es))
+- `src/app/admin/actions.ts` — importancia █████ (6 importador(es))
 - `src/infrastructure/db/schema/index.ts` — importancia ███ (2 importador(es))
 - `src/components/store/brand-mark.tsx` — importancia ███ (2 importador(es))
+- `src/app/admin/medios/actions.ts` — importancia ██ (1 importador(es))
+- `src/app/admin/productos/detail-actions.ts` — importancia ██ (1 importador(es))
 - `src/app/(store)/pedidos/consultar/actions.ts` — importancia ██ (1 importador(es))
 - `src/app/acceso-admin/actions.ts` — importancia ██ (1 importador(es))
+- `src/app/admin/clientes/actions.ts` — importancia ██ (1 importador(es))
 - `src/infrastructure/db/client.ts` — importancia ██ (2 importador(es))
 - `src/app/admin/productos/csv-actions.ts` — importancia ██ (1 importador(es))
 - `src/infrastructure/db/schema/customers.ts` — importancia ██ (2 importador(es))
 - `src/infrastructure/db/schema/orders.ts` — importancia ██ (3 importador(es))
 - `src/infrastructure/db/schema/catalog.ts` — importancia ██ (3 importador(es))
-- `scripts/apply-local-patches.mjs` — importancia ██ (1 importador(es))
-- `src/app/(store)/pedidos/consultar/lookup-form.tsx` — importancia ██ (1 importador(es))
-- `src/app/acceso-admin/login-form.tsx` — importancia ██ (1 importador(es))
-- `src/app/admin/configuracion/actions.ts` — importancia ██ (1 importador(es))
+- `next.config.ts` — importancia ██ (1 importador(es))
 
 ## 1. Estructura de carpetas
 
@@ -49,11 +49,13 @@
 - `src/app/(store)/productos/[slug]/` — 1 archivo(s) de código
 - `src/app/(store)/terminos/` — 1 archivo(s) de código
 - `src/app/acceso-admin/` — 3 archivo(s) de código
-- `src/app/admin/` — 5 archivo(s) de código
+- `src/app/admin/` — 6 archivo(s) de código
 - `src/app/admin/analitica/` — 1 archivo(s) de código
 - `src/app/admin/auditoria/` — 1 archivo(s) de código
+- `src/app/admin/buscar/` — 1 archivo(s) de código
 - `src/app/admin/categorias/` — 1 archivo(s) de código
-- `src/app/admin/clientes/` — 1 archivo(s) de código
+- `src/app/admin/clientes/` — 3 archivo(s) de código
+- `src/app/admin/clientes/[id]/` — 1 archivo(s) de código
 - `src/app/admin/colecciones/` — 1 archivo(s) de código
 - `src/app/admin/configuracion/` — 2 archivo(s) de código
 - `src/app/admin/contenido/` — 1 archivo(s) de código
@@ -63,11 +65,13 @@
 - `src/app/admin/estado/` — 1 archivo(s) de código
 - `src/app/admin/integraciones/` — 1 archivo(s) de código
 - `src/app/admin/inventario/` — 1 archivo(s) de código
-- `src/app/admin/medios/` — 1 archivo(s) de código
+- `src/app/admin/medios/` — 3 archivo(s) de código
 - `src/app/admin/pagos/` — 1 archivo(s) de código
 - `src/app/admin/pedidos/` — 1 archivo(s) de código
+- `src/app/admin/pedidos/[id]/` — 1 archivo(s) de código
 - `src/app/admin/popups/` — 1 archivo(s) de código
-- `src/app/admin/productos/` — 3 archivo(s) de código
+- `src/app/admin/productos/` — 5 archivo(s) de código
+- `src/app/admin/productos/[id]/` — 1 archivo(s) de código
 - `src/app/admin/promociones/` — 1 archivo(s) de código
 - `src/app/admin/recompensas/` — 1 archivo(s) de código
 - `src/app/admin/simulador/` — 2 archivo(s) de código
@@ -80,7 +84,7 @@
 - `src/app/api/observability/vitals/` — 1 archivo(s) de código
 - `src/app/api/webhooks/mercado-pago/` — 1 archivo(s) de código
 - `src/application/ports/` — 9 archivo(s) de código
-- `src/components/admin/` — 7 archivo(s) de código
+- `src/components/admin/` — 11 archivo(s) de código
 - `src/components/store/` — 17 archivo(s) de código
 - `src/components/store/cart/` — 8 archivo(s) de código
 - `src/components/store/catalog/` — 2 archivo(s) de código
@@ -108,6 +112,7 @@
 - `src/infrastructure/storage/` — 3 archivo(s) de código
 - `src/infrastructure/try-on/` — 1 archivo(s) de código
 - `src/lib/` — 9 archivo(s) de código
+- `src/modules/admin/` — 2 archivo(s) de código
 - `src/modules/analytics/` — 2 archivo(s) de código
 - `src/modules/auth/` — 5 archivo(s) de código
 - `src/modules/cart/` — 2 archivo(s) de código
@@ -161,6 +166,12 @@
 ### `src/components/store/brand-mark.tsx` (17 líneas) ⭐
 - `function BrandMark({ brand, placement = "header" }: { brand: BrandSettings; placement?: "header" | "mobile"...` → `src/components/store/brand-mark.tsx:4`
 
+### `src/app/admin/medios/actions.ts` (182 líneas) ⭐
+- `function mediaReferenceCount(id: string, url: string)` → `src/app/admin/medios/actions.ts:26`
+
+### `src/app/admin/productos/detail-actions.ts` (108 líneas) ⭐
+- (sin símbolos públicos detectados)
+
 ### `src/app/(store)/pedidos/consultar/actions.ts` (39 líneas) ⭐
 - `type LookupState` → `src/app/(store)/pedidos/consultar/actions.ts:10`
 - `function lookupOrderAction(_state: LookupState, formData: FormData)` → `src/app/(store)/pedidos/consultar/actions.ts:11`
@@ -169,6 +180,9 @@
 - `type LoginState` → `src/app/acceso-admin/actions.ts:19`
 - `type ResetState` → `src/app/acceso-admin/actions.ts:20`
 - `function logoutAction()` → `src/app/acceso-admin/actions.ts:87`
+
+### `src/app/admin/clientes/actions.ts` (37 líneas) ⭐
+- `function updateCustomerAction(_state: AdminActionState, formData: FormData)` → `src/app/admin/clientes/actions.ts:11`
 
 ### `src/infrastructure/db/client.ts` (39 líneas) ⭐
 - `type Db` → `src/infrastructure/db/client.ts:14`
@@ -189,27 +203,13 @@
 ### `src/infrastructure/db/schema/catalog.ts` (199 líneas) ⭐
 - (sin símbolos públicos detectados)
 
-### `scripts/apply-local-patches.mjs` (39 líneas) ⭐
-- `function applyLocalPatches()` → `scripts/apply-local-patches.mjs:4`
-
-### `src/app/(store)/pedidos/consultar/lookup-form.tsx` (17 líneas) ⭐
-- `function LookupForm()` → `src/app/(store)/pedidos/consultar/lookup-form.tsx:7`
-
-### `src/app/acceso-admin/login-form.tsx` (38 líneas) ⭐
-- `function LoginForm()` → `src/app/acceso-admin/login-form.tsx:9`
-
-### `src/app/admin/configuracion/actions.ts` (103 líneas) ⭐
-- `function saveBrandSettingsAction(formData: FormData)` → `src/app/admin/configuracion/actions.ts:30`
-- `function saveManualTransferSettingsAction(formData: FormData)` → `src/app/admin/configuracion/actions.ts:55`
-- `function savePrivacySettingsAction(formData: FormData)` → `src/app/admin/configuracion/actions.ts:72`
+### `next.config.ts` (67 líneas) ⭐
+- (sin símbolos públicos detectados)
 
 ### `drizzle.config.ts` (14 líneas)
 - (sin símbolos públicos detectados)
 
 ### `eslint.config.mjs` (21 líneas)
-- (sin símbolos públicos detectados)
-
-### `next.config.ts` (67 líneas)
 - (sin símbolos públicos detectados)
 
 ### `open-next.config.ts` (10 líneas)
@@ -220,6 +220,9 @@
 
 ### `postcss.config.mjs` (8 líneas)
 - (sin símbolos públicos detectados)
+
+### `scripts/apply-local-patches.mjs` (39 líneas)
+- `function applyLocalPatches()` → `scripts/apply-local-patches.mjs:4`
 
 ### `scripts/db-backup.mjs` (42 líneas)
 - `function databasePath()` → `scripts/db-backup.mjs:6`
@@ -322,6 +325,9 @@
 - `function generateMetadata({ params }: Params)` → `src/app/(store)/paginas/[slug]/page.tsx:22`
 - `function EditorialPage({ params }: Params)` → `src/app/(store)/paginas/[slug]/page.tsx:27`
 
+### `src/app/(store)/pedidos/consultar/lookup-form.tsx` (17 líneas)
+- `function LookupForm()` → `src/app/(store)/pedidos/consultar/lookup-form.tsx:7`
+
 ### `src/app/(store)/pedidos/consultar/page.tsx` (14 líneas)
 - `function TrackOrderPage()` → `src/app/(store)/pedidos/consultar/page.tsx:8`
 
@@ -340,6 +346,9 @@
 ### `src/app/(store)/terminos/page.tsx` (42 líneas)
 - `function TermsPage()` → `src/app/(store)/terminos/page.tsx:21`
 
+### `src/app/acceso-admin/login-form.tsx` (38 líneas)
+- `function LoginForm()` → `src/app/acceso-admin/login-form.tsx:9`
+
 ### `src/app/acceso-admin/page.tsx` (21 líneas)
 - `function AdminLoginPage()` → `src/app/acceso-admin/page.tsx:7`
 
@@ -349,29 +358,52 @@
 ### `src/app/admin/auditoria/page.tsx` (10 líneas)
 - `function Page()` → `src/app/admin/auditoria/page.tsx:6`
 
-### `src/app/admin/categorias/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/categorias/page.tsx:5`
+### `src/app/admin/buscar/page.tsx` (122 líneas)
+- `type SearchResult` → `src/app/admin/buscar/page.tsx:10`
 
-### `src/app/admin/clientes/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/clientes/page.tsx:5`
+### `src/app/admin/categorias/page.tsx` (53 líneas)
+- `function Page()` → `src/app/admin/categorias/page.tsx:8`
 
-### `src/app/admin/colecciones/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/colecciones/page.tsx:5`
+### `src/app/admin/clientes/[id]/page.tsx` (29 líneas)
+- `function CustomerDetailPage({ params }: { params: Promise<{ id: string }> })` → `src/app/admin/clientes/[id]/page.tsx:10`
+
+### `src/app/admin/clientes/customer-editor.tsx` (25 líneas)
+- `function CustomerEditor({ customer }: { customer: { id: string; fullName: string; phone: string; email: str...` → `src/app/admin/clientes/customer-editor.tsx:7`
+
+### `src/app/admin/clientes/page.tsx` (11 líneas)
+- `function Page()` → `src/app/admin/clientes/page.tsx:6`
+
+### `src/app/admin/colecciones/page.tsx` (28 líneas)
+- `function Page()` → `src/app/admin/colecciones/page.tsx:18`
+
+### `src/app/admin/configuracion/actions.ts` (103 líneas)
+- `function saveBrandSettingsAction(formData: FormData)` → `src/app/admin/configuracion/actions.ts:30`
+- `function saveManualTransferSettingsAction(formData: FormData)` → `src/app/admin/configuracion/actions.ts:55`
+- `function savePrivacySettingsAction(formData: FormData)` → `src/app/admin/configuracion/actions.ts:72`
 
 ### `src/app/admin/configuracion/page.tsx` (99 líneas)
 - `function AdminSettingsPage()` → `src/app/admin/configuracion/page.tsx:15`
 
-### `src/app/admin/contenido/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/contenido/page.tsx:5`
+### `src/app/admin/contenido/page.tsx` (37 líneas)
+- `function Page()` → `src/app/admin/contenido/page.tsx:10`
 
-### `src/app/admin/cupones/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/cupones/page.tsx:5`
+### `src/app/admin/cupones/page.tsx` (37 líneas)
+- `function Page()` → `src/app/admin/cupones/page.tsx:27`
 
 ### `src/app/admin/editor/page.tsx` (9 líneas)
 - `function Page()` → `src/app/admin/editor/page.tsx:5`
 
-### `src/app/admin/envios/page.tsx` (10 líneas)
-- `function Page()` → `src/app/admin/envios/page.tsx:6`
+### `src/app/admin/entity-actions.ts` (285 líneas)
+- `function text(formData: FormData, name: string, required = false)` → `src/app/admin/entity-actions.ts:70`
+- `function integer(formData: FormData, name: string, fallback = 0)` → `src/app/admin/entity-actions.ts:76`
+- `function optionalInteger(formData: FormData, name: string)` → `src/app/admin/entity-actions.ts:84`
+- `function bool(formData: FormData, name: string)` → `src/app/admin/entity-actions.ts:92`
+- `function date(formData: FormData, name: string)` → `src/app/admin/entity-actions.ts:96`
+- `function list(formData: FormData, name: string)` → `src/app/admin/entity-actions.ts:104`
+- `function slugCopy(value: string)` → `src/app/admin/entity-actions.ts:109`
+
+### `src/app/admin/envios/page.tsx` (51 líneas)
+- `function Page()` → `src/app/admin/envios/page.tsx:8`
 
 ### `src/app/admin/error.tsx` (28 líneas)
 - (sin símbolos públicos detectados)
@@ -385,11 +417,16 @@
 ### `src/app/admin/inventario/page.tsx` (23 líneas)
 - `function AdminInventoryPage()` → `src/app/admin/inventario/page.tsx:10`
 
-### `src/app/admin/layout.tsx` (28 líneas)
-- `function AdminLayout({ children }: { children: React.ReactNode })` → `src/app/admin/layout.tsx:16`
+### `src/app/admin/layout.tsx` (19 líneas)
+- `function AdminLayout({ children }: { children: React.ReactNode })` → `src/app/admin/layout.tsx:15`
 
-### `src/app/admin/medios/actions.ts` (43 líneas)
-- `function uploadMediaAction(formData: FormData)` → `src/app/admin/medios/actions.ts:10`
+### `src/app/admin/medios/media-forms.tsx` (76 líneas)
+- `function MediaUploadForm()` → `src/app/admin/medios/media-forms.tsx:23`
+- `function MediaEditForm({ id, altText }: { id: string; altText: string })` → `src/app/admin/medios/media-forms.tsx:43`
+- `function MediaDeleteForm({ id }: { id: string })` → `src/app/admin/medios/media-forms.tsx:60`
+
+### `src/app/admin/medios/page.tsx` (82 líneas)
+- `function fileSize(bytes: number)` → `src/app/admin/medios/page.tsx:11`
 
 ### `src/app/admin/not-found.tsx` (17 líneas)
 - `function AdminNotFound()` → `src/app/admin/not-found.tsx:4`
@@ -400,23 +437,32 @@
 ### `src/app/admin/pagos/page.tsx` (18 líneas)
 - `function Page()` → `src/app/admin/pagos/page.tsx:8`
 
-### `src/app/admin/pedidos/page.tsx` (24 líneas)
-- `function AdminOrdersPage()` → `src/app/admin/pedidos/page.tsx:11`
+### `src/app/admin/pedidos/[id]/page.tsx` (56 líneas)
+- `function OrderDetailPage({ params }: { params: Promise<{ id: string }> })` → `src/app/admin/pedidos/[id]/page.tsx:14`
 
-### `src/app/admin/popups/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/popups/page.tsx:5`
+### `src/app/admin/pedidos/page.tsx` (25 líneas)
+- `function AdminOrdersPage()` → `src/app/admin/pedidos/page.tsx:12`
+
+### `src/app/admin/popups/page.tsx` (39 líneas)
+- `function Page()` → `src/app/admin/popups/page.tsx:8`
+
+### `src/app/admin/productos/[id]/page.tsx` (30 líneas)
+- `function ProductDetailPage({ params }: { params: Promise<{ id: string }> })` → `src/app/admin/productos/[id]/page.tsx:9`
 
 ### `src/app/admin/productos/csv-import-form.tsx` (16 líneas)
 - `function CsvImportForm()` → `src/app/admin/productos/csv-import-form.tsx:7`
 
-### `src/app/admin/productos/page.tsx` (45 líneas)
-- `function AdminProductsPage()` → `src/app/admin/productos/page.tsx:12`
+### `src/app/admin/productos/page.tsx` (46 líneas)
+- `function AdminProductsPage()` → `src/app/admin/productos/page.tsx:13`
 
-### `src/app/admin/promociones/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/promociones/page.tsx:5`
+### `src/app/admin/productos/product-editor.tsx` (69 líneas)
+- `type Option` → `src/app/admin/productos/product-editor.tsx:7`
 
-### `src/app/admin/recompensas/page.tsx` (9 líneas)
-- `function Page()` → `src/app/admin/recompensas/page.tsx:5`
+### `src/app/admin/promociones/page.tsx` (29 líneas)
+- `function Page()` → `src/app/admin/promociones/page.tsx:19`
+
+### `src/app/admin/recompensas/page.tsx` (36 líneas)
+- `function Page()` → `src/app/admin/recompensas/page.tsx:26`
 
 ### `src/app/admin/simulador/actions.ts` (147 líneas)
 - `function saveTryOnTextureAction(formData: FormData)` → `src/app/admin/simulador/actions.ts:31`
@@ -506,23 +552,36 @@
 ### `src/components/admin/admin-dev-banner.tsx` (19 líneas)
 - `function AdminDevBanner()` → `src/components/admin/admin-dev-banner.tsx:8`
 
+### `src/components/admin/admin-entity-form.tsx` (110 líneas)
+- `type AdminEntityField` → `src/components/admin/admin-entity-form.tsx:7`
+- `type FieldValue` → `src/components/admin/admin-entity-form.tsx:19`
+
+### `src/components/admin/admin-entity-section.tsx` (57 líneas)
+- `type FieldValue` → `src/components/admin/admin-entity-section.tsx:3`
+
 ### `src/components/admin/admin-logout-button.tsx` (38 líneas)
 - `function AdminLogoutButton()` → `src/components/admin/admin-logout-button.tsx:6`
 
 ### `src/components/admin/admin-module-placeholder.tsx` (39 líneas)
 - (sin símbolos públicos detectados)
 
-### `src/components/admin/admin-page-header.tsx` (9 líneas)
-- `function AdminPageHeader({ title, description }: { title: string; description?: string })` → `src/components/admin/admin-page-header.tsx:1`
-
-### `src/components/admin/admin-record-list.tsx` (23 líneas)
+### `src/components/admin/admin-page-header.tsx` (20 líneas)
 - (sin símbolos públicos detectados)
 
-### `src/components/admin/admin-sidebar.tsx` (60 líneas)
-- `function AdminSidebar({ className }: { className?: string })` → `src/components/admin/admin-sidebar.tsx:9`
+### `src/components/admin/admin-record-list.tsx` (119 líneas)
+- `type AdminRecordRow` → `src/components/admin/admin-record-list.tsx:8`
 
-### `src/components/admin/admin-topbar.tsx` (19 líneas)
-- `function AdminTopbar({ name }: { name: string })` → `src/components/admin/admin-topbar.tsx:4`
+### `src/components/admin/admin-shell.tsx` (36 líneas)
+- (sin símbolos públicos detectados)
+
+### `src/components/admin/admin-sidebar.tsx` (70 líneas)
+- (sin símbolos públicos detectados)
+
+### `src/components/admin/admin-status-badge.tsx` (20 líneas)
+- `function AdminStatusBadge({ status }: { status: string })` → `src/components/admin/admin-status-badge.tsx:4`
+
+### `src/components/admin/admin-topbar.tsx` (41 líneas)
+- (sin símbolos públicos detectados)
 
 ### `src/components/store/add-to-cart-button.tsx` (77 líneas)
 - (sin símbolos públicos detectados)
@@ -954,9 +1013,9 @@
 ### `src/instrumentation.ts` (10 líneas)
 - `function register()` → `src/instrumentation.ts:3`
 
-### `src/lib/admin-nav.ts` (93 líneas)
-- `type AdminNavItem` → `src/lib/admin-nav.ts:26`
-- `type AdminNavGroup` → `src/lib/admin-nav.ts:32`
+### `src/lib/admin-nav.ts` (95 líneas)
+- `type AdminNavItem` → `src/lib/admin-nav.ts:27`
+- `type AdminNavGroup` → `src/lib/admin-nav.ts:33`
 
 ### `src/lib/colombia-locations.ts` (43 líneas)
 - `type DepartmentOption` → `src/lib/colombia-locations.ts:7`
@@ -989,6 +1048,14 @@
 
 ### `src/lib/utils.ts` (7 líneas)
 - `function cn(...inputs: ClassValue[])` → `src/lib/utils.ts:4`
+
+### `src/modules/admin/action-state.ts` (18 líneas)
+- `type AdminActionState` → `src/modules/admin/action-state.ts:1`
+- `function actionError(error: unknown)` → `src/modules/admin/action-state.ts:12`
+
+### `src/modules/admin/status-labels.ts` (47 líneas)
+- `function adminStatusLabel(status: string)` → `src/modules/admin/status-labels.ts:31`
+- `function adminStatusTone(status: string)` → `src/modules/admin/status-labels.ts:35`
 
 ### `src/modules/analytics/analytics-context.tsx` (98 líneas)
 - `type ConsentState` → `src/modules/analytics/analytics-context.tsx:7`
@@ -1166,20 +1233,20 @@
 > Antes de cambiar una firma aquí, revisa a sus importadores.
 
 - `src/infrastructure/db/schema/_helpers.ts` ← `src/infrastructure/db/schema/cart.ts`, `src/infrastructure/db/schema/catalog.ts`, `src/infrastructure/db/schema/content.ts`, `src/infrastructure/db/schema/customers.ts`, `src/infrastructure/db/schema/identity.ts`, `src/infrastructure/db/schema/inventory.ts`, `src/infrastructure/db/schema/marketing.ts`, `src/infrastructure/db/schema/orders.ts`, `src/infrastructure/db/schema/payments.ts`, `src/infrastructure/db/schema/shipping.ts`, `src/infrastructure/db/schema/system.ts`, `src/infrastructure/db/schema/try-on.ts`
-- `src/app/admin/actions.ts` ← `src/app/admin/inventario/page.tsx`, `src/app/admin/pagos/page.tsx`, `src/app/admin/pedidos/page.tsx`, `src/app/admin/productos/page.tsx`, `src/app/admin/usuarios/page.tsx`
+- `src/app/admin/actions.ts` ← `src/app/admin/inventario/page.tsx`, `src/app/admin/pagos/page.tsx`, `src/app/admin/pedidos/[id]/page.tsx`, `src/app/admin/pedidos/page.tsx`, `src/app/admin/productos/page.tsx`, `src/app/admin/usuarios/page.tsx`
 - `src/infrastructure/db/schema/index.ts` ← `src/infrastructure/db/client.ts`, `src/infrastructure/db/seed.ts`
 - `src/components/store/brand-mark.tsx` ← `src/components/store/site-footer.tsx`, `src/components/store/site-header.tsx`
+- `src/app/admin/medios/actions.ts` ← `src/app/admin/medios/media-forms.tsx`
+- `src/app/admin/productos/detail-actions.ts` ← `src/app/admin/productos/product-editor.tsx`
 - `src/app/(store)/pedidos/consultar/actions.ts` ← `src/app/(store)/pedidos/consultar/lookup-form.tsx`
 - `src/app/acceso-admin/actions.ts` ← `src/app/acceso-admin/login-form.tsx`
+- `src/app/admin/clientes/actions.ts` ← `src/app/admin/clientes/customer-editor.tsx`
 - `src/infrastructure/db/client.ts` ← `src/infrastructure/db/migrate.ts`, `src/infrastructure/db/seed.ts`
 - `src/app/admin/productos/csv-actions.ts` ← `src/app/admin/productos/csv-import-form.tsx`
 - `src/infrastructure/db/schema/customers.ts` ← `src/infrastructure/db/schema/cart.ts`, `src/infrastructure/db/schema/orders.ts`
 - `src/infrastructure/db/schema/orders.ts` ← `src/infrastructure/db/schema/marketing.ts`, `src/infrastructure/db/schema/payments.ts`, `src/infrastructure/db/schema/shipping.ts`
 - `src/infrastructure/db/schema/catalog.ts` ← `src/infrastructure/db/schema/cart.ts`, `src/infrastructure/db/schema/inventory.ts`, `src/infrastructure/db/schema/try-on.ts`
-- `scripts/apply-local-patches.mjs` ← `scripts/run-cloudflare.mjs`
-- `src/app/(store)/pedidos/consultar/lookup-form.tsx` ← `src/app/(store)/pedidos/consultar/page.tsx`
-- `src/app/acceso-admin/login-form.tsx` ← `src/app/acceso-admin/page.tsx`
-- `src/app/admin/configuracion/actions.ts` ← `src/app/admin/configuracion/page.tsx`
+- `next.config.ts` ← `tests/unit/transfer-proof.test.ts`
 
 ## 5. Grafo de dependencias locales (Python + JS/TS)
 
@@ -1188,15 +1255,24 @@
 - `src/app/(store)/pedidos/consultar/page.tsx` importa: `src/app/(store)/pedidos/consultar/lookup-form.tsx`
 - `src/app/acceso-admin/login-form.tsx` importa: `src/app/acceso-admin/actions.ts`
 - `src/app/acceso-admin/page.tsx` importa: `src/app/acceso-admin/login-form.tsx`
+- `src/app/admin/clientes/[id]/page.tsx` importa: `src/app/admin/clientes/customer-editor.tsx`
+- `src/app/admin/clientes/customer-editor.tsx` importa: `src/app/admin/clientes/actions.ts`
 - `src/app/admin/configuracion/page.tsx` importa: `src/app/admin/configuracion/actions.ts`
 - `src/app/admin/inventario/page.tsx` importa: `src/app/admin/actions.ts`
+- `src/app/admin/medios/media-forms.tsx` importa: `src/app/admin/medios/actions.ts`
+- `src/app/admin/medios/page.tsx` importa: `src/app/admin/medios/media-forms.tsx`
 - `src/app/admin/pagos/page.tsx` importa: `src/app/admin/actions.ts`
+- `src/app/admin/pedidos/[id]/page.tsx` importa: `src/app/admin/actions.ts`
 - `src/app/admin/pedidos/page.tsx` importa: `src/app/admin/actions.ts`
+- `src/app/admin/productos/[id]/page.tsx` importa: `src/app/admin/productos/product-editor.tsx`
 - `src/app/admin/productos/csv-import-form.tsx` importa: `src/app/admin/productos/csv-actions.ts`
 - `src/app/admin/productos/page.tsx` importa: `src/app/admin/actions.ts`, `src/app/admin/productos/csv-import-form.tsx`
+- `src/app/admin/productos/product-editor.tsx` importa: `src/app/admin/productos/detail-actions.ts`
 - `src/app/admin/simulador/page.tsx` importa: `src/app/admin/simulador/actions.ts`
 - `src/app/admin/usuarios/page.tsx` importa: `src/app/admin/actions.ts`
+- `src/components/admin/admin-entity-section.tsx` importa: `src/components/admin/admin-entity-form.tsx`
 - `src/components/admin/admin-record-list.tsx` importa: `src/components/admin/admin-page-header.tsx`
+- `src/components/admin/admin-shell.tsx` importa: `src/components/admin/admin-sidebar.tsx`, `src/components/admin/admin-topbar.tsx`
 - `src/components/store/site-footer.tsx` importa: `src/components/store/brand-mark.tsx`
 - `src/components/store/site-header.tsx` importa: `src/components/store/brand-mark.tsx`
 - `src/components/store/try-on/try-on-launcher.tsx` importa: `src/components/store/try-on/try-on-simulator.tsx`

@@ -6,18 +6,27 @@ import { cn } from "@/lib/utils";
 import { ADMIN_NAV_GROUPS } from "@/lib/admin-nav";
 import { siteConfig } from "@/lib/site-config";
 
-export function AdminSidebar({ className }: { className?: string }) {
+export function AdminSidebar({
+  className,
+  open = false,
+  onNavigate,
+}: {
+  className?: string;
+  open?: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
     <aside
       className={cn(
-        "flex h-full w-64 shrink-0 flex-col border-r border-border bg-surface-raised",
+        "fixed inset-y-0 left-0 z-40 flex h-dvh w-72 shrink-0 -translate-x-full flex-col border-r border-border bg-surface-raised shadow-lg transition-transform lg:sticky lg:top-0 lg:z-20 lg:w-64 lg:translate-x-0 lg:shadow-none",
+        open && "translate-x-0",
         className,
       )}
     >
       <div className="flex h-16 items-center border-b border-border px-5">
-        <Link href="/admin" className="font-display text-lg font-semibold text-text">
+        <Link href="/admin" onClick={onNavigate} className="font-display text-lg font-semibold text-text">
           {siteConfig.brandName}
           <span className="ml-2 text-xs font-normal text-text-subtle">Panel</span>
         </Link>
@@ -31,12 +40,13 @@ export function AdminSidebar({ className }: { className?: string }) {
             </p>
             <ul className="mt-1.5 flex flex-col gap-0.5">
               {group.items.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(`${item.href}/`));
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={onNavigate}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-text-muted transition-colors duration-fast",

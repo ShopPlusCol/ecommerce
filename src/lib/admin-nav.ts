@@ -21,6 +21,7 @@ import {
   Wallet,
   ChartBar,
   Activity,
+  Images,
 } from "lucide-react";
 
 export type AdminNavItem = {
@@ -76,6 +77,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { href: "/admin/editor", label: "Editor visual", icon: Blocks },
       { href: "/admin/contenido", label: "Contenido", icon: Newspaper },
+      { href: "/admin/medios", label: "Multimedia", icon: Images },
     ],
   },
   {
