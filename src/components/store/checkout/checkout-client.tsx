@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Loader2, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +16,7 @@ import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 import { DEPARTMENTS, MEDELLIN_NEIGHBORHOODS, citiesForDepartment, isMedellin } from "@/lib/colombia-locations";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
-import { LAST_ORDER_KEY } from "@/modules/checkout/last-order";
+import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
 type LocationForm = {
@@ -39,7 +38,6 @@ const EMPTY_LOCATION: LocationForm = {
 };
 
 export function CheckoutClient() {
-  const router = useRouter();
   const { cart, lines, coupon, rewards, totals, clearCart, isHydrated } = useCart();
   const { track, consent: analyticsConsent } = useAnalytics();
   const idempotencyKey = React.useRef(crypto.randomUUID());
@@ -194,11 +192,7 @@ export function CheckoutClient() {
       // Si no hay sessionStorage, la confirmación mostrará un estado genérico.
     }
     clearCart();
-    if (result.order.checkoutUrl) {
-      window.location.assign(result.order.checkoutUrl);
-      return;
-    }
-    router.push("/checkout/confirmacion");
+    window.location.assign(resolveCheckoutDestination(result.order.checkoutUrl));
   };
 
   return (
