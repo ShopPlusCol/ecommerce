@@ -18,7 +18,7 @@ export function WhatsAppCartButton({ onClick }: { onClick?: () => void }) {
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex h-control-md w-full items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#128C4B] transition-colors duration-fast hover:bg-[#25D366]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+      className="inline-flex h-control-md w-full items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#0F7F43] transition-colors duration-fast hover:bg-[#25D366]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
     >
       <MessageCircle className="h-4 w-4" aria-hidden="true" />
       Enviar carrito por WhatsApp

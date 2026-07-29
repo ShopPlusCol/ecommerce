@@ -3,6 +3,7 @@ import { SiteFooter } from "@/components/store/site-footer";
 import { WhatsAppFloatButton } from "@/components/store/whatsapp-float-button";
 import { StoreProviders } from "@/components/store/store-providers";
 import { ConsentBanner } from "@/components/store/consent-banner";
+import { MaintenanceNotice } from "@/components/store/maintenance-notice";
 import { promotionsRepository } from "@/lib/container";
 import { getBrandSettings } from "@/modules/settings/brand";
 
@@ -13,11 +14,12 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     promotionsRepository.listActiveRewardRules(),
     getBrandSettings(),
   ]);
+  const maintenance = process.env.MAINTENANCE_MODE === "true";
 
   return (
     <StoreProviders rewardRules={rewardRules}>
       <SiteHeader brand={brand} />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">{maintenance ? <MaintenanceNotice /> : children}</main>
       <SiteFooter brand={brand} />
       <WhatsAppFloatButton brand={brand} />
       <ConsentBanner />

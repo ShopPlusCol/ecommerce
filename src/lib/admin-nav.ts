@@ -14,11 +14,13 @@ import {
   Package,
   Plug,
   ShoppingCart,
+  ScanFace,
   Tags,
   Ticket,
   Users,
   Wallet,
   ChartBar,
+  Activity,
 } from "lucide-react";
 
 export type AdminNavItem = {
@@ -50,6 +52,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     title: "Catálogo",
     items: [
       { href: "/admin/productos", label: "Productos", icon: Package },
+      { href: "/admin/simulador", label: "Simulador", icon: ScanFace },
       { href: "/admin/inventario", label: "Inventario", icon: Layers },
       { href: "/admin/categorias", label: "Categorías", icon: Tags },
       { href: "/admin/colecciones", label: "Colecciones", icon: ShoppingCart },
@@ -83,6 +86,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { href: "/admin/usuarios", label: "Usuarios y roles", icon: Users },
       { href: "/admin/auditoria", label: "Auditoría", icon: History },
       { href: "/admin/configuracion", label: "Configuración", icon: Cog },
+      { href: "/admin/estado", label: "Estado del sistema", icon: Activity },
     ],
   },
 ];

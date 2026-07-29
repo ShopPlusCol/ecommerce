@@ -9,8 +9,9 @@ import { ProductCard } from "@/components/store/product-card";
 import { ProductPurchasePanel } from "@/components/store/product/product-purchase-panel";
 import { ProductStickyBar } from "@/components/store/product/product-sticky-bar";
 import { CartUpsells } from "@/components/store/cart/cart-upsells";
+import { TryOnLauncher } from "@/components/store/try-on/try-on-launcher";
 import { formatMoney } from "@/domain/value-objects/money";
-import { catalogRepository } from "@/lib/container";
+import { catalogRepository, tryOnRepository } from "@/lib/container";
 import { siteConfig } from "@/lib/site-config";
 import { productJsonLd } from "@/lib/seo";
 
@@ -46,6 +47,8 @@ export default async function ProductPage({ params }: Params) {
     catalogRepository.getRelatedProducts(product.id, 4),
     catalogRepository.getUpsellProducts(product.id, 3),
   ]);
+  const tryOnProducts = [product, ...related].filter((item) => item.sku.startsWith("SPC-LEN"));
+  const tryOnTextures = await tryOnRepository.listApprovedByProductIds(tryOnProducts.map((item) => item.id));
 
   const cover = product.media[0];
   const jsonLd = productJsonLd(product);
@@ -98,6 +101,10 @@ export default async function ProductPage({ params }: Params) {
             </div>
 
             <ProductPurchasePanel product={product} />
+
+            {product.sku.startsWith("SPC-LEN") ? (
+              <TryOnLauncher products={tryOnProducts} textures={tryOnTextures} />
+            ) : null}
 
             {/* Envío y pagos, fácil de comprender (sección 9) */}
             <div className="grid gap-3 rounded-xl border border-border p-4 text-sm sm:grid-cols-2">

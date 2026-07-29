@@ -77,7 +77,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex h-control-md items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#128C4B] transition-colors duration-fast hover:bg-[#25D366]/10"
+        className="inline-flex h-control-md items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#0F7F43] transition-colors duration-fast hover:bg-[#25D366]/10"
       >
         <MessageCircle className="h-4 w-4" aria-hidden="true" />
         Preguntar por WhatsApp

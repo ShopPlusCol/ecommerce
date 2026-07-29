@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Textura base de iris">
+  <defs>
+    <radialGradient id="iris" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#111" stop-opacity="0"/>
+      <stop offset=".24" stop-color="#111" stop-opacity=".12"/>
+      <stop offset=".3" stop-color="#ddd" stop-opacity=".9"/>
+      <stop offset=".68" stop-color="#777" stop-opacity=".82"/>
+      <stop offset=".94" stop-color="#222" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#111" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="fibers">
+      <feTurbulence type="fractalNoise" baseFrequency=".08 1.4" numOctaves="2" seed="9"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+      <feBlend in="SourceGraphic" mode="multiply"/>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#iris)"/>
+  <circle cx="100" cy="100" r="94" fill="url(#iris)" filter="url(#fibers)" opacity=".65"/>
+  <circle cx="100" cy="100" r="28" fill="#111" fill-opacity=".03"/>
+</svg>

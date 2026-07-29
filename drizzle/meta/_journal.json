@@ -36,6 +36,20 @@
       "when": 1785351087830,
       "tag": "0004_robust_silverclaw",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785355357569,
+      "tag": "0005_smiling_kid_colt",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785356378476,
+      "tag": "0006_sparkling_vapor",
+      "breakpoints": true
     }
   ]
 }

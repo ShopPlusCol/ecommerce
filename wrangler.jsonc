@@ -4,7 +4,7 @@
   "main": ".open-next/worker.js",
   // Fecha de compatibilidad conocida y estable. Antes de desplegar a
   // producción, confirma si conviene actualizarla (ver docs/DEPLOYMENT.md).
-  "compatibility_date": "2024-09-23",
+  "compatibility_date": "2026-07-29",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
     "directory": ".open-next/assets",
@@ -22,7 +22,8 @@
       // Crea la base con `npx wrangler d1 create shoppluscol-db` y pega aquí
       // el database_id real antes de desplegar (ver docs/DEPLOYMENT.md).
       "database_name": "shoppluscol-db",
-      "database_id": "REPLACE_WITH_REAL_D1_DATABASE_ID"
+      "database_id": "REPLACE_WITH_REAL_D1_DATABASE_ID",
+      "migrations_dir": "drizzle"
     }
   ],
   "r2_buckets": [
@@ -39,6 +40,47 @@
     "binding": "IMAGES"
   },
   "vars": {
-    "MAINTENANCE_MODE": "false"
+    "MAINTENANCE_MODE": "false",
+    "CLOUDFLARE_WORKER": "1"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "env": {
+    "staging": {
+      "name": "shoppluscol-ecommerce-staging",
+      "vars": {
+        "MAINTENANCE_MODE": "true",
+        "CLOUDFLARE_WORKER": "1"
+      },
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "shoppluscol-ecommerce-staging"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "shoppluscol-db-staging",
+          "database_id": "REPLACE_WITH_STAGING_D1_DATABASE_ID",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "NEXT_INC_CACHE_R2_BUCKET",
+          "bucket_name": "shoppluscol-ecommerce-staging-cache"
+        },
+        {
+          "binding": "MEDIA_BUCKET",
+          "bucket_name": "shoppluscol-media-staging"
+        }
+      ],
+      "images": {
+        "binding": "IMAGES"
+      }
+    }
   }
 }

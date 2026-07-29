@@ -109,3 +109,14 @@ export const idempotencyKeys = sqliteTable("idempotency_keys", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+/** Contadores efímeros y anonimizados para limitar abuso en rutas públicas. */
+export const requestRateLimits = sqliteTable("request_rate_limits", {
+  key: text("key").primaryKey(),
+  scope: text("scope").notNull(),
+  count: integer("count").notNull().default(1),
+  resetAt: integer("reset_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});

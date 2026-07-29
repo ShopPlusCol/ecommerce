@@ -68,3 +68,35 @@ export async function saveManualTransferSettingsAction(formData: FormData) {
   await db.insert(auditLogs).values({ userId: session.user.id, action: "settings.manual_transfer.update", entityType: "setting", entityId: "manual_transfer", after: parsed });
   revalidatePath("/admin/configuracion");
 }
+
+export async function savePrivacySettingsAction(formData: FormData) {
+  const session = await requirePermission("settings", "update");
+  const parsed = z.object({
+    policyVersion: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+    controllerName: z.string().trim().min(1).max(160),
+    legalId: z.string().trim().max(80),
+    address: z.string().trim().max(240),
+    privacyEmail: z.string().trim().email(),
+    orderRetentionMonths: z.coerce.number().int().min(1).max(240),
+    proofRetentionMonths: z.coerce.number().int().min(1).max(240),
+    auditRetentionMonths: z.coerce.number().int().min(1).max(240),
+    legalReviewStatus: z.enum(["pending", "reviewed"]),
+  }).parse(Object.fromEntries(formData));
+  const db = await getRuntimeDb();
+  const [before] = await db.select().from(settings).where(eq(settings.key, "privacy")).limit(1);
+  await db.insert(settings).values({ key: "privacy", value: parsed, updatedByUserId: session.user.id })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value: parsed, updatedByUserId: session.user.id, updatedAt: new Date() },
+    });
+  await db.insert(auditLogs).values({
+    userId: session.user.id,
+    action: "settings.privacy.update",
+    entityType: "setting",
+    entityId: "privacy",
+    before: before?.value as Record<string, unknown> | undefined,
+    after: parsed,
+  });
+  revalidatePath("/privacidad");
+  revalidatePath("/admin/configuracion");
+}

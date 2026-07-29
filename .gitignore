@@ -65,3 +65,4 @@ docker-compose.override.yml
 
 # Caché local del índice de proyecto
 .index_cache.json
+.codebase-memory/

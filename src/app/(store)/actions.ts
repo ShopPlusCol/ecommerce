@@ -34,6 +34,7 @@ import {
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { releaseExpiredReservations } from "@/modules/inventory/reservations";
 import { getManualTransferSettings } from "@/modules/settings/manual-transfer";
+import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit";
 
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
@@ -116,6 +117,12 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
  * la Fase 3.
  */
 export async function createDemoOrderAction(input: CreateDemoOrderInput): Promise<CreateDemoOrderResult> {
+  try {
+    await enforceRateLimit("checkout", 8, 10 * 60);
+  } catch (error) {
+    if (error instanceof RateLimitError) return { ok: false, error: error.message };
+    throw error;
+  }
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Revisa los datos del formulario." };
   const data = parsed.data;
@@ -180,8 +187,8 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   let attribution: Record<string, string> = {};
   let firstAttribution: Record<string, string> = {};
   try {
-    attribution = JSON.parse(cookieStore.get("shoppluscol_utm_last")?.value ?? "{}") as Record<string, string>;
-    firstAttribution = JSON.parse(cookieStore.get("shoppluscol_utm_first")?.value ?? "{}") as Record<string, string>;
+    attribution = JSON.parse(decodeURIComponent(cookieStore.get("shoppluscol_utm_last")?.value ?? "%7B%7D")) as Record<string, string>;
+    firstAttribution = JSON.parse(decodeURIComponent(cookieStore.get("shoppluscol_utm_first")?.value ?? "%7B%7D")) as Record<string, string>;
   } catch {
     attribution = {};
     firstAttribution = {};
