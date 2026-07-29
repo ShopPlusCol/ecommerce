@@ -132,4 +132,21 @@ describe("resolveShippingQuote — jerarquía país › depto › ciudad › bar
     }, money(50_000));
     expect(quote?.ruleId).toBe("co");
   });
+
+  it("respeta los límites de valor configurados por regla", () => {
+    const limited = rule({
+      ruleId: "limited",
+      minOrderAmount: money(50_000),
+      maxOrderAmount: money(150_000),
+    });
+    const target = {
+      country: "CO",
+      department: "Antioquia",
+      city: "Medellín",
+      neighborhood: null,
+    };
+    expect(resolveShippingQuote([limited], target, money(49_999))).toBeNull();
+    expect(resolveShippingQuote([limited], target, money(50_000))?.ruleId).toBe("limited");
+    expect(resolveShippingQuote([limited], target, money(150_001))).toBeNull();
+  });
 });

@@ -28,6 +28,9 @@ export class DrizzleShippingResolver implements ShippingRateResolver {
         estimatedBusinessDaysMax: rule.estimatedBusinessDaysMax,
         sameDayCutoffHour: rule.sameDayCutoffHour,
         customerMessage: rule.customerMessage ?? "",
+        minOrderAmount: rule.minOrderAmount === null ? null : money(rule.minOrderAmount),
+        maxOrderAmount: rule.maxOrderAmount === null ? null : money(rule.maxOrderAmount),
+        allowedPaymentMethods: rule.allowedPaymentMethods,
         priority: rule.priority,
         status: rule.status,
       }));

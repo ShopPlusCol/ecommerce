@@ -23,6 +23,10 @@ import {
 
 const altTextSchema = z.string().trim().max(180, "El texto alternativo admite máximo 180 caracteres.");
 
+export type InlineMediaUploadResult =
+  | { status: "success"; message: string; asset: { id: string; url: string; altText: string } }
+  | { status: "error"; message: string };
+
 async function mediaReferenceCount(id: string, url: string) {
   const db = await getRuntimeDb();
   const [productRows, categoryRows, promotionRows, popupRows, proofRows, textureRows, sectionRows] = await Promise.all([
@@ -49,22 +53,10 @@ async function mediaReferenceCount(id: string, url: string) {
   );
 }
 
-export async function uploadMediaAction(
-  _previousState: AdminActionState,
-  formData: FormData,
-): Promise<AdminActionState> {
+async function persistMediaFile(file: File, altText: string, userId: string) {
   let storedKey: string | null = null;
   let insertedAssetId: string | null = null;
   try {
-    const session = await requirePermission("media", "create");
-    const file = formData.get("file");
-    const parsedAlt = altTextSchema.safeParse(formData.get("altText") ?? "");
-    if (!parsedAlt.success) {
-      return { status: "error", message: parsedAlt.error.issues[0]?.message ?? "Texto alternativo inválido." };
-    }
-    if (!(file instanceof File) || file.size === 0) {
-      return { status: "error", message: "Selecciona un archivo para cargar." };
-    }
     const validated = validateMedia(new Uint8Array(await file.arrayBuffer()), file.type);
     const extension = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1].replace("+xml", "");
     const key = `${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${extension}`;
@@ -83,22 +75,21 @@ export async function uploadMediaAction(
         url: stored.url,
         contentType: stored.contentType,
         sizeBytes: stored.size,
-        altText: parsedAlt.data,
+        altText,
         width: validated.width,
         height: validated.height,
-        uploadedByUserId: session.user.id,
+        uploadedByUserId: userId,
       })
       .returning();
     insertedAssetId = asset.id;
     await db.insert(auditLogs).values({
-      userId: session.user.id,
+      userId,
       action: "media.upload",
       entityType: "media_asset",
       entityId: asset.id,
       after: { contentType: asset.contentType, sizeBytes: asset.sizeBytes, altText: asset.altText },
     });
-    revalidatePath("/admin/medios");
-    return { status: "success", message: "Archivo cargado y registrado correctamente." };
+    return asset;
   } catch (error) {
     if (insertedAssetId) {
       try {
@@ -114,7 +105,48 @@ export async function uploadMediaAction(
         // El error original se conserva; el objeto huérfano puede limpiarse desde mantenimiento.
       }
     }
+    throw error;
+  }
+}
+
+function parseMediaInput(formData: FormData) {
+  const file = formData.get("file");
+  const altText = altTextSchema.parse(formData.get("altText") ?? "");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Selecciona un archivo para cargar.");
+  }
+  return { file, altText };
+}
+
+export async function uploadMediaAction(
+  _previousState: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("media", "create");
+    const { file, altText } = parseMediaInput(formData);
+    await persistMediaFile(file, altText, session.user.id);
+    revalidatePath("/admin/medios");
+    return { status: "success", message: "Archivo cargado y registrado correctamente." };
+  } catch (error) {
     return actionError(error);
+  }
+}
+
+export async function uploadMediaInlineAction(formData: FormData): Promise<InlineMediaUploadResult> {
+  try {
+    const session = await requirePermission("media", "create");
+    const { file, altText } = parseMediaInput(formData);
+    const asset = await persistMediaFile(file, altText, session.user.id);
+    revalidatePath("/admin/medios");
+    return {
+      status: "success",
+      message: "Imagen cargada y seleccionada.",
+      asset: { id: asset.id, url: asset.url, altText: asset.altText ?? altText },
+    };
+  } catch (error) {
+    const state = actionError(error);
+    return { status: "error", message: state.message };
   }
 }
 

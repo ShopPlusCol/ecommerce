@@ -48,6 +48,10 @@ export const shippingRules = sqliteTable(
     minOrderAmount: integer("min_order_amount"),
     maxOrderAmount: integer("max_order_amount"),
     excludedProductIds: text("excluded_product_ids", { mode: "json" }).$type<string[]>(),
+    allowedPaymentMethods: text("allowed_payment_methods", { mode: "json" })
+      .$type<Array<"mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full">>()
+      .notNull()
+      .default(["mercado_pago", "cash_on_delivery", "shipping_advance_transfer", "transfer_full"]),
     customerMessage: text("customer_message"),
     internalInstructions: text("internal_instructions"),
     priority: integer("priority").notNull().default(0),

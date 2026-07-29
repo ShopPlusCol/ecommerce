@@ -21,6 +21,8 @@ export const tryOnTextures = sqliteTable(
       .default("multiply"),
     scaleX: integer("scale_x").notNull().default(100),
     scaleY: integer("scale_y").notNull().default(100),
+    offsetX: integer("offset_x").notNull().default(0),
+    offsetY: integer("offset_y").notNull().default(0),
     rotationOffset: integer("rotation_offset").notNull().default(0),
     perspectiveStrength: integer("perspective_strength").notNull().default(0),
     colorCorrection: text("color_correction", { mode: "json" })

@@ -26,6 +26,9 @@ export type ShippingQuote = {
   estimatedBusinessDaysMax: number;
   sameDayCutoffHour: number | null;
   customerMessage: string;
+  allowedPaymentMethods?: Array<
+    "mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full"
+  >;
 };
 
 export interface ShippingRateResolver {

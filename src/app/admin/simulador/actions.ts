@@ -20,6 +20,8 @@ const textureSchema = z.object({
   blendMode: z.enum(["multiply", "overlay", "soft-light", "source-over"]),
   scaleX: z.coerce.number().int().min(60).max(180),
   scaleY: z.coerce.number().int().min(60).max(180),
+  offsetX: z.coerce.number().int().min(-20).max(20),
+  offsetY: z.coerce.number().int().min(-20).max(20),
   rotationOffset: z.coerce.number().int().min(-45).max(45),
   perspectiveStrength: z.coerce.number().int().min(-50).max(50),
   tint: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
@@ -89,6 +91,8 @@ export async function saveTryOnTextureAction(formData: FormData) {
     blendMode: parsed.data.blendMode,
     scaleX: parsed.data.scaleX,
     scaleY: parsed.data.scaleY,
+    offsetX: parsed.data.offsetX,
+    offsetY: parsed.data.offsetY,
     rotationOffset: parsed.data.rotationOffset,
     perspectiveStrength: parsed.data.perspectiveStrength,
     colorCorrection: {

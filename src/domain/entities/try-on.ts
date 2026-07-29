@@ -10,6 +10,8 @@ export type TryOnTexture = {
   blendMode: TryOnBlendMode;
   scaleX: number;
   scaleY: number;
+  offsetX: number;
+  offsetY: number;
   rotationOffset: number;
   perspectiveStrength: number;
   colorCorrection: {

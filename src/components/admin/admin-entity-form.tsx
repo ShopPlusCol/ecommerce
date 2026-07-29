@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import { adminEntityAction } from "@/app/admin/entity-actions";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
+import { AdminMediaUrlField } from "./admin-media-url-field";
 
 export type AdminEntityField = {
   name: string;
   label: string;
-  type?: "text" | "number" | "textarea" | "select" | "checkbox" | "datetime-local" | "url";
+  type?: "text" | "number" | "textarea" | "select" | "multiselect" | "checkbox" | "datetime-local" | "url";
   required?: boolean;
   min?: number;
   max?: number;
@@ -42,6 +43,17 @@ export function AdminEntityForm({
       {fields.map((field) => {
         const value = values[field.name];
         const commonClassName = "h-10 rounded-md border border-border bg-surface px-3 text-sm font-normal";
+        if (field.type === "url" && field.name.toLocaleLowerCase("es-CO").includes("image")) {
+          return (
+            <AdminMediaUrlField
+              key={field.name}
+              name={field.name}
+              label={field.label}
+              value={String(value ?? "")}
+              required={field.required}
+            />
+          );
+        }
         if (field.type === "checkbox") {
           return (
             <label key={field.name} className="flex items-center gap-2 text-sm font-medium">
@@ -66,6 +78,24 @@ export function AdminEntityForm({
                 {!field.required ? <option value="">Sin asignar</option> : null}
                 {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
+            </label>
+          );
+        }
+        if (field.type === "multiselect") {
+          const selected = String(value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+          return (
+            <label key={field.name} className="grid gap-1 text-sm font-medium">
+              {field.label}
+              <select
+                name={field.name}
+                multiple
+                required={field.required}
+                defaultValue={selected}
+                className="min-h-32 rounded-md border border-border bg-surface p-2 text-sm font-normal"
+              >
+                {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <span className="text-xs font-normal text-text-muted">Mantén Ctrl o Cmd para seleccionar varios.</span>
             </label>
           );
         }

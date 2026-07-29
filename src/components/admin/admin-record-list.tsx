@@ -19,12 +19,16 @@ export function AdminRecordList({
   columns,
   rows,
   actions,
+  emptyTitle,
+  emptyDescription,
 }: {
   title: string;
   description: string;
   columns: string[];
   rows: AdminRecordRow[];
   actions?: React.ReactNode;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }) {
   const [query, setQuery] = useState("");
   const [ascending, setAscending] = useState(true);
@@ -99,9 +103,12 @@ export function AdminRecordList({
             </table>
           </div>
         ) : (
-          <p className="p-10 text-center text-sm text-text-muted">
-            {rows.length ? "No hay coincidencias con el filtro." : "No hay registros todavía."}
-          </p>
+          <div className="p-10 text-center">
+            <p className="font-semibold">
+              {rows.length ? "No hay coincidencias con el filtro." : emptyTitle ?? `Todavía no hay ${title.toLocaleLowerCase("es-CO")}.`}
+            </p>
+            {!rows.length && emptyDescription ? <p className="mt-1 text-sm text-text-muted">{emptyDescription}</p> : null}
+          </div>
         )}
         {filtered.length > PAGE_SIZE ? (
           <div className="flex items-center justify-between border-t border-border p-3 text-sm">

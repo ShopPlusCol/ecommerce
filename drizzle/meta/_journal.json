@@ -50,6 +50,20 @@
       "when": 1785356378476,
       "tag": "0006_sparkling_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785363718444,
+      "tag": "0007_normal_micromax",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1785365752296,
+      "tag": "0008_bent_stick",
+      "breakpoints": true
     }
   ]
 }

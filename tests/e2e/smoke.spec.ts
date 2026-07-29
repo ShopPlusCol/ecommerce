@@ -103,7 +103,7 @@ test("el simulador exige consentimiento, procesa localmente y permite eliminar l
   await expect(page.getByText("Subir o tomar una foto frontal")).toBeVisible();
 });
 
-test("los flujos públicos principales no tienen violaciones axe serias o críticas", async ({
+test("la accesibilidad de los flujos públicos no tiene violaciones axe serias o críticas", async ({
   page,
 }) => {
   for (const route of ["/", "/catalogo", "/productos/amazon-brown", "/privacidad"]) {
@@ -119,11 +119,58 @@ test("los flujos públicos principales no tienen violaciones axe serias o críti
 test("la tienda no desborda horizontalmente en móvil ni escritorio", async ({ page }) => {
   for (const viewport of [
     { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1366, height: 768 },
     { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
   ]) {
     await page.setViewportSize(viewport);
     for (const route of ["/", "/catalogo", "/productos/amazon-brown", "/checkout"]) {
       await page.goto(route);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `${route} a ${viewport.width}px`).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test("el administrador no desborda en las resoluciones operativas", async ({ page }) => {
+  test.setTimeout(180_000);
+  const credentials = JSON.parse(
+    await readFile(path.resolve(".data/e2e-credentials.json"), "utf8"),
+  ) as { email: string; password: string };
+  await page.goto("/admin");
+  await page.getByLabel("Correo").fill(credentials.email);
+  await page.getByLabel("Contraseña").fill(credentials.password);
+  await page.getByRole("button", { name: "Ingresar" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  const routes = [
+    "/admin",
+    "/admin/productos/edicion-masiva",
+    "/admin/inventario",
+    "/admin/envios",
+    "/admin/editor",
+    "/admin/analitica",
+    "/admin/integraciones",
+    "/admin/usuarios",
+    "/admin/auditoria",
+    "/admin/configuracion",
+    "/admin/estado",
+    "/admin/simulador",
+  ];
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const route of routes) {
+      await page.goto(route);
+      await expect(page.locator("main")).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
@@ -153,4 +200,33 @@ test("el administrador inicia sesión, consulta estado y exporta datos", async (
   await expect(page).toHaveURL(/\/acceso-admin$/, { timeout: 10_000 });
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/acceso-admin$/);
+});
+
+test("el propietario puede restablecer pedidos y clientes con confirmación reforzada", async ({ page }) => {
+  const credentials = JSON.parse(
+    await readFile(path.resolve(".data/e2e-credentials.json"), "utf8"),
+  ) as { email: string; password: string };
+  await page.goto("/admin");
+  await page.getByLabel("Correo").fill(credentials.email);
+  await page.getByLabel("Contraseña").fill(credentials.password);
+  await page.getByRole("button", { name: "Ingresar" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  await page.goto("/admin/pedidos");
+  await expect(page.getByRole("button", { name: "Limpiar todos los pedidos" })).toBeDisabled();
+  await page.getByLabel("Escribe BORRAR TODOS LOS PEDIDOS para confirmar").fill("BORRAR TODOS LOS PEDIDOS");
+  await page.getByLabel(/Comprendo que estos datos/).check();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Limpiar todos los pedidos" }).click();
+  await expect(page.getByText(/pedido\(s\) eliminados/)).toBeVisible();
+  await expect(page.getByText("0 pedidos reales.")).toBeVisible();
+
+  await page.goto("/admin/clientes");
+  await expect(page.getByRole("button", { name: "Limpiar todos los clientes" })).toBeDisabled();
+  await page.getByLabel("Escribe BORRAR TODOS LOS CLIENTES para confirmar").fill("BORRAR TODOS LOS CLIENTES");
+  await page.getByLabel(/Comprendo que estos datos/).check();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Limpiar todos los clientes" }).click();
+  await expect(page.getByText(/cliente\(s\).*eliminados/)).toBeVisible();
+  await expect(page.getByText("Todavía no hay clientes.")).toBeVisible();
 });

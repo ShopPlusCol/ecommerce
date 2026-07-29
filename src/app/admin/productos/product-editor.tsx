@@ -1,10 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
+import Image from "next/image";
+import { useActionState, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
+import { uploadMediaInlineAction } from "@/app/admin/medios/actions";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
 import { updateProductDetailAction } from "./detail-actions";
 
 type Option = { id: string; name: string };
+type ProductImage = { url: string; altText: string };
 
 export function ProductEditor({
   product,
@@ -14,6 +18,7 @@ export function ProductEditor({
   selectedCategoryIds,
   selectedCollectionIds,
   media,
+  availableMedia,
 }: {
   product: Record<string, string | number | boolean | null>;
   categories: Option[];
@@ -21,10 +26,51 @@ export function ProductEditor({
   colorFamilies: Option[];
   selectedCategoryIds: string[];
   selectedCollectionIds: string[];
-  media: Array<{ url: string; altText: string }>;
+  media: ProductImage[];
+  availableMedia: ProductImage[];
 }) {
   const [state, action, pending] = useActionState(updateProductDetailAction, INITIAL_ADMIN_ACTION_STATE);
+  const [images, setImages] = useState<ProductImage[]>(media);
+  const [libraryUrl, setLibraryUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const uploadRef = useRef<HTMLInputElement>(null);
   const input = "h-10 rounded-md border border-border bg-surface px-3 text-sm";
+
+  const addImage = (image: ProductImage) => {
+    setImages((current) => current.some((row) => row.url === image.url) ? current : [...current, image]);
+  };
+
+  const uploadImage = async () => {
+    const file = uploadRef.current?.files?.[0];
+    if (!file) {
+      setUploadMessage("Selecciona una imagen desde tu equipo.");
+      return;
+    }
+    setUploading(true);
+    setUploadMessage("");
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("altText", String(product.name));
+    const result = await uploadMediaInlineAction(formData);
+    setUploading(false);
+    setUploadMessage(result.message);
+    if (result.status === "success") {
+      addImage({ url: result.asset.url, altText: result.asset.altText || String(product.name) });
+      if (uploadRef.current) uploadRef.current.value = "";
+    }
+  };
+
+  const moveImage = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= images.length) return;
+    setImages((current) => {
+      const copy = [...current];
+      [copy[index], copy[target]] = [copy[target], copy[index]];
+      return copy;
+    });
+  };
+
   return (
     <form action={action} className="grid gap-6">
       <input type="hidden" name="id" value={String(product.id)} />
@@ -57,7 +103,61 @@ export function ProductEditor({
       </section>
       <section className="grid gap-4 rounded-xl border border-border bg-surface-raised p-5 md:grid-cols-2">
         <h2 className="md:col-span-2">Imágenes y SEO</h2>
-        <label className="grid gap-1 text-sm font-medium md:col-span-2">Imágenes (una por línea: URL | texto alternativo)<textarea className="min-h-36 rounded-md border p-3 font-mono text-sm" name="media" defaultValue={media.map((row) => `${row.url} | ${row.altText}`).join("\n")} /></label>
+        <div className="grid gap-3 rounded-lg border border-border p-4 md:col-span-2">
+          <div>
+            <h3 className="font-semibold">Galería del producto</h3>
+            <p className="text-sm text-text-muted">La primera imagen será la portada que se muestra en el catálogo y la tienda.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <select className={input} value={libraryUrl} onChange={(event) => setLibraryUrl(event.target.value)}>
+              <option value="">Seleccionar de la biblioteca</option>
+              {availableMedia.map((asset) => <option key={asset.url} value={asset.url}>{asset.altText || asset.url}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                const selected = availableMedia.find((asset) => asset.url === libraryUrl);
+                if (selected) addImage(selected);
+              }}
+              disabled={!libraryUrl}
+              className="h-10 rounded-md border border-border px-4 text-sm font-semibold disabled:opacity-50"
+            >
+              Añadir a la galería
+            </button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="min-w-0 rounded-md border border-border p-2 text-sm" aria-label="Subir imagen del producto" />
+            <button type="button" onClick={uploadImage} disabled={uploading} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-4 text-sm font-semibold disabled:opacity-60">
+              {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              {uploading ? "Subiendo…" : "Subir desde el equipo"}
+            </button>
+          </div>
+          {uploadMessage ? <p role="status" className="text-sm text-text-muted">{uploadMessage}</p> : null}
+          {images.length ? (
+            <div className="grid gap-2">
+              {images.map((image, index) => (
+                <div key={image.url} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center">
+                  <Image src={image.url} alt="" width={72} height={72} unoptimized className="h-[72px] w-[72px] rounded-md border border-border object-cover" />
+                  <label className="grid gap-1 text-xs font-semibold">
+                    Texto alternativo
+                    <input
+                      value={image.altText}
+                      onChange={(event) => setImages((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, altText: event.target.value } : row))}
+                      className="h-10 rounded-md border border-border px-3 text-sm font-normal"
+                      maxLength={180}
+                    />
+                  </label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => moveImage(index, -1)} disabled={index === 0} aria-label="Mover imagen hacia arriba" className="grid h-10 w-10 place-items-center rounded-md border border-border disabled:opacity-40"><ArrowUp className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => moveImage(index, 1)} disabled={index === images.length - 1} aria-label="Mover imagen hacia abajo" className="grid h-10 w-10 place-items-center rounded-md border border-border disabled:opacity-40"><ArrowDown className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => setImages((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label="Quitar imagen del producto" className="grid h-10 w-10 place-items-center rounded-md border border-danger/30 text-danger"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-muted">Este producto todavía no tiene imágenes. Sube una para mostrarlo en la tienda.</p>}
+          <input type="hidden" name="media" value={images.map((row) => `${row.url} | ${row.altText}`).join("\n")} />
+        </div>
         <label className="grid gap-1 text-sm font-medium">Título SEO<input className={input} name="seoTitle" maxLength={120} defaultValue={String(product.seoTitle ?? "")} /></label>
         <label className="grid gap-1 text-sm font-medium">Descripción SEO<textarea className="min-h-20 rounded-md border p-3" name="seoDescription" maxLength={240} defaultValue={String(product.seoDescription ?? "")} /></label>
       </section>

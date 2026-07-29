@@ -12,6 +12,8 @@ export function fallbackTexture(product: Product): TryOnTexture {
     blendMode: "multiply",
     scaleX: 112,
     scaleY: 106,
+    offsetX: 0,
+    offsetY: 0,
     rotationOffset: 0,
     perspectiveStrength: 0,
     colorCorrection: {

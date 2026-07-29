@@ -1,12 +1,16 @@
-import { Menu, Search, UserCircle } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, Search, UserCircle } from "lucide-react";
 import { AdminLogoutButton } from "@/components/admin/admin-logout-button";
 
 export function AdminTopbar({
   name,
   onOpenNavigation,
+  onToggleCollapsed,
+  collapsed,
 }: {
   name: string;
   onOpenNavigation: () => void;
+  onToggleCollapsed: () => void;
+  collapsed: boolean;
 }) {
   return (
     <header className="sticky top-0 z-20 flex min-h-16 items-center gap-3 border-b border-border bg-surface-raised/95 px-4 backdrop-blur sm:px-6">
@@ -17,6 +21,9 @@ export function AdminTopbar({
         aria-label="Abrir navegación"
       >
         <Menu className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <button type="button" className="hidden h-10 w-10 place-items-center rounded-md border border-border lg:grid" onClick={onToggleCollapsed} aria-label={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"} title={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"}>
+        {collapsed ? <PanelLeftOpen className="h-5 w-5" aria-hidden="true" /> : <PanelLeftClose className="h-5 w-5" aria-hidden="true" />}
       </button>
       <form action="/admin/buscar" className="relative min-w-0 flex-1 lg:max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-subtle" aria-hidden="true" />

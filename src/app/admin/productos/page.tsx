@@ -16,7 +16,7 @@ export default async function AdminProductsPage() {
   const rows = await db.select().from(products).orderBy(desc(products.updatedAt));
   return (
     <>
-      <AdminPageHeader title="Productos" description={`${rows.length} productos persistidos.`} />
+      <AdminPageHeader title="Productos" description={`${rows.length} productos persistidos.`} actions={<Link href="/admin/productos/edicion-masiva" className="rounded-md border border-border px-4 py-2 text-sm font-semibold">Editar varios productos</Link>} />
       <CsvImportForm />
       <form action={createProductAction} className="mb-6 grid gap-3 rounded-lg border border-border bg-surface-raised p-4 md:grid-cols-3">
         <input name="name" required placeholder="Nombre" className="rounded-md border border-border p-2" />

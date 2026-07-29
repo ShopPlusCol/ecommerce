@@ -2,6 +2,20 @@ import { AdminEntityForm, type AdminEntityField } from "./admin-entity-form";
 
 type FieldValue = string | number | boolean | Date | null | undefined;
 
+const entityCopy: Record<string, { add: string; create: string; empty: string }> = {
+  category: { add: "Añadir una nueva categoría", create: "Crear categoría", empty: "Todavía no tienes categorías." },
+  colorFamily: { add: "Añadir una nueva familia de color", create: "Crear familia de color", empty: "Todavía no tienes familias de color." },
+  collection: { add: "Añadir una nueva colección", create: "Crear colección", empty: "Todavía no tienes colecciones." },
+  coupon: { add: "Añadir un nuevo cupón", create: "Crear cupón", empty: "Todavía no tienes cupones." },
+  shippingZone: { add: "Añadir una nueva zona", create: "Crear zona", empty: "Todavía no tienes zonas de envío." },
+  shippingRule: { add: "Añadir una nueva regla de envío", create: "Crear regla de envío", empty: "Todavía no tienes reglas de envío." },
+  faq: { add: "Añadir una nueva pregunta frecuente", create: "Crear pregunta frecuente", empty: "Todavía no tienes preguntas frecuentes." },
+  testimonial: { add: "Añadir un nuevo testimonio", create: "Crear testimonio", empty: "Todavía no tienes testimonios." },
+  rewardRule: { add: "Añadir una nueva recompensa", create: "Crear recompensa", empty: "Todavía no tienes recompensas." },
+  popup: { add: "Añadir un nuevo pop-up", create: "Crear pop-up", empty: "Todavía no tienes pop-ups." },
+  promotion: { add: "Añadir una nueva promoción", create: "Crear promoción", empty: "Todavía no tienes promociones." },
+};
+
 export function AdminEntitySection({
   entity,
   title,
@@ -21,6 +35,11 @@ export function AdminEntitySection({
   canArchive?: boolean;
   canDuplicate?: boolean;
 }) {
+  const copy = entityCopy[entity] ?? {
+    add: `Añadir ${title.toLocaleLowerCase("es-CO")}`,
+    create: `Crear ${title.toLocaleLowerCase("es-CO")}`,
+    empty: `Todavía no tienes ${title.toLocaleLowerCase("es-CO")}.`,
+  };
   return (
     <section className="mb-8 rounded-xl border border-border bg-surface-raised p-4 sm:p-5">
       <div className="mb-5">
@@ -28,9 +47,9 @@ export function AdminEntitySection({
         <p className="mt-1 text-sm text-text-muted">{description}</p>
       </div>
       <details className="mb-5 rounded-lg border border-brand/20 bg-brand-soft p-4">
-        <summary className="cursor-pointer font-semibold text-brand">Crear registro</summary>
+        <summary className="cursor-pointer font-semibold text-brand">{copy.add}</summary>
         <div className="mt-4">
-          <AdminEntityForm entity={entity} operation="create" fields={fields} submitLabel={`Crear ${title.toLocaleLowerCase("es-CO")}`} />
+          <AdminEntityForm entity={entity} operation="create" fields={fields} submitLabel={copy.create} />
         </div>
       </details>
       {records.length ? (
@@ -49,7 +68,10 @@ export function AdminEntitySection({
           ))}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-border-strong p-8 text-center text-sm text-text-muted">No hay registros todavía.</p>
+        <div className="rounded-lg border border-dashed border-border-strong p-8 text-center">
+          <p className="font-semibold">{copy.empty}</p>
+          <p className="mt-1 text-sm text-text-muted">Usa “{copy.add}” para crear el primer elemento.</p>
+        </div>
       )}
     </section>
   );

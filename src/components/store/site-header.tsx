@@ -58,7 +58,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
         <div className="flex items-center">
           <button
             type="button"
-            className={cn(ICON_BUTTON, "-ml-2 md:hidden")}
+            className={cn(ICON_BUTTON, "-ml-2 lg:hidden")}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
             aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
@@ -67,7 +67,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          <nav className="hidden items-center gap-7 md:flex" aria-label="Navegación principal">
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -130,7 +130,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
         <nav
           id="mobile-nav"
           aria-label="Navegación móvil"
-          className="animate-fade-in border-t border-border bg-surface px-[var(--content-padding-x)] py-3 md:hidden"
+          className="animate-fade-in border-t border-border bg-surface px-[var(--content-padding-x)] py-3 lg:hidden"
         >
           <ul className="flex flex-col gap-0.5">
             {[...NAV_LINKS, { href: "/buscar", label: "Buscar" }, { href: "/favoritos", label: "Favoritos" }].map(

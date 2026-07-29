@@ -30,6 +30,8 @@ export class DrizzleTryOnRepository implements TryOnRepository {
       blendMode: texture.blendMode,
       scaleX: texture.scaleX,
       scaleY: texture.scaleY,
+      offsetX: texture.offsetX,
+      offsetY: texture.offsetY,
       rotationOffset: texture.rotationOffset,
       perspectiveStrength: texture.perspectiveStrength,
       colorCorrection: texture.colorCorrection,

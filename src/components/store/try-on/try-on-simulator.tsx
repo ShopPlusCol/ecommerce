@@ -60,8 +60,8 @@ function drawEye(
   canvasWidth: number,
   canvasHeight: number,
 ) {
-  const centerX = (geometry.centerX + adjustments.x / 100) * canvasWidth;
-  const centerY = (geometry.centerY + adjustments.y / 100) * canvasHeight;
+  const centerX = (geometry.centerX + (texture.offsetX + adjustments.x) / 100) * canvasWidth;
+  const centerY = (geometry.centerY + (texture.offsetY + adjustments.y) / 100) * canvasHeight;
   const baseRadius = Math.max(geometry.radiusX * canvasWidth, geometry.radiusY * canvasHeight, canvasWidth * 0.017);
   const scale = adjustments.scale / 100;
   const radiusX = baseRadius * (texture.baseSize / 100) * (texture.scaleX / 100) * scale;

@@ -12,6 +12,7 @@ export function AdminShell({
   name: string;
 }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [navigationCollapsed, setNavigationCollapsed] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -23,9 +24,9 @@ export function AdminShell({
           onClick={() => setNavigationOpen(false)}
         />
       ) : null}
-      <AdminSidebar open={navigationOpen} onNavigate={() => setNavigationOpen(false)} />
+      <AdminSidebar open={navigationOpen} collapsed={navigationCollapsed} onNavigate={() => setNavigationOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar name={name} onOpenNavigation={() => setNavigationOpen(true)} />
+        <AdminTopbar name={name} collapsed={navigationCollapsed} onOpenNavigation={() => setNavigationOpen(true)} onToggleCollapsed={() => setNavigationCollapsed((value) => !value)} />
         <main className="flex-1 overflow-y-auto bg-surface px-4 py-5 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-[1500px]">{children}</div>
         </main>

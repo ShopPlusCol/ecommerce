@@ -29,6 +29,11 @@ export type ShippingRuleWithZone = {
   estimatedBusinessDaysMax: number;
   sameDayCutoffHour: number | null;
   customerMessage: string;
+  minOrderAmount?: Money | null;
+  maxOrderAmount?: Money | null;
+  allowedPaymentMethods?: Array<
+    "mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full"
+  >;
   priority: number;
   status: "draft" | "active" | "inactive";
 };
@@ -65,6 +70,15 @@ export function resolveShippingQuote(
   const candidates = rules
     .filter((rule) => rule.status === "active")
     .filter((rule) => ruleMatchesDestination(rule, destination))
+    .filter(
+      (rule) =>
+        (rule.minOrderAmount === undefined ||
+          rule.minOrderAmount === null ||
+          cartTotal.amount >= rule.minOrderAmount.amount) &&
+        (rule.maxOrderAmount === undefined ||
+          rule.maxOrderAmount === null ||
+          cartTotal.amount <= rule.maxOrderAmount.amount),
+    )
     .sort((a, b) => {
       const specificityDiff = LEVEL_SPECIFICITY[b.zone.level] - LEVEL_SPECIFICITY[a.zone.level];
       if (specificityDiff !== 0) return specificityDiff;
@@ -89,5 +103,6 @@ export function resolveShippingQuote(
     estimatedBusinessDaysMax: winner.estimatedBusinessDaysMax,
     sameDayCutoffHour: winner.sameDayCutoffHour,
     customerMessage: winner.customerMessage,
+    allowedPaymentMethods: winner.allowedPaymentMethods,
   };
 }

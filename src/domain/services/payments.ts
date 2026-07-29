@@ -29,7 +29,8 @@ export function availablePaymentMethods(quote: ShippingQuote): PaymentMethodId[]
   if (quote.cashOnDeliveryAllowed && !quote.requiresAdvancePayment) {
     methods.push("cash_on_delivery");
   }
-  return methods;
+  const allowed = quote.allowedPaymentMethods;
+  return allowed ? methods.filter((method) => allowed.includes(method)) : methods;
 }
 
 export type PaymentSplit = {

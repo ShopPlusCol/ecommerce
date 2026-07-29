@@ -7,7 +7,10 @@ import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { auditLogs, settings } from "@/infrastructure/db/schema";
 
-const optionalUrl = z.union([z.literal(""), z.string().url()]).transform((value) => value || null);
+const optionalUrl = z.union([
+  z.literal(""),
+  z.string().trim().refine((value) => value.startsWith("/") || URL.canParse(value), "La URL de imagen no es válida."),
+]).transform((value) => value || null);
 const brandSchema = z.object({
   name: z.string().trim().min(1).max(80),
   tagline: z.string().trim().max(160),
