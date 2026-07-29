@@ -14,7 +14,8 @@ export type NotificationEvent =
   | "order_cancelled"
   | "order_refunded"
   | "low_stock"
-  | "manual_transfer_pending";
+  | "manual_transfer_pending"
+  | "password_reset";
 
 export type NotificationPayload = {
   event: NotificationEvent;

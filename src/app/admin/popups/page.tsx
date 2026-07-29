@@ -1,21 +1,8 @@
-import type { Metadata } from "next";
-import { Megaphone } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Pop-ups" };
-
-export default function AdminPopupsPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Pop-ups"
-      description="Campañas emergentes con segmentación y control de frecuencia."
-      icon={Megaphone}
-      plannedFields={[
-        "Imagen móvil/escritorio, cupón opcional, páginas incluidas/excluidas",
-        "Frecuencia por sesión o periodo, retardo, scroll e intención de salida",
-        "Segmentación por UTM, carrito y dispositivo",
-        "Impresiones, cierres, clics y conversiones (con consentimiento)",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { popups } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("promotions", "read"); const rows = await (await getRuntimeDb()).select().from(popups);
+  return <AdminRecordList title="Pop-ups" description="Segmentación, frecuencia y publicación reales." columns={["Nombre", "Frecuencia", "Prioridad", "Estado"]} rows={rows.map((r) => ({ id: r.id, values: [r.name, r.frequency, r.priority, r.status] }))} />;
 }

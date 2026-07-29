@@ -8,7 +8,7 @@ Next.js 16 (App Router, Turbopack) · TypeScript estricto · Tailwind CSS v4 · 
 
 ## Requisitos
 
-- Node.js ≥ 20.9
+- Node.js ≥ 20.19
 - npm
 
 ## Instalación
@@ -28,7 +28,9 @@ npm run db:migrate    # aplica migraciones sobre ./.data/local.db
 npm run db:seed       # datos de ejemplo (catálogo, zonas, FAQ, usuario propietario)
 ```
 
-`db:seed` imprime en consola la contraseña generada del usuario propietario (`owner@shoppluscol.local`). Guárdala: no se vuelve a mostrar. El login real llega en la Fase 3; por ahora sirve como registro de que el flujo de creación de usuarios funciona.
+`db:seed` crea/actualiza roles y, la primera vez, imprime la contraseña generada
+del propietario. También puedes definir `ADMIN_OWNER_PASSWORD` antes del primer
+seed. La contraseña no se vuelve a mostrar.
 
 ## Desarrollo
 
@@ -36,14 +38,15 @@ npm run db:seed       # datos de ejemplo (catálogo, zonas, FAQ, usuario propiet
 npm run dev
 ```
 
-Tienda pública en `/`, panel administrativo en `/admin` (sin autenticación todavía — ver aviso en la propia interfaz).
+Tienda pública en `/`, acceso administrativo en `/acceso-admin` y panel
+protegido en `/admin`.
 
 ## Calidad
 
 ```bash
 npm run typecheck
 npm run lint
-npm run test        # unitarias (Vitest)
+npm run test         # unitarias e integración (Vitest)
 npm run test:e2e     # end-to-end (Playwright; requiere `npx playwright install` una vez)
 npm run build
 ```
@@ -58,7 +61,7 @@ Ver [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) para Cloudflare Workers y para 
 | --- | --- |
 | [`docs/PROJECT_SPEC.md`](./docs/PROJECT_SPEC.md) | Resumen ejecutivo del producto y alcance por fase |
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Arquitectura de puertos y adaptadores, estructura de carpetas |
-| [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md) | Modelo de datos y relaciones (56 tablas) |
+| [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md) | Modelo de datos y relaciones (62 tablas) |
 | [`docs/DECISIONS.md`](./docs/DECISIONS.md) | Decisiones técnicas y su justificación |
 | [`docs/PHASE_STATUS.md`](./docs/PHASE_STATUS.md) | Qué fase está activa, qué falta, próxima acción autorizada |
 | [`docs/ADMIN_GUIDE.md`](./docs/ADMIN_GUIDE.md) | Guía del panel administrativo |

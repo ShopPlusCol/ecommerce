@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Loader2, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +16,7 @@ import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 import { DEPARTMENTS, MEDELLIN_NEIGHBORHOODS, citiesForDepartment, isMedellin } from "@/lib/colombia-locations";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
-import { LAST_ORDER_KEY } from "@/modules/checkout/last-order";
+import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
 type LocationForm = {
@@ -39,9 +38,9 @@ const EMPTY_LOCATION: LocationForm = {
 };
 
 export function CheckoutClient() {
-  const router = useRouter();
   const { cart, lines, coupon, rewards, totals, clearCart, isHydrated } = useCart();
-  const { track } = useAnalytics();
+  const { track, consent: analyticsConsent } = useAnalytics();
+  const idempotencyKey = React.useRef(crypto.randomUUID());
 
   const [contact, setContact] = React.useState<Contact>({ fullName: "", phone: "", email: "" });
   const [location, setLocation] = React.useState<LocationForm>(EMPTY_LOCATION);
@@ -160,6 +159,7 @@ export function CheckoutClient() {
 
     setSubmitting(true);
     const result = await createDemoOrderAction({
+      idempotencyKey: idempotencyKey.current,
       items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
       couponCode: coupon?.code ?? null,
       destination: {
@@ -177,7 +177,7 @@ export function CheckoutClient() {
         addressComplement: location.addressComplement.trim(),
         deliveryInstructions: location.deliveryInstructions.trim(),
       },
-      consent,
+      consent: { ...consent, analytics: analyticsConsent.analytics },
     });
     setSubmitting(false);
 
@@ -192,7 +192,7 @@ export function CheckoutClient() {
       // Si no hay sessionStorage, la confirmación mostrará un estado genérico.
     }
     clearCart();
-    router.push("/checkout/confirmacion");
+    window.location.assign(resolveCheckoutDestination(result.order.checkoutUrl));
   };
 
   return (
@@ -365,9 +365,8 @@ export function CheckoutClient() {
               </p>
             ) : null}
             <p className="rounded-md bg-info-soft p-3 text-xs text-info">
-              El cobro real con Mercado Pago y la verificación de transferencias se activan en la
-              siguiente fase. Este checkout genera un pedido de demostración con el estado financiero
-              correcto.
+              El pedido se registra al confirmar. Mercado Pago solo aparece cuando está configurado;
+              las transferencias quedan pendientes de revisión y un comprobante no equivale a pago aprobado.
             </p>
           </CardContent>
         </Card>
@@ -445,7 +444,7 @@ export function CheckoutClient() {
               Confirmar pedido
             </Button>
             <p className="text-center text-xs text-text-subtle">
-              Pedido de demostración — no se realiza ningún cobro real todavía.
+              Los precios, descuentos, envío, método y stock se validan nuevamente en el servidor.
             </p>
           </CardContent>
         </Card>

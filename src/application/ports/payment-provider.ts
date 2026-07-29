@@ -30,6 +30,10 @@ export type PaymentWebhookPayload = {
 export interface PaymentProvider {
   readonly id: string;
   createPaymentIntent(request: PaymentIntentRequest): Promise<PaymentIntentResult>;
-  verifyWebhookSignature(rawBody: string, signatureHeader: string | null): boolean;
+  verifyWebhookSignature(params: {
+    signatureHeader: string | null;
+    requestId: string | null;
+    dataId: string | null;
+  }): boolean;
   parseWebhookPayload(rawBody: string): PaymentWebhookPayload;
 }

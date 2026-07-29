@@ -1,21 +1,8 @@
-import type { Metadata } from "next";
-import { Ticket } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Cupones" };
-
-export default function AdminCouponsPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Cupones"
-      description="Códigos manuales o autogenerados, con atribución a creadores de contenido."
-      icon={Ticket}
-      plannedFields={[
-        "Descuento fijo, porcentual, envío gratis o regalo",
-        "Límite de usos total y por cliente, compra mínima, productos y zonas",
-        "Atribución a creador, campaña o socio",
-        "Analítica: usos, ventas brutas y netas, ticket promedio",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { coupons } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("promotions", "read"); const rows = await (await getRuntimeDb()).select().from(coupons);
+  return <AdminRecordList title="Cupones" description="Reglas validadas nuevamente en servidor." columns={["Código", "Tipo", "Valor", "Prioridad", "Estado"]} rows={rows.map((r) => ({ id: r.id, values: [r.code, r.discountType, r.discountValue, r.priority, r.status] }))} />;
 }

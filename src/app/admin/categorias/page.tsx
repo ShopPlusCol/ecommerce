@@ -1,22 +1,8 @@
-import type { Metadata } from "next";
-import { Tags } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Categorías" };
-
-export default function AdminCategoriesPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Categorías"
-      description="Árbol de categorías y familias de color, totalmente editable."
-      icon={Tags}
-      plannedFields={[
-        "Crear, editar, archivar y reordenar categorías y subcategorías",
-        "Imagen, icono, slug y descripción SEO",
-        "Categoría padre y prevención de ciclos en la jerarquía",
-        "Visibilidad en menú, filtros e inicio",
-        "Creación de nuevas familias de color sin tocar código",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { categories } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("catalog", "read"); const rows = await (await getRuntimeDb()).select().from(categories);
+  return <AdminRecordList title="Categorías" description="Categorías persistidas y ordenadas." columns={["Nombre", "Slug", "Orden", "Menú"]} rows={rows.map((r) => ({ id: r.id, values: [r.name, r.slug, r.order, r.visibleInMenu ? "Visible" : "Oculta"] }))} />;
 }

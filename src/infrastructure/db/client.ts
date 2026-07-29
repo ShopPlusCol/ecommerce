@@ -3,6 +3,7 @@ import { drizzle as drizzleBetterSqlite3 } from "drizzle-orm/better-sqlite3";
 import { drizzle as drizzleD1 } from "drizzle-orm/d1";
 import type { D1Database } from "@cloudflare/workers-types";
 import * as schema from "./schema";
+import { getCloudflareEnv } from "@/infrastructure/cloudflare/env";
 
 /**
  * Puerto de acceso a datos con dos adaptadores sobre el mismo dialecto SQL
@@ -26,6 +27,12 @@ export function getLocalDb(sqlitePath = process.env.SQLITE_PATH ?? "./.data/loca
 
 export function getD1Db(d1: D1Database) {
   return drizzleD1(d1, { schema });
+}
+
+/** Selecciona D1 en Workers y SQLite local en Node/Docker. */
+export async function getRuntimeDb(): Promise<Db> {
+  const cloudflare = await getCloudflareEnv();
+  return (cloudflare ? getD1Db(cloudflare.DB) : getLocalDb()) as unknown as Db;
 }
 
 export { schema };

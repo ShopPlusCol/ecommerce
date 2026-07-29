@@ -1,21 +1,8 @@
-import type { Metadata } from "next";
-import { Newspaper } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Contenido" };
-
-export default function AdminContentPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Contenido"
-      description="Marca, contacto, FAQ, cuidados, avisos y textos del checkout."
-      icon={Newspaper}
-      plannedFields={[
-        "Nombre de marca, logo, favicon y colores dentro de límites seguros",
-        "WhatsApp, redes sociales, horarios y mensajes de entrega",
-        "Editor de texto enriquecido saneado",
-        "SEO global y datos para compartir",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { faqs } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("content", "read"); const rows = await (await getRuntimeDb()).select().from(faqs);
+  return <AdminRecordList title="Contenido" description="FAQ, testimonios y contenido legal persistente." columns={["Pregunta", "Categoría", "Orden", "Estado"]} rows={rows.map((r) => ({ id: r.id, values: [r.question, r.category, r.order, r.status] }))} />;
 }

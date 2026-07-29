@@ -14,6 +14,8 @@ export const carts = sqliteTable("carts", {
   utmCampaign: text("utm_campaign"),
   utmContent: text("utm_content"),
   utmTerm: text("utm_term"),
+  utmFirstAttribution: text("utm_first_attribution", { mode: "json" }).$type<Record<string, string>>(),
+  utmLastAttribution: text("utm_last_attribution", { mode: "json" }).$type<Record<string, string>>(),
   abandonedAt: integer("abandoned_at", { mode: "timestamp_ms" }),
   convertedOrderId: text("converted_order_id"),
   ...timestampColumns,

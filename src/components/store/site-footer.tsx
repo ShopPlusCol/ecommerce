@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { siteConfig } from "@/lib/site-config";
+import type { BrandSettings } from "@/modules/settings/brand";
+import { BrandMark } from "./brand-mark";
 
 const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ href: string; label: string }> }> = [
   {
@@ -28,14 +30,14 @@ const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ href: string; label:
   },
 ];
 
-export function SiteFooter() {
+export function SiteFooter({ brand }: { brand: BrandSettings }) {
   return (
     <footer className="border-t border-border bg-surface-raised">
       <div className="mx-auto max-w-(--content-max-width) px-[var(--content-padding-x)] py-12">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
-            <p className="font-display text-lg font-semibold text-text">{siteConfig.brandName}</p>
-            <p className="mt-2 max-w-[26ch] text-sm text-text-muted">{siteConfig.tagline}</p>
+            <p className="font-display text-lg font-semibold text-text"><BrandMark brand={brand} placement="footer" /></p>
+            <p className="mt-2 max-w-[26ch] text-sm text-text-muted">{brand.tagline}</p>
           </div>
           {FOOTER_COLUMNS.map((column) => (
             <div key={column.title}>
@@ -53,7 +55,7 @@ export function SiteFooter() {
           ))}
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-text-subtle sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} {siteConfig.brandName}. Todos los derechos reservados.</p>
+          <p>© {new Date().getFullYear()} {brand.name}. Todos los derechos reservados.</p>
           <p>Medellín, Colombia</p>
         </div>
       </div>

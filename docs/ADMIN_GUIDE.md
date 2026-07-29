@@ -1,34 +1,45 @@
 # ADMIN_GUIDE
 
-Estado actual: **scaffold de navegación**, sin autenticación ni persistencia todavía (se activan en la Fase 3). Cada pantalla del panel muestra un aviso de desarrollo y, cuando aplica, la lista de campos/funciones que administrará una vez conectada.
-
 ## Acceso
 
-`http://localhost:3000/admin` en desarrollo. No hay login: cualquiera con la URL puede entrar. **No desplegar este scaffold accesible públicamente** hasta que la Fase 3 añada autenticación real (sección 30).
+1. Ejecuta `npm run db:migrate` y `npm run db:seed`.
+2. Guarda la contraseña que el seed imprime únicamente al crear la credencial.
+3. Abre `/acceso-admin`. `/admin` redirige al login sin cookie y vuelve a
+   validar sesión/estado del usuario contra la base de datos.
 
-## Navegación (sección 22.3)
+El owner local usa el correo `ADMIN_OWNER_EMAIL` (por defecto
+`owner@shoppluscol.local`). Define `ADMIN_OWNER_PASSWORD` antes del primer seed
+si no quieres una contraseña aleatoria. Nunca la publiques ni la versionas.
 
-| Grupo | Secciones |
+## Roles
+
+| Rol | Alcance |
 | --- | --- |
-| General | Resumen (KPIs, con estados vacíos honestos) |
-| Ventas | Pedidos, Clientes, Pagos |
-| Catálogo | Productos, Inventario, Categorías, Colecciones |
-| Logística | Envíos y zonas |
-| Marketing | Promociones, Cupones, Recompensas, Pop-ups |
-| Contenido | Editor visual, Contenido |
-| Sistema | Analítica, Integraciones, Usuarios y roles, Auditoría, Configuración |
+| Propietario | Acceso total |
+| Administrador | Todo excepto eliminar propietarios |
+| Operaciones | Pedidos, inventario, clientes, envíos y pagos |
+| Editor de contenido | Catálogo, promociones, contenido y medios |
+| Analista de solo lectura | Lectura y exportación |
 
-## Qué existe hoy
+Todas las mutaciones vuelven a autorizar por recurso/acción en el servidor; no
+se confía en ocultar botones.
 
-- Layout con sidebar, topbar y aviso de modo desarrollo.
-- Resumen con tarjetas de KPI en estado vacío (sin datos inventados).
-- Cada módulo describe, en una lista, qué campos y acciones administrará (tomado directamente de las secciones correspondientes del prompt maestro).
+## Operación
 
-## Qué falta (por fase)
+- **Productos:** crear, cambiar estado, importar/exportar CSV y consultar datos
+  reales. El CSV requiere `sku,name,slug,price,status`.
+- **Inventario:** el ajuste exige cantidad y motivo; se rechaza si invade stock
+  reservado. Checkout crea reservas temporales auditables.
+- **Pedidos:** estados de pedido, pago y envío son independientes. Cada cambio
+  de estado crea línea de tiempo y auditoría.
+- **Configuración:** identidad de marca, logos por URL de `media_assets`,
+  favicon, Open Graph, contacto y redes. Nunca uses base64.
+- **Integraciones:** solo muestra presencia/estado de configuración, nunca
+  tokens. No declares pruebas externas exitosas sin credenciales.
+- **Auditoría:** conserva actor, acción, entidad, antes/después y motivo.
 
-- **Fase 2**: nada del panel — esa fase es 100% tienda pública.
-- **Fase 3**: autenticación y roles, persistencia real contra la base de datos para todos los módulos listados arriba, carga masiva de productos, verificación manual de transferencias, Mercado Pago/Meta/WhatsApp configurables, auditoría real.
+## Recuperación y bloqueo
 
-## Usuario propietario de desarrollo
-
-Creado por `npm run db:seed` (`owner@shoppluscol.local`, contraseña impresa una sola vez en consola). No tiene ningún efecto todavía porque no existe pantalla de login; sirve para validar que el modelo de roles y el hash de contraseña funcionan de extremo a extremo.
+Tras cinco fallos se bloquea la identidad durante 15 minutos; Better Auth añade
+rate limit persistente. La recuperación siempre responde de forma genérica. Sin
+SMTP configurado no se envía correo y el panel lo comunica honestamente.

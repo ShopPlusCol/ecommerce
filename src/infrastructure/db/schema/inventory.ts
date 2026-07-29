@@ -35,3 +35,16 @@ export const inventoryMovements = sqliteTable("inventory_movements", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+/** Reserva temporal creada por checkout; expira y puede liberarse sin alterar ventas. */
+export const inventoryReservations = sqliteTable("inventory_reservations", {
+  id: idColumn(),
+  inventoryItemId: text("inventory_item_id")
+    .notNull()
+    .references(() => inventoryItems.id, { onDelete: "cascade" }),
+  orderId: text("order_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  status: text("status", { enum: ["active", "consumed", "released"] }).notNull().default("active"),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  ...timestampColumns,
+});

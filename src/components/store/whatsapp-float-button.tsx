@@ -1,16 +1,16 @@
 import { MessageCircle } from "lucide-react";
-import { siteConfig } from "@/lib/site-config";
+import type { BrandSettings } from "@/modules/settings/brand";
 
 /**
  * Botón flotante de WhatsApp (sección 20.1). Enlace real a wa.me: no depende
  * de ninguna integración de backend, así que es funcional desde la Fase 1.
- * Número y mensaje se volverán editables desde el panel en la Fase 3.
+ * Número y marca se reciben desde la configuración persistida.
  */
-export function WhatsAppFloatButton() {
+export function WhatsAppFloatButton({ brand }: { brand: BrandSettings }) {
   const message = encodeURIComponent(
-    `Hola, tengo una pregunta sobre los lentes de ${siteConfig.brandName}.`,
+    `Hola, tengo una pregunta sobre los lentes de ${brand.name}.`,
   );
-  const href = `https://wa.me/${siteConfig.contact.whatsappNumber}?text=${message}`;
+  const href = `https://wa.me/${brand.whatsapp}?text=${message}`;
 
   return (
     <a

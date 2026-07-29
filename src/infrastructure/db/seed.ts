@@ -1,10 +1,12 @@
 import "dotenv/config";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { hashPassword } from "better-auth/crypto";
 import { getLocalDb } from "./client";
 import {
   adminUsers,
+  authAccounts,
   categories,
   colorFamilies,
   collectionProducts,
@@ -12,15 +14,21 @@ import {
   coupons,
   faqs,
   inventoryItems,
+  pageSections,
+  pages,
+  pageVersions,
   productCategories,
   productMedia,
   products,
+  permissions,
+  rolePermissions,
   roles,
   shippingRules,
   shippingZones,
   userRoles,
 } from "./schema";
-import { hashPassword, generateRandomPassword } from "@/modules/auth/password";
+import { generateRandomPassword } from "@/modules/auth/password";
+import { demoHomePage } from "@/infrastructure/demo/demo-home-page";
 
 /**
  * Seed de demostración (sección 42). Todo lo aquí creado es contenido de
@@ -32,14 +40,7 @@ async function seed() {
   mkdirSync(dirname(sqlitePath), { recursive: true });
   const db = getLocalDb(sqlitePath);
 
-  const [existingProduct] = await db.select({ id: products.id }).from(products).limit(1);
-  if (existingProduct) {
-    console.log("La base de datos ya tiene datos de ejemplo sembrados. No se vuelve a sembrar.");
-    console.log("Si necesitas datos frescos, borra el archivo SQLite (SQLITE_PATH) y vuelve a migrar.");
-    return;
-  }
-
-  console.log("Sembrando roles y usuario propietario...");
+  console.log("Sembrando identidad administrativa...");
   const [insertedOwnerRole] = await db
     .insert(roles)
     .values({ name: "Propietario", slug: "owner", description: "Acceso total", isSystemRole: true })
@@ -56,21 +57,96 @@ async function seed() {
     ])
     .onConflictDoNothing();
 
-  const ownerPassword = generateRandomPassword();
-  const [owner] = await db
-    .insert(adminUsers)
-    .values({
-      fullName: "Propietario ShopPlusCol",
-      email: "owner@shoppluscol.local",
-      passwordHash: hashPassword(ownerPassword),
-    })
-    .onConflictDoNothing()
-    .returning();
+  const allRoles = await db.select().from(roles);
+  const permissionDefinitions = [
+    ...["dashboard", "catalog", "inventory", "orders", "customers", "shipping", "payments", "promotions", "content", "media", "integrations", "users", "settings", "audit"].flatMap(
+      (resource) => ["read", "create", "update", "delete", "export"].map((action) => ({ resource, action })),
+    ),
+  ];
+  await db.insert(permissions).values(permissionDefinitions).onConflictDoNothing();
+  const allPermissions = await db.select().from(permissions);
+  const roleBySlug = new Map(allRoles.map((role) => [role.slug, role]));
+  const grants: Record<string, (permission: (typeof allPermissions)[number]) => boolean> = {
+    owner: () => true,
+    admin: (permission) => permission.resource !== "users" || permission.action !== "delete",
+    operations: (permission) =>
+      ["dashboard", "inventory", "orders", "customers", "shipping", "payments"].includes(permission.resource),
+    content_editor: (permission) =>
+      ["catalog", "promotions", "content", "media"].includes(permission.resource),
+    read_only_analyst: (permission) => ["read", "export"].includes(permission.action),
+  };
+  for (const [roleSlug, allows] of Object.entries(grants)) {
+    const role = roleBySlug.get(roleSlug);
+    if (!role) continue;
+    const values = allPermissions
+      .filter(allows)
+      .map((permission) => ({ roleId: role.id, permissionId: permission.id }));
+    if (values.length) await db.insert(rolePermissions).values(values).onConflictDoNothing();
+  }
 
-  if (owner) {
-    await db.insert(userRoles).values({ userId: owner.id, roleId: ownerRole.id }).onConflictDoNothing();
-    console.log(`Usuario propietario creado: owner@shoppluscol.local / ${ownerPassword}`);
-    console.log("Guarda esta contraseña ahora: no se volverá a mostrar. El login real llega en la Fase 3.");
+  const ownerEmail = (process.env.ADMIN_OWNER_EMAIL ?? "owner@shoppluscol.local").trim().toLowerCase();
+  const ownerName = process.env.ADMIN_OWNER_NAME ?? "Propietario ShopPlusCol";
+  let [owner] = await db.select().from(adminUsers).where(eq(adminUsers.email, ownerEmail)).limit(1);
+  if (!owner) {
+    [owner] = await db
+      .insert(adminUsers)
+      .values({ fullName: ownerName, email: ownerEmail, passwordHash: "pending-auth-account" })
+      .returning();
+  }
+  await db.insert(userRoles).values({ userId: owner.id, roleId: ownerRole.id }).onConflictDoNothing();
+
+  const [credential] = await db
+    .select({ id: authAccounts.id })
+    .from(authAccounts)
+    .where(and(eq(authAccounts.providerId, "credential"), eq(authAccounts.userId, owner.id)))
+    .limit(1);
+  if (!credential) {
+    const ownerPassword = process.env.ADMIN_OWNER_PASSWORD || generateRandomPassword();
+    const passwordHash = await hashPassword(ownerPassword);
+    await db.update(adminUsers).set({ passwordHash }).where(eq(adminUsers.id, owner.id));
+    await db.insert(authAccounts).values({
+      accountId: owner.id,
+      providerId: "credential",
+      userId: owner.id,
+      password: passwordHash,
+    });
+    console.log(`Usuario propietario habilitado: ${ownerEmail} / ${ownerPassword}`);
+    console.log("Guarda esta contraseña ahora: no se volverá a mostrar.");
+  }
+
+  let [homePage] = await db.select().from(pages).where(eq(pages.slug, demoHomePage.slug)).limit(1);
+  if (!homePage) {
+    [homePage] = await db
+      .insert(pages)
+      .values({ slug: demoHomePage.slug, title: demoHomePage.title, isHome: true })
+      .returning();
+  }
+  if (!homePage.publishedVersionId) {
+    const [version] = await db
+      .insert(pageVersions)
+      .values({ pageId: homePage.id, versionNumber: 1, publishedAt: new Date() })
+      .returning();
+    await db.insert(pageSections).values(
+      demoHomePage.blocks.map((block, order) => ({
+        id: block.id,
+        pageVersionId: version.id,
+        blockType: block.type,
+        order,
+        config: block.config,
+        visibleOnMobile: block.visibleOnMobile,
+        visibleOnDesktop: block.visibleOnDesktop,
+      })),
+    );
+    await db
+      .update(pages)
+      .set({ publishedVersionId: version.id, status: "published" })
+      .where(eq(pages.id, homePage.id));
+  }
+
+  const [existingProduct] = await db.select({ id: products.id }).from(products).limit(1);
+  if (existingProduct) {
+    console.log("Identidad actualizada; los datos comerciales de ejemplo ya existían.");
+    return;
   }
 
   console.log("Sembrando familias de color y categorías...");

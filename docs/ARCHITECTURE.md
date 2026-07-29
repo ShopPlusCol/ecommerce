@@ -61,3 +61,11 @@ Next.js 16 renombró `middleware.ts` a `proxy.ts` (mismo comportamiento, funció
 ## Decisiones de modelado no cubiertas literalmente por el prompt
 
 Ver [`DECISIONS.md`](./DECISIONS.md).
+# Implementación de Fase 3
+
+El composition root usa adaptadores Drizzle para catálogo, promociones, páginas
+y envíos. `getRuntimeDb()` selecciona SQLite en Node/Docker y D1 en Workers.
+Better Auth persiste usuarios/sesiones/cuentas sobre el mismo esquema y el DAL
+de autorización resuelve roles/permisos por solicitud. Medios, pagos,
+notificaciones y analítica permanecen detrás de puertos; los adaptadores local,
+R2, transferencia manual y Mercado Pago no contaminan el dominio.

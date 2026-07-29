@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Heart, Menu, Search, ShoppingBag, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { siteConfig } from "@/lib/site-config";
+import type { BrandSettings } from "@/modules/settings/brand";
+import { BrandMark } from "./brand-mark";
 import { useCart } from "@/modules/cart/cart-context";
 import { useFavorites } from "@/modules/favorites/favorites-context";
 
@@ -19,7 +20,7 @@ const NAV_LINKS = [
 const ICON_BUTTON =
   "flex h-control-md w-control-md items-center justify-center rounded-full text-text transition-colors duration-fast hover:bg-surface-sunken";
 
-export function SiteHeader() {
+export function SiteHeader({ brand }: { brand: BrandSettings }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
@@ -88,7 +89,7 @@ export function SiteHeader() {
           href="/"
           className="justify-self-center font-display text-xl font-semibold tracking-[0.18em] text-text uppercase sm:text-2xl"
         >
-          {siteConfig.brandName}
+          <BrandMark brand={brand} />
         </Link>
 
         {/* Derecha: acciones */}

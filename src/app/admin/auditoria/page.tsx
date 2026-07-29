@@ -1,20 +1,9 @@
-import type { Metadata } from "next";
-import { History } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Auditoría" };
-
-export default function AdminAuditPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Auditoría"
-      description="Registro de quién, qué, cuándo y por qué en acciones sensibles."
-      icon={History}
-      plannedFields={[
-        "Cambios de precio, stock, pagos manuales y estado de pedido",
-        "Reembolsos, reglas de envío, cupones y promociones",
-        "Antes/después de forma segura, con identificador de correlación",
-      ]}
-    />
-  );
+import { desc } from "drizzle-orm";
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { auditLogs } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("audit", "read"); const rows = await (await getRuntimeDb()).select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(200);
+  return <AdminRecordList title="Auditoría" description="Últimas 200 operaciones sensibles, sin secretos." columns={["Fecha", "Acción", "Entidad", "Usuario", "Motivo"]} rows={rows.map((r) => ({ id: r.id, values: [r.createdAt.toLocaleString("es-CO"), r.action, `${r.entityType}:${r.entityId}`, r.userId, r.reason] }))} />;
 }
