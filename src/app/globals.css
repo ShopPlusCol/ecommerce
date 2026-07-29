@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+/*
+ * Sistema de diseño ShopPlusCol.
+ * Fuente única de verdad para color, tipografía, espaciado, radios,
+ * sombras y movimiento. Los componentes solo deben usar las variables
+ * "--color-*", "--font-*", "--radius-*", "--shadow-*" y "--text-*"
+ * expuestas por @theme inline (o las clases de Tailwind que generan),
+ * nunca los valores crudos "--tk-*".
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Paleta cruda */
+  --tk-white: #ffffff;
+  --tk-cream-50: #fdfbf8;
+  --tk-cream-100: #faf6f1;
+  --tk-cream-200: #f3ece3;
+  --tk-carbon-100: #e6e4e1;
+  --tk-carbon-200: #cbc7c2;
+  --tk-carbon-300: #a39d96;
+  --tk-carbon-400: #766f68;
+  --tk-carbon-500: #55504a;
+  --tk-carbon-600: #3d3934;
+  --tk-carbon-700: #2a2724;
+  --tk-carbon-800: #1c1a18;
+  --tk-carbon-900: #131110;
+
+  --tk-cherry-50: #fbeef0;
+  --tk-cherry-100: #f3ccd4;
+  --tk-cherry-200: #e5a0ae;
+  --tk-cherry-300: #cf6e83;
+  --tk-cherry-400: #ab3d57;
+  --tk-cherry-500: #87233d;
+  --tk-cherry-600: #6f1a32;
+  --tk-cherry-700: #551426;
+
+  --tk-rose-100: #f7e4e6;
+  --tk-rose-300: #e6b8c0;
+
+  --tk-success-500: #2f6f4e;
+  --tk-success-100: #e4f0e8;
+  --tk-warning-500: #96650f;
+  --tk-warning-100: #f6ecd8;
+  --tk-danger-500: #a92b25;
+  --tk-danger-100: #f7e2e0;
+  --tk-info-500: #2454a0;
+  --tk-info-100: #e3ebf7;
+
+  /* Tokens semánticos — tema claro (tienda y panel por defecto) */
+  --tk-surface: var(--tk-cream-50);
+  --tk-surface-raised: var(--tk-white);
+  --tk-surface-sunken: var(--tk-cream-200);
+  --tk-border: var(--tk-carbon-100);
+  --tk-border-strong: var(--tk-carbon-200);
+
+  --tk-text: var(--tk-carbon-800);
+  --tk-text-muted: var(--tk-carbon-500);
+  --tk-text-subtle: var(--tk-carbon-400);
+  --tk-text-inverted: var(--tk-cream-50);
+
+  --tk-brand: var(--tk-cherry-500);
+  --tk-brand-hover: var(--tk-cherry-600);
+  --tk-brand-active: var(--tk-cherry-700);
+  --tk-brand-soft: var(--tk-cherry-50);
+  --tk-brand-contrast: var(--tk-white);
+
+  --tk-accent-rose: var(--tk-rose-300);
+  --tk-accent-rose-soft: var(--tk-rose-100);
+
+  --tk-success: var(--tk-success-500);
+  --tk-success-soft: var(--tk-success-100);
+  --tk-warning: var(--tk-warning-500);
+  --tk-warning-soft: var(--tk-warning-100);
+  --tk-danger: var(--tk-danger-500);
+  --tk-danger-soft: var(--tk-danger-100);
+  --tk-info: var(--tk-info-500);
+  --tk-info-soft: var(--tk-info-100);
+
+  --tk-focus-ring: var(--tk-cherry-400);
+
+  /* Radios */
+  --tk-radius-sm: 6px;
+  --tk-radius-md: 10px;
+  --tk-radius-lg: 16px;
+  --tk-radius-xl: 22px;
+  --tk-radius-full: 9999px;
+
+  /* Sombras (sutiles, sin abusar) */
+  --tk-shadow-xs: 0 1px 2px rgba(19, 17, 16, 0.05);
+  --tk-shadow-sm: 0 2px 8px rgba(19, 17, 16, 0.06);
+  --tk-shadow-md: 0 8px 24px rgba(19, 17, 16, 0.08);
+  --tk-shadow-lg: 0 16px 40px rgba(19, 17, 16, 0.12);
+
+  /* Controles (alturas táctiles) */
+  --tk-control-sm: 36px;
+  --tk-control-md: 44px;
+  --tk-control-lg: 52px;
+
+  /* Movimiento */
+  --tk-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --tk-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --tk-duration-fast: 120ms;
+  --tk-duration-base: 200ms;
+  --tk-duration-slow: 320ms;
+}
+
+/* Variante oscura reservada para el panel administrativo (opt-in vía data-theme) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --tk-surface: var(--tk-carbon-900);
+  --tk-surface-raised: var(--tk-carbon-800);
+  --tk-surface-sunken: #0d0c0b;
+  --tk-border: var(--tk-carbon-700);
+  --tk-border-strong: var(--tk-carbon-600);
+
+  --tk-text: var(--tk-cream-100);
+  --tk-text-muted: var(--tk-carbon-300);
+  --tk-text-subtle: var(--tk-carbon-400);
+  --tk-text-inverted: var(--tk-carbon-900);
+
+  --tk-brand: var(--tk-cherry-400);
+  --tk-brand-hover: var(--tk-cherry-300);
+  --tk-brand-active: var(--tk-cherry-200);
+  --tk-brand-soft: rgba(171, 61, 87, 0.16);
+  --tk-brand-contrast: var(--tk-carbon-900);
+}
+
+@theme inline {
+  /* Color semántico expuesto como utilidades Tailwind: bg-surface, text-text, border-border, etc. */
+  --color-surface: var(--tk-surface);
+  --color-surface-raised: var(--tk-surface-raised);
+  --color-surface-sunken: var(--tk-surface-sunken);
+  --color-border: var(--tk-border);
+  --color-border-strong: var(--tk-border-strong);
+
+  --color-text: var(--tk-text);
+  --color-text-muted: var(--tk-text-muted);
+  --color-text-subtle: var(--tk-text-subtle);
+  --color-text-inverted: var(--tk-text-inverted);
+
+  --color-brand: var(--tk-brand);
+  --color-brand-hover: var(--tk-brand-hover);
+  --color-brand-active: var(--tk-brand-active);
+  --color-brand-soft: var(--tk-brand-soft);
+  --color-brand-contrast: var(--tk-brand-contrast);
+
+  --color-accent-rose: var(--tk-accent-rose);
+  --color-accent-rose-soft: var(--tk-accent-rose-soft);
+
+  --color-success: var(--tk-success);
+  --color-success-soft: var(--tk-success-soft);
+  --color-warning: var(--tk-warning);
+  --color-warning-soft: var(--tk-warning-soft);
+  --color-danger: var(--tk-danger);
+  --color-danger-soft: var(--tk-danger-soft);
+  --color-info: var(--tk-info);
+  --color-info-soft: var(--tk-info-soft);
+
+  --color-focus-ring: var(--tk-focus-ring);
+
+  /* Tipografía */
+  --font-display: var(--font-fraunces), "Iowan Old Style", serif;
+  --font-sans: var(--font-manrope), system-ui, "Segoe UI", sans-serif;
+
+  --text-xs: clamp(0.72rem, 0.7rem + 0.1vw, 0.78rem);
+  --text-sm: clamp(0.82rem, 0.8rem + 0.1vw, 0.88rem);
+  --text-base: clamp(0.94rem, 0.9rem + 0.2vw, 1rem);
+  --text-md: clamp(1.05rem, 1rem + 0.25vw, 1.15rem);
+  --text-lg: clamp(1.2rem, 1.1rem + 0.4vw, 1.4rem);
+  --text-xl: clamp(1.45rem, 1.3rem + 0.7vw, 1.75rem);
+  --text-2xl: clamp(1.8rem, 1.5rem + 1.2vw, 2.4rem);
+  --text-3xl: clamp(2.2rem, 1.8rem + 1.8vw, 3.2rem);
+  --text-4xl: clamp(2.6rem, 2rem + 2.6vw, 4rem);
+
+  /* Radios y sombras */
+  --radius-sm: var(--tk-radius-sm);
+  --radius-md: var(--tk-radius-md);
+  --radius-lg: var(--tk-radius-lg);
+  --radius-xl: var(--tk-radius-xl);
+  --radius-full: var(--tk-radius-full);
+
+  --shadow-xs: var(--tk-shadow-xs);
+  --shadow-sm: var(--tk-shadow-sm);
+  --shadow-md: var(--tk-shadow-md);
+  --shadow-lg: var(--tk-shadow-lg);
+
+  /* Alturas de control como escala de espaciado: h-control-md, w-control-md, p-control-md */
+  --spacing-control-sm: var(--tk-control-sm);
+  --spacing-control-md: var(--tk-control-md);
+  --spacing-control-lg: var(--tk-control-lg);
+
+  /* Movimiento: ease-standard, ease-emphasized, duration-fast|base|slow */
+  --ease-standard: var(--tk-ease-standard);
+  --ease-emphasized: var(--tk-ease-emphasized);
+  --duration-fast: var(--tk-duration-fast);
+  --duration-base: var(--tk-duration-base);
+  --duration-slow: var(--tk-duration-slow);
+}
+
+/* Tokens de layout sin equivalente de utilidad Tailwind: se consumen como var() directamente */
+:root {
+  --space-section-y-sm: clamp(2.5rem, 2rem + 2vw, 4rem);
+  --space-section-y-lg: clamp(3.5rem, 2.5rem + 3vw, 6rem);
+  --content-max-width: 1280px;
+  --content-max-width-narrow: 760px;
+  --content-padding-x: clamp(1rem, 0.8rem + 1vw, 2.5rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-brand-soft);
+  color: var(--color-text);
+}

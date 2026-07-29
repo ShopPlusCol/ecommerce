@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "shopluscol-ecommerce",
+  "main": ".open-next/worker.js",
+  // Fecha de compatibilidad conocida y estable. Antes de desplegar a
+  // producción, confirma si conviene actualizarla (ver docs/DEPLOYMENT.md).
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "shopluscol-ecommerce"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      // Crea la base con `npx wrangler d1 create shopluscol-db` y pega aquí
+      // el database_id real antes de desplegar (ver docs/DEPLOYMENT.md).
+      "database_name": "shopluscol-db",
+      "database_id": "REPLACE_WITH_REAL_D1_DATABASE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "shopluscol-ecommerce-opennext-cache"
+    },
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "shopluscol-media"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  },
+  "vars": {
+    "MAINTENANCE_MODE": "false"
+  }
+}
