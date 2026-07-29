@@ -2,9 +2,9 @@
 
 ## Estado
 
-**Fase 4 implementada técnicamente en `fase-4-codex`, pendiente de las tres
+**Fase 4.1 implementada técnicamente en `fase-4-codex`, pendiente de las tres
 validaciones manuales finales y de la aprobación expresa del propietario.**
-Base recibida: `80d165c`. No se ha hecho merge a `main`, despliegue, dominio,
+Continuación recibida desde `e6d2627`. No se ha hecho merge a `main`, despliegue, dominio,
 creación de recursos Cloudflare ni activación de pagos o eventos reales.
 
 ## Entregado
@@ -31,17 +31,18 @@ creación de recursos Cloudflare ni activación de pagos o eventos reales.
 ## Verificación local
 
 - `typecheck`, `lint`, build Next y build Cloudflare: correctos.
-- Vitest: 46/46. Playwright: 6/6 sobre base aislada.
+- Vitest: 62/62 en 14 archivos. Playwright: 8/8 sobre base aislada.
 - Axe WCAG 2.2 AA crítica/seria: 0 hallazgos en rutas principales.
-- Responsive: sin overflow a 390×844 y 1440×900.
+- Responsive: sin overflow en storefront y rutas administrativas a 390×844,
+  768×1024, 1366×768, 1440×900 y 1920×1080.
 - Lighthouse local producción:
   - Inicio: Performance 90, Accessibility 100, Best Practices 100, SEO 100;
     LCP 3,3 s, TBT 190 ms, CLS 0.
   - Producto: 95/100/100/100; LCP 2,9 s, TBT 40 ms, CLS 0.
-- Auditoría de producción: 0 vulnerabilidades altas/críticas; quedan 4
-  moderadas en la cadena de desarrollo de Drizzle Kit/esbuild. La auditoría
-  completa añade avisos altos en tooling de ESLint/OpenNext sin corrección
-  compatible; no se aplicó `--force`.
+- `npm audit --omit=dev` reporta 4 avisos moderados en la cadena de Drizzle
+  Kit/esbuild; la auditoría completa reporta 17 avisos (4 moderados y 13 altos)
+  al añadir ESLint/minimatch y OpenNext/node-minify. npm no ofrece corrección
+  compatible: solo retrocesos o saltos mayores; no se aplicó `--force`.
 
 ## Pendiente externo y humano
 
@@ -53,3 +54,15 @@ creación de recursos Cloudflare ni activación de pagos o eventos reales.
 - Contenido: fotografías reales, datos legales, cuenta bancaria, contactos,
   textos comerciales y dominio definitivo.
 - La salida a producción **no está aprobada**.
+# Avance Fase 4.1 — panel administrativo completo (2026-07-29)
+
+- Inventario, envíos, editor visual, analítica, integraciones, usuarios/roles, simulador, auditoría, configuración, estado y dashboard cuentan con controles persistentes.
+- El shell administrativo incorpora navegación móvil, búsqueda real y sidebar colapsable; los estados y métodos visibles se traducen al español.
+- Migraciones `0007` y `0008` agregan métodos de pago permitidos por regla y posición persistente del simulador.
+- Productos cuentan con galería de carga directa y editor masivo sin límite funcional fijo en `/admin/productos/edicion-masiva`; el guardado se fragmenta en bloques de transporte.
+- Los campos de imagen de categorías, promociones, pop-ups y configuración permiten cargar desde el equipo y usar el recurso inmediatamente.
+- Pedidos y clientes incorporan limpieza total exclusiva del propietario, doble confirmación, auditoría y liberación de reservas.
+- Las acciones de creación muestran nombres específicos y los vacíos explican qué ocurrirá o cuál es el siguiente paso.
+- Matriz funcional y visual: `docs/PHASE_4_1_MATRIX.md`.
+- Pendientes externos: credenciales y pruebas sandbox de Mercado Pago/Meta/SMTP; creación y comprobación de D1/R2/Worker; dominio y contenido legal definitivo.
+- Estado de producción: **no aprobado**. La rama continúa aislada de `main`.

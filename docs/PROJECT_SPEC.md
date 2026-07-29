@@ -26,9 +26,11 @@ envíos nacionales.
 
 ## Estado de fases
 
-Fases 1–3 aprobadas. Fase 4 implementada localmente y pendiente de tres
-validaciones manuales finales. No existe aprobación de producción.
+Fases 1–3 aprobadas. Fase 4 y su ampliación administrativa 4.1 están
+implementadas localmente y pendientes de tres validaciones manuales finales.
+No existe aprobación de producción.
 
 Ver [PHASE_STATUS.md](./PHASE_STATUS.md),
+[PHASE_4_1_MATRIX.md](./PHASE_4_1_MATRIX.md),
 [PHASE_4_CHECKLIST.md](./PHASE_4_CHECKLIST.md) y
 [DEPLOYMENT.md](./DEPLOYMENT.md).
