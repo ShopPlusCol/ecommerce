@@ -1,20 +1,8 @@
-import type { Metadata } from "next";
-import { ShoppingCart } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Colecciones" };
-
-export default function AdminCollectionsPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Colecciones"
-      description="Colecciones manuales, dinámicas por reglas, programadas o destacadas."
-      icon={ShoppingCart}
-      plannedFields={[
-        "Reglas por categoría, etiqueta, precio, stock, fecha o ventas",
-        "Recomendaciones globales, por categoría, producto, carrito o colección",
-        "Prioridad determinista y visible",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { collections } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("catalog", "read"); const rows = await (await getRuntimeDb()).select().from(collections);
+  return <AdminRecordList title="Colecciones" description="Colecciones manuales y dinámicas reales." columns={["Nombre", "Slug", "Tipo", "Destacada"]} rows={rows.map((r) => ({ id: r.id, values: [r.name, r.slug, r.type, r.featured ? "Sí" : "No"] }))} />;
 }

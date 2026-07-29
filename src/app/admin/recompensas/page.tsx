@@ -1,20 +1,8 @@
-import type { Metadata } from "next";
-import { Gift } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Recompensas" };
-
-export default function AdminRewardsPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Recompensas"
-      description="Reglas de recompensa y su rendimiento (costo y uso real)."
-      icon={Gift}
-      plannedFields={[
-        "Mensaje de progreso y de beneficio desbloqueado",
-        "Métodos de envío y pago válidos por regla",
-        "Costo de la recompensa y número de redenciones",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { rewardRules } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("promotions", "read"); const rows = await (await getRuntimeDb()).select().from(rewardRules);
+  return <AdminRecordList title="Recompensas" description="Metas y beneficios persistidos." columns={["Nombre", "Condición", "Meta", "Beneficio", "Estado"]} rows={rows.map((r) => ({ id: r.id, values: [r.name, r.conditionType, r.targetValue, r.rewardType, r.status] }))} />;
 }

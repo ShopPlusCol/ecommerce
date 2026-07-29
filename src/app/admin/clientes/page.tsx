@@ -1,21 +1,8 @@
-import type { Metadata } from "next";
-import { Users } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Clientes" };
-
-export default function AdminCustomersPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Clientes"
-      description="Ficha de cliente creada automáticamente al primer pedido, sin cuenta obligatoria."
-      icon={Users}
-      plannedFields={[
-        "Direcciones, pedidos, valor total y ticket promedio",
-        "Primera y última compra, cupones usados",
-        "Consentimiento, notas internas y etiquetas",
-        "Deduplicación prudente (sin fusión automática)",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { customers } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("customers", "read"); const rows = await (await getRuntimeDb()).select().from(customers);
+  return <AdminRecordList title="Clientes" description="Clientes generados por pedidos, sin métricas inventadas." columns={["Nombre", "Teléfono", "Correo", "Último pedido"]} rows={rows.map((r) => ({ id: r.id, values: [r.fullName, r.phone, r.email, r.lastOrderAt?.toLocaleDateString("es-CO")] }))} />;
 }

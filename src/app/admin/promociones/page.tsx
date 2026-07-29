@@ -1,21 +1,8 @@
-import type { Metadata } from "next";
-import { BadgePercent } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Promociones" };
-
-export default function AdminPromotionsPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Promociones"
-      description="Motor de recompensas configurable para aumentar el ticket promedio."
-      icon={BadgePercent}
-      plannedFields={[
-        "Envío gratis, producto gratuito, descuento fijo o porcentual",
-        "Condición por monto, cantidad, combinación, categoría o zona",
-        "Prioridad, acumulable, fechas de vigencia y límite total",
-        "Vista previa y explicación de qué regla ganó ante conflictos",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { promotions } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("promotions", "read"); const rows = await (await getRuntimeDb()).select().from(promotions);
+  return <AdminRecordList title="Promociones" description="Campañas y vigencias persistidas." columns={["Nombre", "Inicio", "Fin", "Estado"]} rows={rows.map((r) => ({ id: r.id, values: [r.name, r.startsAt?.toLocaleDateString("es-CO"), r.endsAt?.toLocaleDateString("es-CO"), r.status] }))} />;
 }

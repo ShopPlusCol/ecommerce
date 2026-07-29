@@ -1,6 +1,6 @@
 import type { DemoOrder } from "@/modules/checkout/order-types";
 
-/** Clave de sessionStorage donde el checkout deja el pedido de demostración recién creado. */
+/** Clave de sessionStorage para la confirmación del pedido recién creado. */
 export const LAST_ORDER_KEY = "shoppluscol.lastOrder.v1";
 
 export function readLastOrder(): DemoOrder | null {

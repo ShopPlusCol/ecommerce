@@ -1,6 +1,8 @@
 # DATA_MODEL
 
-Esquema completo en `src/infrastructure/db/schema/*.ts` (Drizzle, dialecto SQLite — compatible D1 y better-sqlite3). Migración inicial generada en `drizzle/0000_*.sql`. 56 tablas, organizadas en 11 archivos por dominio.
+Esquema completo en `src/infrastructure/db/schema/*.ts` (Drizzle, dialecto
+SQLite — compatible D1 y better-sqlite3). Migraciones versionadas en
+`drizzle/0000_*.sql` a `0004_*.sql`. 62 tablas organizadas por dominio.
 
 ## Convenciones
 
@@ -12,7 +14,11 @@ Esquema completo en `src/infrastructure/db/schema/*.ts` (Drizzle, dialecto SQLit
 
 ## Identidad y acceso (`identity.ts`)
 
-`admin_users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `sessions` — RBAC simple con roles predefinidos (propietario, administrador, operaciones, editor de contenido, analista de solo lectura). Contraseñas con `scrypt` (`src/modules/auth/password.ts`); login real y sesiones HttpOnly/Secure llegan en la Fase 3.
+`admin_users`, `roles`, `permissions`, `role_permissions`, `user_roles`,
+`sessions`, `auth_accounts`, `auth_verifications`, `auth_rate_limits` y
+`auth_login_attempts` — Better Auth, sesiones revocables y RBAC con cinco roles.
+Las credenciales usan el hash mantenido por Better Auth; las cookies son
+HttpOnly/SameSite y Secure en producción.
 
 ## Catálogo (`catalog.ts`)
 
@@ -78,3 +84,16 @@ orders ─┬─ order_items (snapshot)
         ├─ shipments
         └─ coupon_redemptions / reward_redemptions
 ```
+# Extensiones de Fase 3
+
+- `auth_accounts`, `auth_verifications`, `auth_rate_limits` y
+  `auth_login_attempts` completan Better Auth y el bloqueo persistente.
+- `sessions.token` permite revocación real y conserva filas antiguas durante la
+  migración.
+- `orders.payment_method` y `orders.lookup_token_hash` guardan el método elegido
+  y protegen la consulta pública.
+- `inventory_reservations` separa reservas temporales de stock vendido y permite
+  liberación/consumo idempotente.
+- `media_assets`, `settings`, `webhook_events`, `audit_logs` e
+  `idempotency_keys` son las fuentes autoritativas para medios, marca,
+  integraciones, auditoría y deduplicación.

@@ -1,21 +1,8 @@
-import type { Metadata } from "next";
-import { Blocks } from "lucide-react";
-import { AdminModulePlaceholder } from "@/components/admin/admin-module-placeholder";
-
-export const metadata: Metadata = { title: "Editor visual" };
-
-export default function AdminPageBuilderPage() {
-  return (
-    <AdminModulePlaceholder
-      title="Editor visual"
-      description="Constructor por secciones (no lienzo libre) para la página de inicio y páginas editoriales."
-      icon={Blocks}
-      plannedFields={[
-        "Bloques: hero, banner, carrusel, colecciones, testimonios, FAQ, CTA y más",
-        "Borrador, vista previa segura, publicación e historial de versiones",
-        "Reordenamiento con drag-and-drop y alternativa accesible",
-        "Plantillas: Halloween, Día de la Madre, lanzamiento, etc.",
-      ]}
-    />
-  );
+import { AdminRecordList } from "@/components/admin/admin-record-list";
+import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { pages } from "@/infrastructure/db/schema";
+export default async function Page() {
+  await requirePermission("content", "read"); const rows = await (await getRuntimeDb()).select().from(pages);
+  return <AdminRecordList title="Editor visual" description="El storefront consume las versiones publicadas de este mismo contrato de bloques." columns={["Página", "Slug", "Inicio", "Estado", "Versión publicada"]} rows={rows.map((r) => ({ id: r.id, values: [r.title, r.slug, r.isHome ? "Sí" : "No", r.status, r.publishedVersionId] }))} />;
 }

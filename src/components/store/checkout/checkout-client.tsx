@@ -41,7 +41,8 @@ const EMPTY_LOCATION: LocationForm = {
 export function CheckoutClient() {
   const router = useRouter();
   const { cart, lines, coupon, rewards, totals, clearCart, isHydrated } = useCart();
-  const { track } = useAnalytics();
+  const { track, consent: analyticsConsent } = useAnalytics();
+  const idempotencyKey = React.useRef(crypto.randomUUID());
 
   const [contact, setContact] = React.useState<Contact>({ fullName: "", phone: "", email: "" });
   const [location, setLocation] = React.useState<LocationForm>(EMPTY_LOCATION);
@@ -160,6 +161,7 @@ export function CheckoutClient() {
 
     setSubmitting(true);
     const result = await createDemoOrderAction({
+      idempotencyKey: idempotencyKey.current,
       items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
       couponCode: coupon?.code ?? null,
       destination: {
@@ -177,7 +179,7 @@ export function CheckoutClient() {
         addressComplement: location.addressComplement.trim(),
         deliveryInstructions: location.deliveryInstructions.trim(),
       },
-      consent,
+      consent: { ...consent, analytics: analyticsConsent.analytics },
     });
     setSubmitting(false);
 
@@ -192,6 +194,10 @@ export function CheckoutClient() {
       // Si no hay sessionStorage, la confirmación mostrará un estado genérico.
     }
     clearCart();
+    if (result.order.checkoutUrl) {
+      window.location.assign(result.order.checkoutUrl);
+      return;
+    }
     router.push("/checkout/confirmacion");
   };
 
@@ -365,9 +371,8 @@ export function CheckoutClient() {
               </p>
             ) : null}
             <p className="rounded-md bg-info-soft p-3 text-xs text-info">
-              El cobro real con Mercado Pago y la verificación de transferencias se activan en la
-              siguiente fase. Este checkout genera un pedido de demostración con el estado financiero
-              correcto.
+              El pedido se registra al confirmar. Mercado Pago solo aparece cuando está configurado;
+              las transferencias quedan pendientes de revisión y un comprobante no equivale a pago aprobado.
             </p>
           </CardContent>
         </Card>
@@ -445,7 +450,7 @@ export function CheckoutClient() {
               Confirmar pedido
             </Button>
             <p className="text-center text-xs text-text-subtle">
-              Pedido de demostración — no se realiza ningún cobro real todavía.
+              Los precios, descuentos, envío, método y stock se validan nuevamente en el servidor.
             </p>
           </CardContent>
         </Card>

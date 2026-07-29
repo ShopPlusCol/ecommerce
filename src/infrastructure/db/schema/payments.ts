@@ -1,6 +1,7 @@
 import { integer, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { idColumn, timestampColumns } from "./_helpers";
 import { orders } from "./orders";
+import { mediaAssets } from "./content";
 
 /** Sección 18: puede haber varias transacciones por pedido (anticipo + saldo). */
 export const payments = sqliteTable(
@@ -60,4 +61,16 @@ export const refunds = sqliteTable("refunds", {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
+});
+
+/** Comprobante de transferencia: subirlo nunca aprueba el pago. */
+export const manualTransferProofs = sqliteTable("manual_transfer_proofs", {
+  id: idColumn(),
+  paymentId: text("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }),
+  mediaAssetId: text("media_asset_id").notNull().references(() => mediaAssets.id, { onDelete: "restrict" }),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
+  reviewedByUserId: text("reviewed_by_user_id"),
+  reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
+  rejectionReason: text("rejection_reason"),
+  ...timestampColumns,
 });

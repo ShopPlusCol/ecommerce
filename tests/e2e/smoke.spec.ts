@@ -12,13 +12,26 @@ test("navega del inicio al catálogo y a un producto", async ({ page }) => {
   await page.getByRole("link", { name: "Ver catálogo" }).first().click();
   await expect(page).toHaveURL(/\/catalogo$/);
 
-  await page.getByRole("link", { name: "Amazon Brown" }).click();
+  await page.locator('a:visible', { hasText: "Amazon Brown" }).first().click();
   await expect(page).toHaveURL(/\/productos\/amazon-brown$/);
   await expect(page.getByRole("heading", { name: "Amazon Brown" })).toBeVisible();
 });
 
-test("el panel administrativo carga con navegación lateral", async ({ page }) => {
+test("el panel administrativo exige autenticación", async ({ page }) => {
   await page.goto("/admin");
+  await expect(page).toHaveURL(/\/acceso-admin/);
+  await expect(page.getByRole("heading", { name: "Acceso administrativo" })).toBeVisible();
+  await expect(page.getByLabel("Correo")).toBeVisible();
+});
+
+test("el propietario inicia y cierra sesión", async ({ page }) => {
+  test.skip(!process.env.E2E_ADMIN_PASSWORD, "Requiere credencial efímera de la base local.");
+  await page.goto("/acceso-admin");
+  await page.getByLabel("Correo").fill(process.env.E2E_ADMIN_EMAIL ?? "owner@shoppluscol.local");
+  await page.getByLabel("Contraseña").fill(process.env.E2E_ADMIN_PASSWORD!);
+  await page.getByRole("button", { name: "Ingresar" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole("heading", { name: "Resumen" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Pedidos" })).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await expect(page).toHaveURL(/\/acceso-admin$/);
 });

@@ -22,7 +22,9 @@ Catálogo, carrito y checkout completos son entregables de la **Fase 2**. Para n
 
 ## Autenticación provisional del seed
 
-El usuario propietario creado por `db:seed` usa hash `scrypt` (`node:crypto`, sin dependencias nuevas) en vez de una librería de autenticación completa, porque el login real (sesiones, cookies, roles aplicados) es un entregable explícito de la Fase 3. El esquema de hash puede mantenerse o migrarse a una librería dedicada según la UX que se necesite en esa fase (2FA, etc.).
+La decisión provisional de Fase 1 de usar `scrypt` directo fue reemplazada en
+Fase 3 por Better Auth. El seed migra/crea la cuenta `credential` con el hash de
+la librería mantenida y no conserva una contraseña pública fija.
 
 ## Tabla `promotions` (sección 28.6)
 
@@ -56,9 +58,12 @@ El catálogo, cupones, recompensas, zonas de envío y la página de inicio se si
 
 La lógica de totales, cupones, recompensas, envío y división de pago vive en `domain/services/` como funciones puras. El cliente la usa para respuesta inmediata (drawer, checkout) y las Server Actions la reutilizan para el cálculo autoritativo. No hay una segunda implementación en el frontend (sección 1.3). Las Server Actions reconstruyen el carrito desde el catálogo por ID, ignorando los precios enviados por el cliente (sección 29).
 
-## Pedido de checkout de demostración, sin persistir ni cobrar
+## Pedido de checkout persistente (actualización de Fase 3)
 
-La Server Action `createDemoOrderAction` calcula el resumen financiero autoritativo y genera un número de pedido, pero **no** escribe en la base de datos ni cobra: la persistencia de pedidos, Mercado Pago y las transferencias son entregables de la Fase 3. El pedido resultante se pasa a la confirmación vía `sessionStorage`. Esto evita fingir una integración de pago activa (sección 1.3) manteniendo un recorrido completo evaluable.
+La Server Action conserva su nombre por compatibilidad interna, pero ahora
+reconstruye el carrito, reserva inventario y persiste cliente, instantánea,
+pedido, pago, consentimiento e idempotencia. `sessionStorage` solo transporta
+la vista de confirmación y el token de consulta; no es la fuente de verdad.
 
 ## Editor visual: modelo de bloques renderizado ya en la tienda
 
@@ -71,3 +76,18 @@ La capa de analítica (`modules/analytics`) registra eventos solo tras el consen
 ## `set-state-in-effect`: hidratación desde almacenamiento del navegador
 
 Los proveedores de carrito, favoritos, consentimiento y la confirmación hidratan su estado desde `localStorage`/`sessionStorage` dentro de un `useEffect` de montaje. Esto es intencional para que el HTML del servidor y el primer render del cliente coincidan (evita desajustes de hidratación); el estado guardado se aplica después. La regla `react-hooks/set-state-in-effect` marca este patrón como falso positivo y se desactiva puntualmente con justificación en cada punto. El efecto de cotización de envío del checkout es un efecto de obtención de datos (sistema externo) y sigue el mismo criterio.
+# Decisiones de Fase 3
+
+- **Better Auth 1.6** sobre Drizzle: compatible con Next 16/React 19, sesiones
+  revocables, cookies seguras y rate limiting persistente. La inscripción
+  pública está desactivada.
+- **Checkout Pro por REST:** la preferencia se crea en backend y `Purchase` no
+  depende del redirect. El webhook valida HMAC, consulta el pago autoritativo y
+  deduplica por evento antes de cambiar pedido/inventario.
+- **Reserva condicional:** `quantity_on_hand - quantity_reserved` debe cubrir la
+  solicitud en la misma actualización SQL; así una segunda compra no puede
+  sobreasignar stock.
+- **Medios fuera de settings:** `settings` solo contiene configuración/URLs;
+  bytes en disco local o R2, nunca base64.
+- **Credenciales externas honestas:** Mercado Pago, Meta, SMTP y R2 permanecen
+  desactivados o no entregados hasta recibir secretos de prueba/autorización.

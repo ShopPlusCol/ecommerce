@@ -22,6 +22,7 @@ export type ConversionEvent = {
   contentIds?: string[];
   contentType?: "product" | "product_group";
   orderId?: string;
+  userData?: { email?: string; phone?: string };
   utm?: {
     source?: string;
     medium?: string;

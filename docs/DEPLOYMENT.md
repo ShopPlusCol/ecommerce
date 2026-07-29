@@ -25,10 +25,17 @@ npm run cf:deploy      # opennextjs-cloudflare deploy
 Nunca en `wrangler.jsonc` en texto plano salvo valores no sensibles (`MAINTENANCE_MODE`). Secretos reales:
 
 ```bash
-npx wrangler secret put MERCADOPAGO_ACCESS_TOKEN
-npx wrangler secret put META_CONVERSIONS_API_TOKEN
-npx wrangler secret put SESSION_SECRET
+npx wrangler secret put BETTER_AUTH_SECRET
+npx wrangler secret put MERCADO_PAGO_ACCESS_TOKEN
+npx wrangler secret put MERCADO_PAGO_WEBHOOK_SECRET
+npx wrangler secret put META_CONVERSIONS_ACCESS_TOKEN
+npx wrangler secret put SMTP_PASSWORD
 ```
+
+Configura además `BETTER_AUTH_URL`, `NEXT_PUBLIC_SITE_URL`,
+`MERCADO_PAGO_TEST_MODE`, `MEDIA_PUBLIC_URL`, `META_PIXEL_ID`, `SMTP_HOST` y
+`SMTP_USER`. El adaptador R2 usa el binding `MEDIA_BUCKET`; no se creó ningún
+recurso real durante la Fase 3.
 
 ## Node / Docker (Hostinger, Railway, VPS, etc.)
 
@@ -52,3 +59,5 @@ La imagen no usa `output: "standalone"` (ver `docs/DECISIONS.md`); usa `next sta
 - [ ] `MAINTENANCE_MODE` probado en al menos un despliegue.
 - [ ] Backups de D1/SQLite verificados y con restauración probada al menos una vez.
 - [ ] Revisión de secretos y contenido temporal (sección 1.3) completada.
+- [ ] Login, logout, recuperación y rotación/revocación de sesiones probados.
+- [ ] Firma del webhook de Mercado Pago validada con el simulador oficial.

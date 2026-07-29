@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -59,3 +61,6 @@ docker-compose.override.yml
 # Base de datos local
 .data/*
 !.data/.gitkeep
+
+# Caché local del índice de proyecto
+.index_cache.json

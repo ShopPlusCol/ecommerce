@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
 import { fraunces, manrope } from "@/lib/fonts";
 import { siteConfig } from "@/lib/site-config";
+import { getBrandSettings } from "@/modules/settings/brand";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: {
-    default: `${siteConfig.brandName} — ${siteConfig.tagline}`,
-    template: `%s | ${siteConfig.brandName}`,
-  },
-  description: siteConfig.description,
-  openGraph: {
-    type: "website",
-    locale: siteConfig.locale,
-    siteName: siteConfig.brandName,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBrandSettings();
+  return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+    title: { default: `${brand.name} — ${brand.tagline}`, template: `%s | ${brand.name}` },
+    description: brand.description,
+    icons: { icon: brand.faviconUrl ?? undefined, apple: brand.appleTouchIconUrl ?? undefined },
+    openGraph: {
+      type: "website",
+      locale: siteConfig.locale,
+      siteName: brand.name,
+      images: brand.openGraphImageUrl ? [brand.openGraphImageUrl] : undefined,
+    },
+  };
+}
 
 export default function RootLayout({
   children,

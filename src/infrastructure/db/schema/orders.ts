@@ -46,7 +46,11 @@ export const orders = sqliteTable(
     customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
     status: text("status", { enum: ORDER_STATUSES }).notNull().default("draft"),
     paymentStatus: text("payment_status", { enum: PAYMENT_STATUSES }).notNull().default("unpaid"),
+    paymentMethod: text("payment_method", {
+      enum: ["mercado_pago", "cash_on_delivery", "shipping_advance_transfer", "transfer_full"],
+    }).notNull(),
     deliveryMethod: text("delivery_method", { enum: ["delivery", "pickup"] }).notNull(),
+    lookupTokenHash: text("lookup_token_hash").notNull(),
 
     customerFullName: text("customer_full_name").notNull(),
     customerPhone: text("customer_phone").notNull(),
@@ -77,6 +81,8 @@ export const orders = sqliteTable(
     utmCampaign: text("utm_campaign"),
     utmContent: text("utm_content"),
     utmTerm: text("utm_term"),
+    utmFirstAttribution: text("utm_first_attribution", { mode: "json" }).$type<Record<string, string>>(),
+    utmLastAttribution: text("utm_last_attribution", { mode: "json" }).$type<Record<string, string>>(),
 
     termsVersionAccepted: text("terms_version_accepted"),
     marketingConsent: integer("marketing_consent", { mode: "boolean" }).notNull().default(false),

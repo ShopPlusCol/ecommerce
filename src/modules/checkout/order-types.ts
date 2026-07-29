@@ -15,12 +15,13 @@ export type CheckoutContact = {
 };
 
 export type CreateDemoOrderInput = {
+  idempotencyKey: string;
   items: CartItemInput[];
   couponCode: string | null;
   destination: ShippingDestination;
   paymentMethod: PaymentMethodId;
   contact: CheckoutContact;
-  consent: { terms: boolean; marketing: boolean };
+  consent: { terms: boolean; marketing: boolean; analytics: boolean };
 };
 
 export type DemoOrderItem = {
@@ -36,7 +37,17 @@ export type DemoOrderItem = {
 export type DemoOrder = {
   orderNumber: string;
   createdAt: string;
-  isDemo: true;
+  isDemo: false;
+  lookupToken: string;
+  checkoutUrl: string | null;
+  manualTransfer: {
+    bankName: string;
+    accountType: string;
+    accountNumber: string;
+    accountHolder: string;
+    instructions: string;
+    qrUrl: string | null;
+  } | null;
   contact: CheckoutContact;
   destination: ShippingDestination;
   paymentMethod: PaymentMethodId;
