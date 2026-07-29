@@ -14,7 +14,7 @@ import { evaluateRewards, type RewardEvaluation } from "@/domain/services/reward
 import { computeSubtotal } from "@/domain/services/cart-pricing";
 import { lineKey, productToCartLine } from "@/modules/cart/cart-line";
 
-const STORAGE_KEY = "shopluscol.cart.v1";
+const STORAGE_KEY = "shoppluscol.cart.v1";
 
 type PersistedCart = { lines: CartLine[]; coupon: Coupon | null };
 

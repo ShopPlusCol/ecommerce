@@ -31,4 +31,4 @@ Estado actual: **scaffold de navegación**, sin autenticación ni persistencia t
 
 ## Usuario propietario de desarrollo
 
-Creado por `npm run db:seed` (`owner@shopluscol.local`, contraseña impresa una sola vez en consola). No tiene ningún efecto todavía porque no existe pantalla de login; sirve para validar que el modelo de roles y el hash de contraseña funcionan de extremo a extremo.
+Creado por `npm run db:seed` (`owner@shoppluscol.local`, contraseña impresa una sola vez en consola). No tiene ningún efecto todavía porque no existe pantalla de login; sirve para validar que el modelo de roles y el hash de contraseña funcionan de extremo a extremo.

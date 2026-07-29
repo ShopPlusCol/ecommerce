@@ -12,11 +12,11 @@ export const siteConfig = {
   timeZone: "America/Bogota",
   contact: {
     whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "573000000000",
-    supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "hola@shopluscol.com",
+    supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "hola@shoppluscol.com",
   },
   social: {
-    instagram: "https://instagram.com/shopluscol",
-    facebook: "https://facebook.com/shopluscol",
-    tiktok: "https://tiktok.com/@shopluscol",
+    instagram: "https://instagram.com/shoppluscol",
+    facebook: "https://facebook.com/shoppluscol",
+    tiktok: "https://tiktok.com/@shoppluscol",
   },
 } as const;

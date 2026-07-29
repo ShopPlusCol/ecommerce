@@ -10,7 +10,7 @@ export type ConsentState = {
   marketing: boolean;
 };
 
-const CONSENT_KEY = "shopluscol.consent.v1";
+const CONSENT_KEY = "shoppluscol.consent.v1";
 
 export type AnalyticsContextValue = {
   consent: ConsentState;

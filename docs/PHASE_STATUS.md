@@ -44,9 +44,14 @@ Las reglas financieras, la lógica y los contratos no cambiaron. El contenido ed
 
 Recorrido completo probado en local: home renderizada por bloques → producto → agregar al carrito (drawer con barra de progreso y cupón) → checkout con destino nacional (Bogotá) → envío cotizado $16.000 → método "envío ahora + saldo" → **pagar ahora $16.000 / pagar al recibir $49.000 / total $65.000** → confirmación con número de pedido. Filtros de catálogo por URL verificados. Sin errores de consola.
 
+## Corrección de nombrado técnico (shopluscol → shoppluscol)
+
+Se corrigió un identificador técnico mal escrito en todo el repositorio: `shopluscol` → `shoppluscol` (nombre visible de marca `ShopPlusCol` sin cambios). Alcance: `package.json`/`package-lock.json` (nombre del paquete), `wrangler.jsonc` (nombre del Worker, servicio, nombre de D1, buckets R2 previstos — sin crear recursos reales), `.env`/`.env.example` (correo de ejemplo), `src/lib/site-config.ts` (correo y redes sociales), claves de `localStorage`/`sessionStorage` en carrito/favoritos/analítica/checkout, seed (`owner@shoppluscol.local`), y documentación (`README.md`, `docs/ADMIN_GUIDE.md`, `docs/DEPLOYMENT.md`). No se crearon recursos reales en Cloudflare.
+
 ## Pendiente (fuera de alcance de la Fase 2)
 
 - **Fase 3**: autenticación y panel real conectado a la base de datos, carga masiva de productos, Mercado Pago en pruebas, Conversions API real, webhooks idempotentes, cupones/promociones/pop-ups administrables, transferencias manuales, auditoría, notificaciones.
+  - Incluye **identidad de marca configurable desde el panel**: nombre visible, logo (PNG/WebP/SVG sanitizado), modo de presentación (texto, imagen o ambos), logo específico para móvil y para footer, favicon, Apple Touch Icon, imagen para compartir (Open Graph), y datos de contacto/redes sociales. Se persistirá mediante la tabla `settings` y los archivos se relacionarán con `media_assets` + el adaptador de almacenamiento (sin base64 en `settings`). No implementado todavía: solo queda pendiente para la Fase 3.
 - **Fase 4**: simulador de lentes por foto, hardening de seguridad/rendimiento, Core Web Vitals, despliegue a producción.
 
 ## Naturaleza de los datos en la Fase 2

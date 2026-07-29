@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-const STORAGE_KEY = "shopluscol.favorites.v1";
+const STORAGE_KEY = "shoppluscol.favorites.v1";
 
 export type FavoritesContextValue = {
   favorites: string[];

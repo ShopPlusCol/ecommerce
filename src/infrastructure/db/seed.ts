@@ -61,7 +61,7 @@ async function seed() {
     .insert(adminUsers)
     .values({
       fullName: "Propietario ShopPlusCol",
-      email: "owner@shopluscol.local",
+      email: "owner@shoppluscol.local",
       passwordHash: hashPassword(ownerPassword),
     })
     .onConflictDoNothing()
@@ -69,7 +69,7 @@ async function seed() {
 
   if (owner) {
     await db.insert(userRoles).values({ userId: owner.id, roleId: ownerRole.id }).onConflictDoNothing();
-    console.log(`Usuario propietario creado: owner@shopluscol.local / ${ownerPassword}`);
+    console.log(`Usuario propietario creado: owner@shoppluscol.local / ${ownerPassword}`);
     console.log("Guarda esta contraseña ahora: no se volverá a mostrar. El login real llega en la Fase 3.");
   }
 

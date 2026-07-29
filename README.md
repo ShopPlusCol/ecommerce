@@ -28,7 +28,7 @@ npm run db:migrate    # aplica migraciones sobre ./.data/local.db
 npm run db:seed       # datos de ejemplo (catálogo, zonas, FAQ, usuario propietario)
 ```
 
-`db:seed` imprime en consola la contraseña generada del usuario propietario (`owner@shopluscol.local`). Guárdala: no se vuelve a mostrar. El login real llega en la Fase 3; por ahora sirve como registro de que el flujo de creación de usuarios funciona.
+`db:seed` imprime en consola la contraseña generada del usuario propietario (`owner@shoppluscol.local`). Guárdala: no se vuelve a mostrar. El login real llega en la Fase 3; por ahora sirve como registro de que el flujo de creación de usuarios funciona.
 
 ## Desarrollo
 

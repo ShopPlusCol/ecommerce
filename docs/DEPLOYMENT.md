@@ -7,9 +7,9 @@ Dos destinos soportados desde la Fase 1: **Cloudflare Workers** (costo bajo inic
 ### Requisitos previos
 
 1. Cuenta de Cloudflare y `npx wrangler login`.
-2. Crear la base D1: `npx wrangler d1 create shopluscol-db` y copiar el `database_id` real en `wrangler.jsonc` (reemplazar `REPLACE_WITH_REAL_D1_DATABASE_ID`).
-3. Crear los buckets R2: `npx wrangler r2 bucket create shopluscol-media` y `npx wrangler r2 bucket create shopluscol-ecommerce-opennext-cache`.
-4. Aplicar migraciones sobre D1: `npx wrangler d1 migrations apply shopluscol-db --remote` (usa los archivos de `drizzle/`).
+2. Crear la base D1: `npx wrangler d1 create shoppluscol-db` y copiar el `database_id` real en `wrangler.jsonc` (reemplazar `REPLACE_WITH_REAL_D1_DATABASE_ID`).
+3. Crear los buckets R2: `npx wrangler r2 bucket create shoppluscol-media` y `npx wrangler r2 bucket create shoppluscol-ecommerce-opennext-cache`.
+4. Aplicar migraciones sobre D1: `npx wrangler d1 migrations apply shoppluscol-db --remote` (usa los archivos de `drizzle/`).
 5. Confirmar `compatibility_date` en `wrangler.jsonc` (ver `docs/DECISIONS.md`) — puede actualizarse a la fecha vigente si conviene.
 
 ### Build y despliegue
@@ -33,8 +33,8 @@ npx wrangler secret put SESSION_SECRET
 ## Node / Docker (Hostinger, Railway, VPS, etc.)
 
 ```bash
-docker build -t shopluscol-ecommerce .
-docker run -p 3000:3000 --env-file .env shopluscol-ecommerce
+docker build -t shoppluscol-ecommerce .
+docker run -p 3000:3000 --env-file .env shoppluscol-ecommerce
 ```
 
 La imagen no usa `output: "standalone"` (ver `docs/DECISIONS.md`); usa `next start` sobre el build completo. Para esta ruta, la base de datos es SQLite local (`better-sqlite3`) o, si se desea, un adaptador PostgreSQL futuro detrás de la misma interfaz `Db` (`src/infrastructure/db/client.ts`) — no está implementado todavía porque el volumen inicial (50-100 pedidos/mes) no lo requiere.
