@@ -2,44 +2,51 @@
 
 ## Acceso
 
-1. Ejecuta `npm run db:migrate` y `npm run db:seed`.
-2. Guarda la contraseña que el seed imprime únicamente al crear la credencial.
-3. Abre `/acceso-admin`. `/admin` redirige al login sin cookie y vuelve a
-   validar sesión/estado del usuario contra la base de datos.
+```bash
+npm run db:migrate
+npm run db:seed
+```
 
-El owner local usa el correo `ADMIN_OWNER_EMAIL` (por defecto
-`owner@shoppluscol.local`). Define `ADMIN_OWNER_PASSWORD` antes del primer seed
-si no quieres una contraseña aleatoria. Nunca la publiques ni la versionas.
-
-## Roles
-
-| Rol | Alcance |
-| --- | --- |
-| Propietario | Acceso total |
-| Administrador | Todo excepto eliminar propietarios |
-| Operaciones | Pedidos, inventario, clientes, envíos y pagos |
-| Editor de contenido | Catálogo, promociones, contenido y medios |
-| Analista de solo lectura | Lectura y exportación |
-
-Todas las mutaciones vuelven a autorizar por recurso/acción en el servidor; no
-se confía en ocultar botones.
+El seed muestra la contraseña solo al crear la credencial. El correo proviene
+de `ADMIN_OWNER_EMAIL`. Guarda ambos en un gestor de contraseñas; no en Git,
+capturas, documentación ni chats compartidos. Abre `/acceso-admin`.
 
 ## Operación
 
-- **Productos:** crear, cambiar estado, importar/exportar CSV y consultar datos
-  reales. El CSV requiere `sku,name,slug,price,status`.
-- **Inventario:** el ajuste exige cantidad y motivo; se rechaza si invade stock
-  reservado. Checkout crea reservas temporales auditables.
-- **Pedidos:** estados de pedido, pago y envío son independientes. Cada cambio
-  de estado crea línea de tiempo y auditoría.
-- **Configuración:** identidad de marca, logos por URL de `media_assets`,
-  favicon, Open Graph, contacto y redes. Nunca uses base64.
-- **Integraciones:** solo muestra presencia/estado de configuración, nunca
-  tokens. No declares pruebas externas exitosas sin credenciales.
-- **Auditoría:** conserva actor, acción, entidad, antes/después y motivo.
+- Productos: alta, estado, CSV y metadatos.
+- Simulador: sube PNG/WebP cuadrado de hasta 2 MB, ajusta apariencia, guarda y
+  aprueba solo tras revisar el producto real. Rechazar/pendiente no se publica.
+- Inventario: todo ajuste requiere motivo y no puede invadir reservas.
+- Pedidos/pagos: pedido y pago tienen estados separados. Un comprobante queda
+  pendiente hasta revisión explícita; cargarlo nunca aprueba el pago.
+- Configuración: identidad, transferencia, privacidad, retención y exportación.
+- Estado del sistema: confirma DB/runtime/revisión y si una integración está
+  configurada, sin mostrar secretos.
+- Auditoría: revisa actor, acción, entidad y cambios antes/después.
 
-## Recuperación y bloqueo
+## Privacidad
 
-Tras cinco fallos se bloquea la identidad durante 15 minutos; Better Auth añade
-rate limit persistente. La recuperación siempre responde de forma genérica. Sin
-SMTP configurado no se envía correo y el panel lo comunica honestamente.
+En Configuración completa responsable, datos legales, correo, versión y
+retención. No marques “Revisada” hasta que el negocio/asesor competente la
+valide. La foto del simulador no aparece en medios ni exportaciones porque
+nunca llega al servidor.
+
+## Exportación y recuperación
+
+- Panel: Configuración → Exportar datos de negocio.
+- CLI: `npm run db:export`.
+- Backup: `npm run db:backup`.
+- Restauración: sigue [RECOVERY.md](./RECOVERY.md); nunca restaures con la
+  aplicación escribiendo sobre la misma base.
+
+## Seguridad
+
+Tras cinco intentos fallidos se bloquea la identidad temporalmente. Cerrar
+sesión usa el endpoint de Better Auth y se verifica al volver a `/admin`.
+La recuperación responde de forma genérica y requiere SMTP para enviar correo.
+
+## Integraciones pendientes
+
+Mercado Pago sandbox, Meta Test Events, SMTP y R2 requieren credenciales o
+recursos externos. El panel dice “Pendiente” hasta una validación real. No
+habilites modo producción ni Meta desde el panel por anticipado.

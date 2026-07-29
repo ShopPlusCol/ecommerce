@@ -1,57 +1,55 @@
 # PHASE_STATUS
 
-## Fase actual
+## Estado
 
-**Fase 3 — Backend, administrador e integraciones: completada técnicamente en
-`fase-3-codex`.** Base: `3740797` (`Cierre final de la Fase 2`). La Fase 2
-continúa aprobada y la Fase 4 no está iniciada.
+**Fase 4 implementada técnicamente en `fase-4-codex`, pendiente de las tres
+validaciones manuales finales y de la aprobación expresa del propietario.**
+Base recibida: `80d165c`. No se ha hecho merge a `main`, despliegue, dominio,
+creación de recursos Cloudflare ni activación de pagos o eventos reales.
 
-## Entregado en Fase 3
+## Entregado
 
-- Persistencia SQLite/D1 mediante Drizzle y migraciones `0001`–`0004`, probadas
-  desde una base vacía. Seed seguro, idempotente y sin contraseña pública fija.
-- Better Auth con contraseña hasheada, sesiones revocables, cookies seguras,
-  logout, recuperación desacoplada de SMTP, rate limit, bloqueo por identidad,
-  cinco roles, permisos por recurso/acción y auditoría.
-- Todo `/admin` requiere sesión verificada en servidor. Los módulos muestran
-  datos reales; productos, estados de pedido, inventario y marca tienen
-  operaciones persistentes protegidas.
-- Repositorios demo sustituidos por adaptadores Drizzle para catálogo,
-  promociones, envíos y páginas publicadas.
-- Checkout persistente e idempotente: recalcula en servidor, crea cliente,
-  instantánea de pedido, pago y consentimiento, reserva stock condicionalmente
-  y entrega un token privado de consulta.
-- Inventario con disponible/reservado/vendido, movimientos y reservas
-  temporales. Los webhooks verificados de Mercado Pago consumen la reserva una
-  sola vez y nunca confían en la pantalla de retorno.
-- Medios PNG/JPEG/WebP/SVG sanitizado con validación real, límite de 8 MB,
-  dimensiones y adaptadores local/R2. Identidad de marca persistida en
-  `settings`, con fallback textual y metadata dinámica.
-- CSV de productos con validación por fila, prevención de duplicados, informe
-  de aceptadas/rechazadas, importación masiva, exportación y auditoría.
-- Panel real para catálogo, inventario, pedidos, clientes, envíos, pagos,
-  marketing, contenido, analítica, integraciones, usuarios y auditoría.
+- Simulador fotográfico bajo demanda con consentimiento explícito, procesamiento
+  en navegador, MediaPipe Face Landmarker, fallback manual, selector de tono,
+  antes/después, ajustes, eliminación y alta al carrito.
+- Administración de texturas por producto con validación real de archivo,
+  almacenamiento local/R2, parámetros visuales, revisión y auditoría.
+- Política y retención configurables, consentimiento revocable y garantía
+  técnica de que la foto del simulador no se sube ni se registra.
+- Rate limiting persistente en checkout, consulta, comprobantes y Web Vitals;
+  headers CSP/HSTS/COOP/Permissions-Policy, validación de uploads y revisión de
+  secretos.
+- Health público mínimo, estado administrativo protegido, logs JSON, revisión
+  de integraciones sin exponer valores y captura técnica de Web Vitals.
+- Exportación JSON de negocio sin credenciales/sesiones/binarios; backup SQLite
+  con `integrity_check` y SHA-256; restauración segura con copia previa.
+- Staging Cloudflare preparado con placeholders, D1/R2 separados y modo
+  mantenimiento; alternativa Node/Docker con volúmenes y healthcheck.
+- Migraciones `0005` y `0006`, pruebas unitarias/E2E, accesibilidad, responsive,
+  Lighthouse, bundle analysis, smoke test y documentación final.
 
-## Integraciones y estado honesto
+## Verificación local
 
-- **Mercado Pago:** implementación Checkout Pro y webhook firmado lista; falta
-  aportar `MERCADO_PAGO_ACCESS_TOKEN` y `MERCADO_PAGO_WEBHOOK_SECRET` de prueba
-  para validar contra la cuenta externa.
-- **Meta CAPI:** contrato, persistencia, consentimiento y diagnóstico
-  preparados; falta `META_PIXEL_ID`, `META_CONVERSIONS_ACCESS_TOKEN` y
-  autorización antes de enviar eventos reales.
-- **SMTP:** recuperación/notificaciones desacopladas; falta configurar
-  `SMTP_HOST`, `SMTP_USER` y `SMTP_PASSWORD` y elegir/validar el transporte.
-- **R2:** adaptador preparado; no se creó ningún bucket. Requiere binding
-  `MEDIA_BUCKET` y `MEDIA_PUBLIC_URL`.
+- `typecheck`, `lint`, build Next y build Cloudflare: correctos.
+- Vitest: 46/46. Playwright: 6/6 sobre base aislada.
+- Axe WCAG 2.2 AA crítica/seria: 0 hallazgos en rutas principales.
+- Responsive: sin overflow a 390×844 y 1440×900.
+- Lighthouse local producción:
+  - Inicio: Performance 90, Accessibility 100, Best Practices 100, SEO 100;
+    LCP 3,3 s, TBT 190 ms, CLS 0.
+  - Producto: 95/100/100/100; LCP 2,9 s, TBT 40 ms, CLS 0.
+- Auditoría de producción: 0 vulnerabilidades altas/críticas; quedan 4
+  moderadas en la cadena de desarrollo de Drizzle Kit/esbuild. La auditoría
+  completa añade avisos altos en tooling de ESLint/OpenNext sin corrección
+  compatible; no se aplicó `--force`.
 
-## Verificación
+## Pendiente externo y humano
 
-- `npm run typecheck`, `npm run lint`, `npm run test` (37), `npm run build`.
-- Playwright: storefront, protección de `/admin`, login y logout reales (3).
-- Migraciones sobre base vacía y seed ejecutado dos veces (idempotencia).
-- Revisión de secretos, rutas administrativas y datos inventados completada.
-
-## Siguiente acción
-
-Esperar validación manual y una nueva `LUZ VERDE`. No iniciar la Fase 4.
+- Cloudflare: crear D1/R2/Worker de staging y validar preview remoto.
+- Mercado Pago: credenciales sandbox y prueba oficial de preferencia/webhook.
+- Meta: credenciales de prueba, consentimiento y autorización antes de un test
+  event; no se enviaron eventos.
+- SMTP: proveedor/credenciales y prueba de recuperación.
+- Contenido: fotografías reales, datos legales, cuenta bancaria, contactos,
+  textos comerciales y dominio definitivo.
+- La salida a producción **no está aprobada**.
