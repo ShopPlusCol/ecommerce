@@ -1,11 +1,52 @@
+import { access, mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { sql } from "drizzle-orm";
-import { getRuntimeDb } from "@/infrastructure/db/client";
+import { getRuntimeDb, type Db } from "@/infrastructure/db/client";
+import { getCloudflareEnv } from "@/infrastructure/cloudflare/env";
 import { adminUsers, integrationSettings, orders, products, sessions, settings, tryOnTextures } from "@/infrastructure/db/schema";
+import migrationJournal from "../../../drizzle/meta/_journal.json";
+
+type StatusCheck = { status: "ok" | "warning" | "error" | "pending"; detail: string };
+
+async function checkMigrations(db: Db): Promise<StatusCheck> {
+  const expected = migrationJournal.entries.length;
+  const latestTag = migrationJournal.entries.at(-1)?.tag ?? "desconocida";
+  try {
+    const row = await db.get<{ count: number }>(sql`select count(*) as count from __drizzle_migrations`);
+    const applied = Number(row?.count ?? 0);
+    if (applied >= expected) return { status: "ok", detail: `${applied}/${expected} migraciones aplicadas · última: ${latestTag}` };
+    return { status: "error", detail: `${applied}/${expected} migraciones aplicadas · falta aplicar ${latestTag}` };
+  } catch {
+    return { status: "error", detail: "No se pudo leer el historial de migraciones (__drizzle_migrations)." };
+  }
+}
+
+async function checkStorage(): Promise<StatusCheck> {
+  const cloudflare = await getCloudflareEnv();
+  if (cloudflare) {
+    try {
+      await cloudflare.MEDIA_BUCKET.head("__healthcheck__");
+      return { status: "ok", detail: "Binding R2 responde a operaciones de lectura." };
+    } catch {
+      return { status: "error", detail: "El binding R2 no respondió; revisa la configuración del Worker." };
+    }
+  }
+  const probePath = join(process.cwd(), "public", "uploads", ".healthcheck");
+  try {
+    await mkdir(join(process.cwd(), "public", "uploads"), { recursive: true });
+    await writeFile(probePath, "ok");
+    await access(probePath);
+    await rm(probePath, { force: true });
+    return { status: "ok", detail: "Adaptador local activo; carpeta de subidas escribible." };
+  } catch {
+    return { status: "error", detail: "No se pudo escribir en public/uploads; revisa permisos del disco." };
+  }
+}
 
 export async function getSystemStatus() {
   const startedAt = performance.now();
   const db = await getRuntimeDb();
-  const [settingsCount, productCount, orderCount, textureCount, userCount, sessionCount, integrations] = await Promise.all([
+  const [settingsCount, productCount, orderCount, textureCount, userCount, sessionCount, integrations, migrations, storageCheck] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(settings),
     db.select({ count: sql<number>`count(*)` }).from(products),
     db.select({ count: sql<number>`count(*)` }).from(orders),
@@ -13,6 +54,8 @@ export async function getSystemStatus() {
     db.select({ count: sql<number>`count(*)` }).from(adminUsers),
     db.select({ count: sql<number>`count(*)` }).from(sessions),
     db.select().from(integrationSettings),
+    checkMigrations(db),
+    checkStorage(),
   ]);
   const target = process.env.CLOUDFLARE_WORKER ? "cloudflare" : "node";
   const storage = target === "cloudflare" ? "r2" : "local";
@@ -37,8 +80,8 @@ export async function getSystemStatus() {
     checks: {
       application: { status: "ok" as const, detail: `Revisión ${process.env.APP_REVISION ?? "local"}` },
       database: { status: "ok" as const, detail: `${Math.round(performance.now() - startedAt)} ms` },
-      migrations: { status: "ok" as const, detail: "Esquema compatible hasta migración 0008" },
-      storage: { status: "ok" as const, detail: storage === "r2" ? "Binding R2 declarado por el runtime" : "Adaptador local activo" },
+      migrations,
+      storage: storageCheck,
       authentication: { status: Number(userCount[0]?.count ?? 0) > 0 ? "ok" as const : "warning" as const, detail: `${Number(userCount[0]?.count ?? 0)} usuarios · ${Number(sessionCount[0]?.count ?? 0)} sesiones` },
       backups: { status: backupAt ? "ok" as const : "warning" as const, detail: backupAt ? `Último: ${backupAt}` : "Sin ejecución externa registrada" },
       cloudflare: { status: target === "cloudflare" ? "ok" as const : "pending" as const, detail: target === "cloudflare" ? "Runtime Worker activo" : "Build preparado; recurso no creado" },
