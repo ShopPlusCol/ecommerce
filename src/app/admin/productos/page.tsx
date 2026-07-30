@@ -10,6 +10,7 @@ import { getRuntimeDb } from "@/infrastructure/db/client";
 import { productMedia, products } from "@/infrastructure/db/schema";
 import { createProductAction, updateProductStatusAction } from "../actions";
 import { CsvImportForm } from "./csv-import-form";
+import { isVideoUrl } from "@/lib/media-type";
 
 export const metadata: Metadata = { title: "Productos" };
 
@@ -85,7 +86,11 @@ export default async function AdminProductsPage({
                       <td className="p-3">
                         <div className="flex items-center gap-3">
                           <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md border border-border bg-surface-sunken">
-                            {cover ? <Image src={cover} alt="" width={44} height={44} unoptimized className="h-11 w-11 object-cover" /> : null}
+                            {cover && isVideoUrl(cover) ? (
+                              <video src={cover} muted playsInline preload="metadata" className="h-11 w-11 object-cover" />
+                            ) : cover ? (
+                              <Image src={cover} alt="" width={44} height={44} unoptimized className="h-11 w-11 object-cover" />
+                            ) : null}
                           </div>
                           <Link href={`/admin/productos/${row.id}`} className="font-semibold text-brand hover:underline">{row.name}</Link>
                         </div>

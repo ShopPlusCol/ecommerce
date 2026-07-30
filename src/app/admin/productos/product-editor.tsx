@@ -5,6 +5,7 @@ import { useActionState, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ImagePlus, LoaderCircle, Trash2 } from "lucide-react";
 import { uploadMediaInlineAction } from "@/app/admin/medios/actions";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
+import { isVideoUrl } from "@/lib/media-type";
 import { updateProductDetailAction } from "./detail-actions";
 
 type Option = { id: string; name: string };
@@ -107,7 +108,7 @@ export function ProductEditor({
         <div className="grid gap-3 rounded-lg border border-border p-4 md:col-span-2">
           <div>
             <h3 className="font-semibold">Galería del producto</h3>
-            <p className="text-sm text-text-muted">La primera imagen será la portada que se muestra en el catálogo y la tienda.</p>
+            <p className="text-sm text-text-muted">El primer elemento (imagen o video) será la portada que se muestra en el catálogo y la tienda.</p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <select className={input} value={libraryUrl} onChange={(event) => setLibraryUrl(event.target.value)}>
@@ -132,7 +133,7 @@ export function ProductEditor({
               ref={uploadRef}
               type="file"
               multiple
-              accept="image/jpeg,image/png,image/webp,image/svg+xml"
+              accept="image/jpeg,image/png,image/webp,image/svg+xml,video/mp4,video/webm"
               disabled={uploading}
               onChange={async (event) => {
                 const files = event.target.files ? Array.from(event.target.files) : [];
@@ -141,18 +142,22 @@ export function ProductEditor({
                 }
               }}
               className="min-w-0 flex-1 text-sm file:mr-2 file:rounded file:border-0 file:bg-surface-sunken file:px-2 file:py-1 file:text-xs file:font-semibold disabled:opacity-60"
-              aria-label="Subir imágenes del producto"
+              aria-label="Subir imágenes o videos del producto"
             />
-            <span className="shrink-0 text-xs">{uploading ? "Subiendo…" : "Se suben al elegirlas"}</span>
+            <span className="shrink-0 text-xs">{uploading ? "Subiendo…" : "Imágenes o video (MP4/WebM, máx. 60 MB)"}</span>
           </label>
           {uploadMessage ? <p role="status" className="text-sm text-text-muted">{uploadMessage}</p> : null}
           {images.length ? (
             <div className="grid gap-2">
               {images.map((image, index) => (
                 <div key={image.url} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center">
-                  <Image src={image.url} alt="" width={72} height={72} unoptimized className="h-[72px] w-[72px] rounded-md border border-border object-cover" />
+                  {isVideoUrl(image.url) ? (
+                    <video src={image.url} muted playsInline preload="metadata" className="h-[72px] w-[72px] rounded-md border border-border object-cover" />
+                  ) : (
+                    <Image src={image.url} alt="" width={72} height={72} unoptimized className="h-[72px] w-[72px] rounded-md border border-border object-cover" />
+                  )}
                   <label className="grid gap-1 text-xs font-semibold">
-                    Texto alternativo
+                    Texto alternativo{isVideoUrl(image.url) ? <span className="ml-1.5 rounded-full bg-surface-sunken px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Video</span> : null}
                     <input
                       value={image.altText}
                       onChange={(event) => setImages((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, altText: event.target.value } : row))}

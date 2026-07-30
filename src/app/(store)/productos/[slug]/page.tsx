@@ -14,6 +14,7 @@ import { formatMoney } from "@/domain/value-objects/money";
 import { catalogRepository, tryOnRepository } from "@/lib/container";
 import { siteConfig } from "@/lib/site-config";
 import { productJsonLd } from "@/lib/seo";
+import { isVideoUrl } from "@/lib/media-type";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -71,7 +72,9 @@ export default async function ProductPage({ params }: Params) {
         <Container className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
           <div className="lg:sticky lg:top-28 lg:self-start">
             <div className="relative aspect-square overflow-hidden rounded-[24px] bg-surface-sunken shadow-sm">
-              {cover ? (
+              {cover && isVideoUrl(cover.url) ? (
+                <video src={cover.url} controls muted loop playsInline className="h-full w-full object-cover" aria-label={cover.altText} />
+              ) : cover ? (
                 <Image src={cover.url} alt={cover.altText} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
               ) : null}
               {discount ? (

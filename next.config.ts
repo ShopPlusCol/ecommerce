@@ -34,10 +34,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   experimental: {
-    // Los comprobantes admiten hasta 8 MB. El MB adicional cubre los
-    // encabezados y límites propios de multipart/form-data.
+    // Límite global de las Server Actions: los videos de producto admiten
+    // hasta 60 MB (validado también por tipo en validateMedia); el resto
+    // (imágenes, comprobantes) sigue muy por debajo. Los 5 MB adicionales
+    // cubren los encabezados y límites propios de multipart/form-data.
     serverActions: {
-      bodySizeLimit: "9mb",
+      bodySizeLimit: "65mb",
     },
   },
   images: {
