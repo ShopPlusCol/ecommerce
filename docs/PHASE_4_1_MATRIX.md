@@ -121,3 +121,24 @@ base: `PHASE_STATUS.md`.
 Superset del renglón "Barrios de Medellín configurables" de la ronda 2:
 ahora aplica a cualquier ciudad, admite grupos con varios barrios y agrega
 sin cobertura. Detalle completo en `PHASE_STATUS.md`.
+
+**Reemplazado por completo en la Ronda 3 (2026-07-30)** — ver abajo.
+
+# Rearquitectura del árbol de zonas Departamento → Ciudad → Barrio (Ronda 3, 2026-07-30)
+
+| Capacidad | Ruta y controles reales | Persistencia | Verificación |
+|---|---|---|---|
+| Árbol real de zonas | `/admin/envios` → `/[departamento]` → `/[departamento]/[ciudad]`, breadcrumbs, tarjetas por nivel | `shipping_zones.parent_zone_id` (auto-referencia, `ON DELETE CASCADE`, migraciones `0012`/`0015`) | `shipping.test.ts`: resolución de zona objetivo por nivel; `shipping-zones.spec.ts` E2E |
+| Herencia por campo | Control Heredado/Personalizado por campo en cada zona, con "Heredado de X: valor" visible | `shipping_rules` 1:1 por zona, todo campo nullable (migración `0014`) | `resolveEffectiveZoneConfig` unitarios; verificado en navegador (Bello hereda de Antioquia) |
+| Mismo día con hora límite | Formulario oculta días hábiles cuando "mismo día" está activo; checkout y simulador muestran si aplica ahora | `business-time.ts`, `resolveSameDayEligibility` | 6 unitarios con hora inyectada (antes/después del límite) |
+| Cobertura y estado en cascada | Badge "Sin cobertura" / "Bloqueada: ancestro inactivo" en cada tarjeta | `resolveShippingQuote`: cadena de ancestros debe estar toda activa y con cobertura | Unitarios de cascada; E2E: barrio sin cobertura no cotiza pero sigue seleccionable |
+| Alta rápida y masiva de zonas | Formularios "Agregar departamento/ciudad/barrio" y "Pegar varios a la vez"; buscador global y filtro dentro de ciudad | `zone-actions.ts` (`createZoneAction`, `createNeighborhoodsBulkAction`) | E2E: crea departamento → ciudad → barrio desde cero |
+| Eliminar con cascada | Botón "Eliminar zona" con confirmación del navegador | `ON DELETE CASCADE` en `parent_zone_id` y `shipping_rules.zone_id` | E2E: elimina un departamento con ciudad y barrio hijos sin error de FK (bug real corregido en la migración `0015`, ver `PHASE_STATUS.md`) |
+| Checkout conectado al árbol real | Departamento (32 + Bogotá D.C. + configurados), Ciudad y Barrio con buscador (`SearchableSelect`); nivel se oculta si no hay hijos configurados | `listShippingCitiesAction`/`listShippingNeighborhoodsAction`/`listExtraShippingDepartmentsAction` | E2E: tarifa propia del barrio coincide exacto en checkout; departamento sin ciudades no pide ciudad |
+| Simulador admin — origen de la tarifa | Muestra "Heredada de X" o "Tarifa propia"; mismo día "disponible ahora" vs. rango de días | `quoteShippingAdminAction` expone `feeSource`/`sameDayEligible` | Verificado en navegador con Bello (hereda de Antioquia) |
+
+Reemplaza íntegramente el renglón "Grupos de barrios por ciudad" de esta
+misma tabla (el tablero de pestañas, `neighborhood_names`/`group_kind` y su
+E2E `neighborhood-groups.spec.ts` fueron retirados). Detalle narrativo
+completo, bugs reales encontrados y el incidente de pérdida/restauración de
+datos en `.data/local.db` durante la verificación: `PHASE_STATUS.md`.

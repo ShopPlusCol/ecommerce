@@ -22,7 +22,13 @@ async function addToCartAndGoToCheckout(page: Page) {
 }
 
 async function selectSearchable(page: Page, label: string, optionName: string) {
-  await page.getByLabel(label).fill(optionName);
+  // Usa el rol "combobox" (no getByLabel a secas): "Barrio o sector" alterna
+  // entre un <input> de texto libre y un combobox con buscador según si la
+  // ciudad tiene barrios configurados, y ese cambio puede llegar después de
+  // que el resto del formulario ya está listo.
+  const field = page.getByRole("combobox", { name: label });
+  await field.waitFor({ state: "visible" });
+  await field.fill(optionName);
   await page.getByRole("option", { name: optionName, exact: true }).click();
 }
 
@@ -41,7 +47,7 @@ test.describe.serial("árbol de zonas de envío (Departamento → Ciudad → Bar
     await page.getByRole("button", { name: "Agregar" }).first().click();
     await expect(page.getByText(`Departamento "${departmentName}" creada.`)).toBeVisible();
 
-    const departmentCard = page.locator("div", { has: page.getByRole("heading", { name: departmentName, exact: true }) }).first();
+    const departmentCard = page.locator(`[data-zone-name="${departmentName}"]`);
     await departmentCard.getByRole("link", { name: /Ver ciudades/ }).click();
     await expect(page.getByRole("heading", { name: departmentName })).toBeVisible();
 
@@ -62,7 +68,7 @@ test.describe.serial("árbol de zonas de envío (Departamento → Ciudad → Bar
     await expect(page.getByText(`Barrio "${blockedNeighborhoodName}" creada.`)).toBeVisible();
 
     // Tarifa propia en el barrio principal.
-    const barrioCard = page.locator("div", { has: page.getByRole("heading", { name: neighborhoodName, exact: true }) }).first();
+    const barrioCard = page.locator(`[data-zone-name="${neighborhoodName}"]`);
     await barrioCard.getByText("Configurar").click();
     const feeForm = barrioCard.locator('form:has(input[name="fee_mode"])');
     await feeForm.locator('input[name="fee_mode"][value="custom"]').check();
@@ -71,7 +77,7 @@ test.describe.serial("árbol de zonas de envío (Departamento → Ciudad → Bar
     await expect(feeForm.getByText(`"${neighborhoodName}" guardada.`)).toBeVisible();
 
     // Sin cobertura en el barrio bloqueado.
-    const blockedCard = page.locator("div", { has: page.getByRole("heading", { name: blockedNeighborhoodName, exact: true }) }).first();
+    const blockedCard = page.locator(`[data-zone-name="${blockedNeighborhoodName}"]`);
     await blockedCard.getByText("Configurar").click();
     const coverageForm = blockedCard.locator('form:has(input[name="fee_mode"])');
     await coverageForm.locator('input[name="coverage_mode"][value="custom"]').check();
@@ -97,11 +103,14 @@ test.describe.serial("árbol de zonas de envío (Departamento → Ciudad → Bar
   });
 
   test("limpieza: elimina el departamento de prueba y sus zonas hijas", async ({ page }) => {
+    await login(page);
     await page.goto("/admin/envios");
     page.once("dialog", (dialog) => dialog.accept());
-    const deptCard = page.locator("div", { has: page.getByRole("heading", { name: departmentName, exact: true }) }).first();
+    const deptCard = page.locator(`[data-zone-name="${departmentName}"]`);
     await deptCard.getByRole("button", { name: "Eliminar zona" }).click();
-    await expect(page.getByRole("heading", { name: departmentName })).toHaveCount(0);
+    // El mensaje de éxito es transitorio (la revalidación puede reemplazarlo
+    // casi de inmediato); lo que importa es que la zona ya no esté.
+    await expect(page.getByRole("heading", { name: departmentName })).toHaveCount(0, { timeout: 10_000 });
   });
 });
 

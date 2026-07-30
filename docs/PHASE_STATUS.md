@@ -245,3 +245,137 @@ pastillas donde se pegan varios barrios separados por coma a la vez.
 - Esta funcionalidad **no aprueba producción, no hace merge y no
   constituye autorización para desplegar**. Queda pendiente de revisión
   humana.
+
+# Envíos y zonas: rearquitectura completa Departamento → Ciudad → Barrio (Ronda 3, 2026-07-30)
+
+Pedido explícito del propietario: "grupos de barrios" (la ronda anterior) no
+daba una jerarquía real ni herencia de configuración, y mezclaba
+departamentos/ciudades/barrios en una sola pantalla. Se pidió rehacer por
+completo el modelo de datos y la interfaz — "es casi como crear todo desde
+0" — sin perder zonas, tarifas ni configuración existentes, y sin romper el
+checkout, el carrito, los pagos ni el resto del panel.
+
+## Diseño
+
+- `shipping_zones` pasa de campos de texto sueltos (`department`/`city`/
+  `neighborhood` comparados por igualdad) a un árbol real vía
+  `parent_zone_id` (auto-referencia con `ON DELETE CASCADE`): Departamento
+  (raíz) → Ciudad/Municipio → Barrio, más un nivel `country` sin padre como
+  respaldo nacional ("Resto de Colombia").
+- `shipping_rules` pasa de 1\:N por zona (reglas con fecha/prioridad) a
+  **1:1 por zona**, con cada campo nullable: `null` = "hereda del ancestro
+  más cercano que tenga un valor propio"; un valor no nulo = personalizado.
+  Se retira la programación de tarifas por fecha (`starts_at`/`ends_at`/
+  `priority`): no se encontraron datos reales que dependieran de ella.
+- `resolveShippingQuote` (`src/domain/services/shipping.ts`) se reescribe
+  por completo: encuentra la zona configurada más específica que coincide
+  con el destino (profundizando solo mientras haya una zona hija que
+  coincida), exige que la zona **y todos sus ancestros** estén activos y
+  con cobertura disponible, y arma la configuración efectiva heredando cada
+  campo del ancestro más cercano que lo tenga definido. El mismo motor lo
+  usan el checkout, el simulador admin y el cálculo de recompensas por
+  zona — nunca hay dos implementaciones que puedan divergir.
+- `src/domain/services/business-time.ts` (nuevo) calcula si "mismo día"
+  sigue disponible según la hora actual de `America/Bogota` contra la hora
+  límite configurada; si ya pasó, el checkout usa los días hábiles
+  configurados como respaldo.
+- `/admin/envios` se reescribe como rutas anidadas con breadcrumbs
+  (`/admin/envios` → `/[departamento]` → `/[departamento]/[ciudad]`) en vez
+  de una sola pantalla; cada zona tiene un control Heredado/Personalizado
+  por campo. Se retiran por completo el tablero de "grupos de barrios"
+  (`neighborhood-groups-board.tsx` y sus acciones) y los casos
+  `shippingZone`/`shippingRule` del sistema genérico de entidades — ya sin
+  ningún formulario que los invocara.
+- El checkout deja de usar la lista estática `colombia-locations.ts`.
+  Departamento ahora muestra los 32 departamentos de Colombia + Bogotá D.C.
+  (para que un cliente fuera de las zonas configuradas pueda seleccionar su
+  ubicación real) más cualquier departamento configurado con un nombre
+  distinto a esa lista; Ciudad/Municipio y Barrio se leen del árbol real y
+  solo aparecen si el nivel superior tiene hijos configurados y activos.
+  Los tres selectores son un combobox nuevo (`SearchableSelect`) con
+  filtro de texto.
+
+## Bugs reales encontrados y corregidos durante la verificación
+
+- **`zone-actions.ts` exportaba una constante desde un archivo `"use
+  server"`**, algo que Next.js prohíbe (solo permite exportar funciones
+  async). Esto hacía que el componente de creación de zonas fallara en
+  silencio dentro de un error boundary — ningún botón de "Agregar" hacía
+  nada, sin mensaje visible. Se corrigió dejando de exportar la constante.
+- **Eliminar un departamento o ciudad con hijos fallaba con "FOREIGN KEY
+  constraint failed"** en vez de borrar en cascada. Causa raíz: la
+  migración que agregó `parent_zone_id` (`0012`) lo hizo vía
+  `ALTER TABLE ... ADD COLUMN`, y SQLite no aplica `ON DELETE CASCADE` en
+  esa forma para una referencia a la propia tabla — aunque el esquema de
+  Drizzle sí lo declaraba, la base real nunca lo tuvo. Se agregó la
+  migración `0015` que reconstruye `shipping_zones` con la cláusula
+  correcta. Encontrado por la prueba E2E nueva, no por revisión manual.
+
+## Incidente: pérdida de datos en `.data/local.db` durante la verificación
+
+Durante la verificación final, una comprobación por línea de comandos
+mostró que `shipping_zones` había quedado con solo 2 filas (Antioquia y
+Resto de Colombia) y `shipping_rules` con 0 — Medellín, Bello y los 213
+barrios de Medellín con su tarifa habían desaparecido de la base de
+desarrollo local. Se confirmó el mismo estado a través del panel real (no
+era un espejismo de visibilidad de WAL entre procesos). No se identificó con certeza el mecanismo exacto que lo causó; el
+sospechoso más plausible es el largo historial de manipulación directa de
+esa misma base en rondas anteriores de esta sesión (backups, scripts
+correctivos, migraciones a mano descritos más arriba en este documento),
+no ninguna acción de esta ronda en particular.
+
+**Se restauró** Medellín, Bello y los 213 barrios (con sus tarifas: $9.000
+propia en Medellín, $9.900 por barrio, mismo día antes de la 1:00 p.m.)
+usando como fuente el respaldo pre-rearquitectura
+`.data/backups/shoppluscol-2026-07-30T19-16-17Z.sqlite` (creado al inicio
+del Paso 1 con `npm run db:backup`), reproduciendo exactamente la lógica de
+la migración de datos original. Se verificó `PRAGMA integrity_check` = `ok`
+y `PRAGMA foreign_key_check` sin filas antes de continuar, y se confirmó
+visualmente en el panel que los 213 barrios y sus tarifas volvieron a
+aparecer.
+
+**Esto solo afectó `.data/local.db` (base de desarrollo local, no
+versionada en git).** No se tocó ninguna base de producción ni ningún
+recurso externo. Se recomienda que el propietario revise personalmente
+`/admin/envios` antes de confiar en los datos de Medellín, y considere este
+incidente al decidir si aprobar el despliegue — no se declara "luz verde"
+en ningún momento de esta ronda.
+
+## Verificación
+
+- `typecheck`, `lint`, `test` (99/99), build Next y build Cloudflare:
+  correctos.
+- `test:e2e`: 15/15, incluida una prueba nueva
+  (`shipping-zones.spec.ts`) que crea departamento → ciudad → barrio desde
+  el panel, fija una tarifa propia, la verifica exactamente en el
+  checkout, confirma que "sin cobertura" bloquea la cotización sin
+  desaparecer del selector, confirma que un departamento sin ciudades
+  configuradas no pide ciudad, y elimina el departamento de prueba
+  (verificando en el camino la corrección de la cascada de eliminación).
+  Reemplaza `neighborhood-groups.spec.ts` (probaba la interfaz retirada).
+- `npm run security:secrets`: 0 secretos encontrados. `npm audit
+  --omit=dev`: una advertencia moderada preexistente en `drizzle-kit`/
+  `esbuild` (herramienta de desarrollo, no se envía a producción), no
+  introducida por esta ronda.
+- Verificado en el navegador real contra `.data/local.db`, no solo con
+  pruebas automatizadas: creación/edición/eliminación de zona en los tres
+  niveles, herencia visible ("Heredado de Antioquia: $13.900"), búsqueda
+  global de zonas, filtro dentro de una ciudad con más de 200 barrios,
+  checkout completo con departamento sin ciudades configuradas (Bogotá
+  D.C.) y con barrio con tarifa propia (El Poblado, $9.900).
+
+## Pendiente
+
+- Esta ronda **no aprueba producción, no hace merge y no constituye
+  autorización para desplegar**. Queda pendiente de revisión humana —
+  en particular, revisar el incidente de pérdida/restauración de datos
+  descrito arriba antes de decidir sobre el despliegue.
+- La zona "Resto de Colombia" (respaldo nacional) sigue **Inactiva**, un
+  estado preexistente a esta ronda (no se investigó ni cambió): mientras
+  siga así, ningún destino fuera de Antioquia recibe cotización — el
+  checkout responde correctamente "Cotización requerida", pero vale la pena
+  que el propietario decida si eso es lo que quiere.
+- Puntos 5, 6 y 7 de la ronda de trabajo siguen sin empezar: nombre/
+  descripción editable de métodos de pago, lista curada de textos
+  editables del sitio, y editor visual con vista previa en vivo + edición
+  de texto en línea.

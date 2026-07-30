@@ -17,6 +17,21 @@ async function loadActiveTree() {
   return { zones, rules, isUsable };
 }
 
+/**
+ * Departamentos configurados y activos que no están en la lista estática de
+ * los 32 departamentos + Bogotá D.C. (`COLOMBIA_DEPARTMENTS`): si un admin
+ * nombra un departamento distinto a esa lista real, el checkout igual debe
+ * poder ofrecerlo — nunca queda una zona configurada inalcanzable desde el
+ * checkout.
+ */
+export async function listExtraShippingDepartmentsAction(): Promise<string[]> {
+  const { zones, isUsable } = await loadActiveTree();
+  return zones
+    .filter((zone) => zone.level === "department" && isUsable(zone.id))
+    .map((zone) => zone.name)
+    .sort((a, b) => a.localeCompare(b, "es-CO"));
+}
+
 /** Ciudades/municipios configurados y activos bajo un departamento (vacío = el checkout no pide ciudad, usa la config del departamento). */
 export async function listShippingCitiesAction(department: string): Promise<string[]> {
   const { zones, isUsable } = await loadActiveTree();

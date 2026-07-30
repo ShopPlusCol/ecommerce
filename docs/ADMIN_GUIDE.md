@@ -72,7 +72,7 @@ habilites modo producción ni Meta desde el panel por anticipado.
 # Operación añadida en Fase 4.1
 
 - **Inventario:** filtra existencias y movimientos, exporta CSV, ajusta con motivo y libera reservas desde `/admin/inventario`. El servidor impide quedar por debajo de lo reservado.
-- **Envíos:** administra zonas jerárquicas, vigencias, tarifas, tiempos y métodos; valida una dirección con el cotizador de `/admin/envios`.
+- **Envíos:** árbol real Departamento → Ciudad/Municipio → Barrio con herencia de configuración por campo; ver la sección "Envíos y zonas: árbol Departamento → Ciudad → Barrio" más abajo para el detalle completo (reemplaza la descripción anterior de "grupos de barrios").
 - **Editor:** crea la página en `/admin/editor`, agrega bloques, guarda el borrador, abre la vista previa y publica. Restaurar siempre crea otra versión. El contenido de cada bloque se edita con campos guiados (texto, número, casilla, listas de beneficios/testimonios/preguntas); “Editar como JSON avanzado” sigue disponible para casos puntuales.
 - **Analítica:** selecciona fechas en `/admin/analitica`; “Negocio” usa pedidos reales y “Eventos técnicos” diagnostica instrumentación.
 - **Usuarios:** crea una cuenta con contraseña temporal, asigna un rol, revoca sesiones o cambia la contraseña. No puede suspenderse al último propietario activo.
@@ -110,20 +110,8 @@ habilites modo producción ni Meta desde el panel por anticipado.
   imagen, texto, cupón opcional, rutas donde aparece/no aparece, frecuencia
   (una vez por sesión, una vez por período o siempre) y el disparador
   (retraso en segundos, porcentaje de scroll o intención de salida).
-- **Grupos de barrios (`/admin/envios`, sección "Barrios por ciudad"):** cada
-  ciudad con una zona configurada tiene su propio tablero. Escribe uno o
-  varios nombres de barrio separados por coma en el cuadro (ej. "Guayabal,
-  Castropol") y pulsa "Añadir": aparecen como pastillas en la pestaña activa.
-  Arrastra una pastilla y suéltala sobre otra pestaña para mover ese barrio
-  de grupo. Cada grupo tiene su propia tarifa, tiempos de entrega y mensaje
-  al cliente — un grupo de un solo barrio funciona como tarifa individual.
-  La pestaña **"Sin grupo"** es para barrios que se entregan pero sin tarifa
-  propia (usan la tarifa general de la ciudad); la pestaña **"Sin
-  cobertura"** es para barrios donde no se hace envío — el checkout no
-  ofrece esos barrios como opción. Los barrios de cualquier grupo (salvo
-  "Sin cobertura") aparecen automáticamente en el desplegable del checkout
-  de esa ciudad; si una ciudad no tiene ningún barrio configurado, el
-  checkout pide el barrio como texto libre obligatorio.
+- **Grupos de barrios (`/admin/envios`):** retirado en la Ronda 3 — ver la
+  sección "Envíos y zonas: árbol Departamento → Ciudad → Barrio" más abajo.
 - **Editor visual (`/admin/editor/[id]`):** cada bloque tiene un asa de
   arrastre (⠿) junto al título; arrástralo sobre otro bloque para
   reordenar. Los botones ↑/↓ siguen disponibles como alternativa sin mouse.
@@ -133,3 +121,62 @@ habilites modo producción ni Meta desde el panel por anticipado.
 - **Zonas de peligro (`/admin/pedidos`, `/admin/clientes`):** "Limpiar
   todos los pedidos/clientes" está ahora colapsado por defecto; haz clic en
   el título para expandirlo antes de usarlo.
+
+# Envíos y zonas: árbol Departamento → Ciudad → Barrio (Ronda 3, 2026-07-30)
+
+`/admin/envios` reemplaza por completo el modelo anterior de "zonas geográficas
++ reglas + grupos de barrios" (texto suelto comparado por igualdad) por un
+árbol real con navegación progresiva:
+
+- **Nivel 1 — Departamentos (`/admin/envios`):** tarjetas compactas con
+  estado, cobertura, tarifa propia o "heredada de X", contraentrega, mismo
+  día y cantidad de ciudades. El formulario "Agregar departamento" crea uno
+  nuevo; el buscador global encuentra cualquier zona por nombre y enlaza
+  directo a su nivel. Al final de la lista, la tarjeta **"Resto de
+  Colombia"** es el respaldo nacional: se usa solo cuando el departamento del
+  pedido no tiene una zona configurada. No se puede eliminar.
+- **Nivel 2 — Ciudades (`/admin/envios/[departamento]`):** breadcrumb,
+  configuración propia/heredada del departamento arriba, tarjetas de sus
+  ciudades/municipios y alta rápida de una nueva ciudad.
+- **Nivel 3 — Barrios (`/admin/envios/[departamento]/[ciudad]`):**
+  breadcrumb, configuración de la ciudad, alta de un barrio individual o
+  **pegar varios a la vez** (separados por coma o uno por línea), y un
+  buscador que aparece automáticamente cuando la ciudad tiene más de 8
+  barrios (Medellín, por ejemplo, tiene más de 200).
+- **Herencia por campo:** cada zona expone un control **Heredado /
+  Personalizado** por cada campo (tarifa, envío gratis desde, cobertura,
+  contraentrega, anticipo, mismo día + hora límite, días hábiles, métodos de
+  pago, mensaje al cliente). En modo "Heredado" se muestra en gris el valor
+  efectivo y de qué zona ancestro viene ("Heredado de Antioquia: $13.900");
+  en modo "Personalizado" se habilita el campo real. Un barrio sin tarifa
+  propia usa la de su ciudad; una ciudad sin tarifa propia usa la de su
+  departamento; cambiar la tarifa del departamento se refleja de inmediato en
+  cualquier hijo que herede, sin tocarlo uno por uno.
+- **Mismo día con hora límite real:** si "Entrega el mismo día" está activo,
+  el campo de hora límite (hora de Bogotá) decide en vivo, tanto en el
+  checkout como en el simulador admin, si "hoy" sigue disponible o si ya hay
+  que usar los días hábiles configurados como respaldo.
+- **Cobertura:** una zona con cobertura "Sin cobertura" (propia o heredada)
+  nunca cotiza en el checkout, aunque siga apareciendo en los selectores para
+  que el cliente pueda elegir su barrio real y reciba el mensaje claro de que
+  ahí no se hace envío, en vez de que la opción desaparezca sin explicación.
+- **Estado activo/inactivo en cascada:** si un departamento o ciudad queda
+  "Inactiva", ningún hijo suyo es una opción válida en el checkout aunque el
+  hijo mismo diga "Activa" — el formulario de cada zona avisa cuando esto
+  pasa ("Bloqueada: ancestro inactivo").
+- **Eliminar una zona** borra también todas sus zonas hijas (con
+  confirmación del navegador antes de continuar); no hay forma de dejar
+  barrios "huérfanos".
+- **Checkout (`/checkout`):** Departamento siempre muestra los 32
+  departamentos de Colombia + Bogotá D.C. (para que cualquier cliente pueda
+  ubicarse aunque su zona no esté configurada) más cualquier departamento
+  configurado con un nombre distinto a esa lista. Ciudad/Municipio y Barrio
+  solo aparecen si el nivel superior elegido tiene hijos configurados y
+  activos; si no, el checkout no los pide y usa directamente la
+  configuración del nivel superior. Los tres selectores tienen buscador. La
+  tarifa, cobertura, contraentrega, mismo día y tiempo de entrega que ve el
+  cliente son exactamente los que calcula `resolveShippingQuote` — el mismo
+  motor que usa el simulador admin.
+- **Simulador admin (`/admin/envios`, arriba de todo):** muestra si la
+  tarifa aplicada es propia de la zona resuelta o heredada de un ancestro, y
+  si el mismo día aplica a la hora actual.

@@ -87,7 +87,7 @@ export function ZoneCard({
   const [state, action, pending] = useActionState(deleteZoneAction, INITIAL_ADMIN_ACTION_STATE);
 
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-4">
+    <div data-zone-name={name} className="rounded-xl border border-border bg-surface-raised p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
