@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ShieldCheck, Truck } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Section } from "@/components/ui/section";
 import { PageHeader } from "@/components/store/page-header";
 import { ProductCard } from "@/components/store/product-card";
+import { ProductGallery } from "@/components/store/product/product-gallery";
 import { ProductPurchasePanel } from "@/components/store/product/product-purchase-panel";
 import { ProductStickyBar } from "@/components/store/product/product-sticky-bar";
 import { CartUpsells } from "@/components/store/cart/cart-upsells";
@@ -14,7 +14,6 @@ import { formatMoney } from "@/domain/value-objects/money";
 import { catalogRepository, tryOnRepository } from "@/lib/container";
 import { siteConfig } from "@/lib/site-config";
 import { productJsonLd } from "@/lib/seo";
-import { isVideoUrl } from "@/lib/media-type";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -51,7 +50,6 @@ export default async function ProductPage({ params }: Params) {
   const tryOnProducts = [product, ...related].filter((item) => item.sku.startsWith("SPC-LEN"));
   const tryOnTextures = await tryOnRepository.listApprovedByProductIds(tryOnProducts.map((item) => item.id));
 
-  const cover = product.media[0];
   const jsonLd = productJsonLd(product);
   const discount =
     product.compareAtPrice && product.compareAtPrice.amount > product.price.amount
@@ -71,18 +69,17 @@ export default async function ProductPage({ params }: Params) {
       <Section spacing="sm">
         <Container className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
           <div className="lg:sticky lg:top-28 lg:self-start">
-            <div className="relative aspect-square overflow-hidden rounded-[24px] bg-surface-sunken shadow-sm">
-              {cover && isVideoUrl(cover.url) ? (
-                <video src={cover.url} controls muted loop playsInline className="h-full w-full object-cover" aria-label={cover.altText} />
-              ) : cover ? (
-                <Image src={cover.url} alt={cover.altText} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
-              ) : null}
-              {discount ? (
-                <span className="absolute left-4 top-4 rounded-full bg-brand px-2.5 py-1 text-xs font-semibold text-brand-contrast shadow-brand">
-                  −{discount}%
-                </span>
-              ) : null}
-            </div>
+            <ProductGallery
+              media={product.media}
+              productName={product.name}
+              badge={
+                discount ? (
+                  <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-brand px-2.5 py-1 text-xs font-semibold text-brand-contrast shadow-brand">
+                    −{discount}%
+                  </span>
+                ) : undefined
+              }
+            />
           </div>
 
           <div className="flex flex-col gap-5 pb-24 md:pb-0">
