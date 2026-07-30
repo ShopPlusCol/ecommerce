@@ -1,49 +1,39 @@
 import type { Money } from "@/domain/value-objects/money";
+import { money } from "@/domain/value-objects/money";
 import type { ShippingDestination, ShippingQuote } from "@/application/ports/shipping-rate-resolver";
+import { resolveSameDayEligibility } from "@/domain/services/business-time";
 
-/** Nivel jerárquico de una zona (sección 17.1). Más específico gana. */
 export type ShippingLevel = "country" | "department" | "city" | "neighborhood";
 
-const LEVEL_SPECIFICITY: Record<ShippingLevel, number> = {
-  country: 1,
-  department: 2,
-  city: 3,
-  neighborhood: 4,
+export type ShippingZoneNode = {
+  id: string;
+  name: string;
+  level: ShippingLevel;
+  parentZoneId: string | null;
+  status: "active" | "inactive";
 };
 
-export type ShippingRuleWithZone = {
+/** Configuración propia de una zona (a lo sumo una por zona). Cada campo nulo significa "hereda del ancestro más cercano que tenga un valor" (sección 17.2). */
+export type ShippingRuleConfig = {
   ruleId: string;
   zoneId: string;
-  zone: {
-    level: ShippingLevel;
-    country: string;
-    department: string | null;
-    city: string | null;
-    neighborhood: string | null;
-    /** Para zonas nivel "neighborhood": barrios que comparten esta fila (grupo). */
-    neighborhoodNames?: string[] | null;
-  };
-  /** Si es verdadero, esta regla significa "sin cobertura" (sección 17.5): no se debe inventar una tarifa de un nivel más amplio. */
-  blocksDelivery?: boolean;
-  fee: Money;
+  fee: Money | null;
   freeShippingThreshold: Money | null;
-  cashOnDeliveryAllowed: boolean;
-  requiresAdvancePayment: boolean;
+  coverage: "available" | "unavailable" | null;
+  cashOnDeliveryAllowed: boolean | null;
+  requiresAdvancePayment: boolean | null;
   advancePercentage: number | null;
-  estimatedBusinessDaysMin: number;
-  estimatedBusinessDaysMax: number;
+  sameDayAvailable: boolean | null;
   sameDayCutoffHour: number | null;
-  customerMessage: string;
-  minOrderAmount?: Money | null;
-  maxOrderAmount?: Money | null;
-  allowedPaymentMethods?: Array<
-    "mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full"
-  >;
-  priority: number;
-  status: "draft" | "active" | "inactive";
+  estimatedBusinessDaysMin: number | null;
+  estimatedBusinessDaysMax: number | null;
+  allowedPaymentMethods:
+    | Array<"mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full">
+    | null;
+  customerMessage: string | null;
 };
 
-/** Normaliza texto (minúsculas, sin tildes) para comparar destinos/nombres de barrio sin distinguir mayúsculas ni acentos. */
+/** Normaliza texto (minúsculas, sin tildes) para comparar destinos/nombres de zona sin distinguir mayúsculas ni acentos. */
 export function normalize(value: string | null | undefined): string {
   return (value ?? "")
     .trim()
@@ -52,73 +42,110 @@ export function normalize(value: string | null | undefined): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
-/** Una regla aplica si cada nivel definido en su zona coincide con el destino. */
-function ruleMatchesDestination(rule: ShippingRuleWithZone, dest: ShippingDestination): boolean {
-  const { zone } = rule;
-  if (normalize(zone.country) !== normalize(dest.country)) return false;
-  if (zone.department && normalize(zone.department) !== normalize(dest.department)) return false;
-  if (zone.city && normalize(zone.city) !== normalize(dest.city)) return false;
-  if (zone.level === "neighborhood") {
-    const names = zone.neighborhoodNames && zone.neighborhoodNames.length > 0 ? zone.neighborhoodNames : zone.neighborhood ? [zone.neighborhood] : [];
-    if (names.length === 0) return false;
-    const target = normalize(dest.neighborhood);
-    if (!target) return false;
-    if (!names.some((name) => normalize(name) === target)) return false;
-  }
-  return true;
+function findChild(zones: ShippingZoneNode[], parentId: string, level: ShippingLevel, name: string): ShippingZoneNode | undefined {
+  const target = normalize(name);
+  return zones.find((z) => z.level === level && z.parentZoneId === parentId && normalize(z.name) === target);
 }
 
 /**
- * Selecciona la regla de envío más específica y válida para un destino
- * (sección 17.1). Empata por especificidad de nivel y luego por prioridad.
- * Devuelve null si ninguna regla aplica: el checkout NO debe inventar una
- * tarifa, debe mostrar "cotización requerida".
+ * Camina Departamento › Ciudad/Municipio › Barrio hasta la zona configurada
+ * más específica que coincide con el destino, profundizando solo mientras
+ * haya una zona hija que coincida (sección 17.3): si un nivel no tiene
+ * zonas configuradas, o ninguna coincide con el destino, se queda en el
+ * nivel más específico que sí encontró.
+ */
+function resolveTargetZone(zones: ShippingZoneNode[], destination: ShippingDestination): ShippingZoneNode | null {
+  const department = zones.find((z) => z.level === "department" && normalize(z.name) === normalize(destination.department));
+  if (!department) {
+    return zones.find((z) => z.level === "country") ?? null;
+  }
+  const city = findChild(zones, department.id, "city", destination.city);
+  if (!city) return department;
+  if (!destination.neighborhood) return city;
+  const neighborhood = findChild(zones, city.id, "neighborhood", destination.neighborhood);
+  return neighborhood ?? city;
+}
+
+/** Zona objetivo seguida de todos sus ancestros, hasta la raíz (protegido contra ciclos). */
+function ancestorChain(zones: ShippingZoneNode[], target: ShippingZoneNode): ShippingZoneNode[] {
+  const byId = new Map(zones.map((z) => [z.id, z]));
+  const chain: ShippingZoneNode[] = [];
+  const seen = new Set<string>();
+  let cursor: ShippingZoneNode | null = target;
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
+    chain.push(cursor);
+    cursor = cursor.parentZoneId ? byId.get(cursor.parentZoneId) ?? null : null;
+  }
+  return chain;
+}
+
+function firstOwn<K extends keyof ShippingRuleConfig>(
+  chain: ShippingZoneNode[],
+  rulesByZoneId: Map<string, ShippingRuleConfig>,
+  key: K,
+): { value: NonNullable<ShippingRuleConfig[K]>; source: ShippingZoneNode } | null {
+  for (const zone of chain) {
+    const value = rulesByZoneId.get(zone.id)?.[key];
+    if (value !== null && value !== undefined) {
+      return { value: value as NonNullable<ShippingRuleConfig[K]>, source: zone };
+    }
+  }
+  return null;
+}
+
+/**
+ * Resuelve la tarifa y configuración de envío efectiva para un destino
+ * (sección 17). Encuentra la zona configurada más específica, valida
+ * disponibilidad efectiva (la zona y todos sus ancestros deben estar
+ * activos y con cobertura), y arma la configuración final heredando cada
+ * campo del ancestro más cercano que lo tenga definido. Sin tarifa en toda
+ * la cadena → null (no se inventa una tarifa).
  */
 export function resolveShippingQuote(
-  rules: ShippingRuleWithZone[],
+  zones: ShippingZoneNode[],
+  rules: ShippingRuleConfig[],
   destination: ShippingDestination,
   cartTotal: Money,
+  now: Date = new Date(),
 ): ShippingQuote | null {
-  const candidates = rules
-    .filter((rule) => rule.status === "active")
-    .filter((rule) => ruleMatchesDestination(rule, destination))
-    .filter(
-      (rule) =>
-        (rule.minOrderAmount === undefined ||
-          rule.minOrderAmount === null ||
-          cartTotal.amount >= rule.minOrderAmount.amount) &&
-        (rule.maxOrderAmount === undefined ||
-          rule.maxOrderAmount === null ||
-          cartTotal.amount <= rule.maxOrderAmount.amount),
-    )
-    .sort((a, b) => {
-      const specificityDiff = LEVEL_SPECIFICITY[b.zone.level] - LEVEL_SPECIFICITY[a.zone.level];
-      if (specificityDiff !== 0) return specificityDiff;
-      return b.priority - a.priority;
-    });
+  const target = resolveTargetZone(zones, destination);
+  if (!target) return null;
 
-  const winner = candidates[0];
-  if (!winner) return null;
-  // "Sin cobertura" (sección 17.5): la zona más específica gana, pero en vez
-  // de heredar la tarifa de un nivel más amplio, no hay envío disponible.
-  if (winner.blocksDelivery) return null;
+  const chain = ancestorChain(zones, target);
+  if (chain.some((z) => z.status !== "active")) return null;
 
-  const qualifiesForFreeShipping =
-    winner.freeShippingThreshold !== null && cartTotal.amount >= winner.freeShippingThreshold.amount;
+  const rulesByZoneId = new Map(rules.map((r) => [r.zoneId, r]));
+
+  const coverage = firstOwn(chain, rulesByZoneId, "coverage");
+  if (coverage?.value === "unavailable") return null;
+
+  const feeResult = firstOwn(chain, rulesByZoneId, "fee");
+  if (!feeResult) return null;
+
+  const winningRule = rulesByZoneId.get(feeResult.source.id);
+  if (!winningRule) return null;
+
+  const freeShippingThreshold = firstOwn(chain, rulesByZoneId, "freeShippingThreshold")?.value ?? null;
+  const qualifiesForFreeShipping = freeShippingThreshold !== null && cartTotal.amount >= freeShippingThreshold.amount;
+  const sameDayAvailable = firstOwn(chain, rulesByZoneId, "sameDayAvailable")?.value ?? false;
+  const sameDayCutoffHour = firstOwn(chain, rulesByZoneId, "sameDayCutoffHour")?.value ?? null;
 
   return {
-    ruleId: winner.ruleId,
-    ruleLevel: winner.zone.level,
-    matchingZoneIds: [...new Set(candidates.map((candidate) => candidate.zoneId))],
-    fee: qualifiesForFreeShipping ? { amount: 0, currency: "COP" } : winner.fee,
-    freeShippingThreshold: winner.freeShippingThreshold,
-    cashOnDeliveryAllowed: winner.cashOnDeliveryAllowed,
-    requiresAdvancePayment: winner.requiresAdvancePayment,
-    advancePercentage: winner.advancePercentage,
-    estimatedBusinessDaysMin: winner.estimatedBusinessDaysMin,
-    estimatedBusinessDaysMax: winner.estimatedBusinessDaysMax,
-    sameDayCutoffHour: winner.sameDayCutoffHour,
-    customerMessage: winner.customerMessage,
-    allowedPaymentMethods: winner.allowedPaymentMethods,
+    ruleId: winningRule.ruleId,
+    ruleLevel: feeResult.source.level,
+    matchingZoneIds: chain.map((z) => z.id),
+    fee: qualifiesForFreeShipping ? money(0) : feeResult.value,
+    feeSource: feeResult.source.id === target.id ? null : { zoneId: feeResult.source.id, zoneName: feeResult.source.name },
+    freeShippingThreshold,
+    cashOnDeliveryAllowed: firstOwn(chain, rulesByZoneId, "cashOnDeliveryAllowed")?.value ?? false,
+    requiresAdvancePayment: firstOwn(chain, rulesByZoneId, "requiresAdvancePayment")?.value ?? false,
+    advancePercentage: firstOwn(chain, rulesByZoneId, "advancePercentage")?.value ?? null,
+    estimatedBusinessDaysMin: firstOwn(chain, rulesByZoneId, "estimatedBusinessDaysMin")?.value ?? 1,
+    estimatedBusinessDaysMax: firstOwn(chain, rulesByZoneId, "estimatedBusinessDaysMax")?.value ?? 3,
+    sameDayEligible: resolveSameDayEligibility(sameDayAvailable, sameDayCutoffHour, now),
+    sameDayCutoffHour,
+    customerMessage: firstOwn(chain, rulesByZoneId, "customerMessage")?.value ?? "",
+    allowedPaymentMethods: firstOwn(chain, rulesByZoneId, "allowedPaymentMethods")?.value,
   };
 }
