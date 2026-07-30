@@ -213,6 +213,7 @@ test("el propietario puede restablecer pedidos y clientes con confirmación refo
   await expect(page).toHaveURL(/\/admin$/);
 
   await page.goto("/admin/pedidos");
+  await page.getByRole("heading", { name: "Limpiar todos los pedidos" }).click();
   await expect(page.getByRole("button", { name: "Limpiar todos los pedidos" })).toBeDisabled();
   await page.getByLabel("Escribe BORRAR TODOS LOS PEDIDOS para confirmar").fill("BORRAR TODOS LOS PEDIDOS");
   await page.getByLabel(/Comprendo que estos datos/).check();
@@ -222,6 +223,7 @@ test("el propietario puede restablecer pedidos y clientes con confirmación refo
   await expect(page.getByText("0 pedidos reales.")).toBeVisible();
 
   await page.goto("/admin/clientes");
+  await page.getByRole("heading", { name: "Limpiar todos los clientes" }).click();
   await expect(page.getByRole("button", { name: "Limpiar todos los clientes" })).toBeDisabled();
   await page.getByLabel("Escribe BORRAR TODOS LOS CLIENTES para confirmar").fill("BORRAR TODOS LOS CLIENTES");
   await page.getByLabel(/Comprendo que estos datos/).check();
