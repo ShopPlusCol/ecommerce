@@ -61,7 +61,6 @@ export default async function ProductPage({ params }: Params) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <PageHeader
-        title={product.name}
         breadcrumbs={[
           { href: "/catalogo", label: "Catálogo" },
           { href: `/productos/${product.slug}`, label: product.name },
@@ -90,14 +89,17 @@ export default async function ProductPage({ params }: Params) {
               </span>
             ) : null}
 
-            <div className="flex flex-wrap items-baseline gap-3">
-              <span className="font-display text-3xl font-semibold text-text">{formatMoney(product.price)}</span>
-              {product.compareAtPrice ? (
-                <>
-                  <span className="text-md text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
-                  {discount ? <span className="text-sm font-medium text-brand">Ahorras {discount}%</span> : null}
-                </>
-              ) : null}
+            <div className="flex flex-col gap-1.5">
+              <h1 className="font-display text-2xl font-semibold text-text">{product.name}</h1>
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className="font-display text-xl font-semibold text-text">{formatMoney(product.price)}</span>
+                {product.compareAtPrice ? (
+                  <>
+                    <span className="text-sm text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
+                    {discount ? <span className="text-sm font-medium text-brand">Ahorras {discount}%</span> : null}
+                  </>
+                ) : null}
+              </div>
             </div>
 
             <ProductPurchasePanel product={product} />

@@ -9,7 +9,7 @@ export function PageHeader({
   description,
   breadcrumbs,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   breadcrumbs?: Breadcrumb[];
 }) {
@@ -31,7 +31,7 @@ export function PageHeader({
             ))}
           </nav>
         ) : null}
-        <h1 className="text-2xl text-text">{title}</h1>
+        {title ? <h1 className="text-2xl text-text">{title}</h1> : null}
         {description ? <p className="mt-2 max-w-prose text-text-muted">{description}</p> : null}
       </Container>
     </div>
