@@ -34,3 +34,59 @@ Fecha de auditoría local: 2026-07-29. Rama: `fase-4-codex`.
   previsualizar, ordenar, reemplazar o eliminar según el módulo.
 - Las tablas de módulos heredados usan tarjeta/scroll controlado en móvil; una futura mejora puede ofrecer personalización de columnas.
 - No se declara aprobación de producción ni éxito de proveedores externos.
+
+# Auditoría final — `fase-4-claude-review` (2026-07-29)
+
+Auditoría funcional y visual sobre la base `d4081f6`, con recorrido real en
+navegador (no solo lectura de código) y línea base completa antes y después
+de los cambios. Detalle de hallazgos y correcciones en `PHASE_STATUS.md`.
+
+## Errores reales corregidos
+
+- `/admin/productos/edicion-masiva` fallaba con "Error en el panel": el
+  editor de producto individual guardaba la URL de imagen con un espacio
+  final (`detail-actions.ts` no recortaba antes del separador `|`), y
+  `next/image` rechaza URLs con espacio. Se corrigió el parseo y el dato ya
+  guardado en la base local.
+- `/admin/estado` mostraba "Migraciones" y "Almacenamiento" como correctos
+  de forma incondicional, sin verificación real. Ahora migraciones compara
+  el conteo aplicado contra el manifiesto real y almacenamiento hace una
+  prueba de escritura (local) o `head()` (R2).
+- `status-labels.ts` no traducía varios estados de pedido/pago
+  (`pending_payment`, `advance_pending`, etc.) ni los de recompensas/pop-ups/
+  cupones/promociones/contenido, que se mostraban en inglés crudo en el
+  título plegable de cada registro.
+- Componente `admin-module-placeholder.tsx` sin uso en ningún módulo actual:
+  eliminado.
+
+## Rediseño visual y de UX
+
+- Edición masiva de productos: de tarjetas verticales por producto a una
+  tabla compacta tipo hoja de cálculo, con encabezado y columna de
+  selección fijos y miniatura clicable que expande slug/descripción/
+  categorías/imagen. Mismo contrato de datos y guardado por bloques.
+- `/admin/pagos`, `/admin/pedidos` y `/admin/productos` eran las últimas
+  pantallas con tablas HTML sin estilo ni estado vacío; ahora usan el
+  mismo lenguaje visual que `/admin/inventario` (filtros, badges de
+  estado, estados vacíos reales, miniatura de producto).
+- Editor visual: el contenido de cada bloque se editaba como JSON crudo.
+  Ahora usa campos guiados generados a partir de la propia configuración
+  (texto, número, casilla, listas repetibles para beneficios/testimonios/
+  preguntas, selector de origen para colecciones de productos), con un
+  modo "JSON avanzado" opcional para casos no cubiertos.
+- Imágenes de producto (catálogo, tarjetas, ficha de producto, colecciones
+  del home) pasan de `aspect-[4/5]` a `aspect-square` para un recorte 1:1
+  consistente; el skeleton de `/catalogo` ya usaba `aspect-square`, así que
+  ahora coincide con la tarjeta real.
+
+## Pendiente observado, no corregido en esta pasada
+
+- La ficha de producto pública solo muestra `product.media[0]`; no existe
+  galería con miniaturas para las imágenes adicionales que sí admite el
+  editor. Queda como mejora futura, fuera del alcance pedido en esta
+  auditoría.
+- El recorte de imágenes sigue sin implementarse (documentado desde la
+  fase anterior); se mantiene la carga/selección/orden existentes.
+- `/admin/auditoria` traduce las acciones más frecuentes, pero algunas
+  siguen mostrando el nombre técnico de la entidad (p. ej.
+  "ShippingRule · update") en vez de una frase totalmente en español.

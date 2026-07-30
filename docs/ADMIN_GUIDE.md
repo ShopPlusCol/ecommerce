@@ -16,10 +16,12 @@ capturas, documentación ni chats compartidos. Abre `/acceso-admin`.
 - Productos: alta, estado, CSV, galería con carga directa y metadatos. La
   edición individual permite subir, seleccionar, ordenar y retirar imágenes;
   la primera es la portada visible en la tienda.
-- Edición masiva: abre `/admin/productos/edicion-masiva`, busca productos,
-  selecciona cualquier cantidad y cambia nombre, slug, SKU, precios, estado,
-  categorías, familia de color, imagen principal y opciones comerciales. El
-  guardado se envía por bloques técnicos para no imponer un límite funcional.
+- Edición masiva: abre `/admin/productos/edicion-masiva`. La tabla es
+  compacta (encabezado y columna de selección fijos): marca los productos a
+  editar, cambia nombre, SKU, estado, precios, familia de color o alerta de
+  stock directamente en la fila, y usa el botón “Más” junto a cada producto
+  para abrir slug, descripción corta, categorías e imagen. El guardado se
+  envía por bloques técnicos para no imponer un límite funcional.
 - Simulador: sube PNG/WebP cuadrado de hasta 2 MB, ajusta apariencia, guarda y
   aprueba solo tras revisar el producto real. Rechazar/pendiente no se publica.
 - Inventario: todo ajuste requiere motivo y no puede invadir reservas.
@@ -71,7 +73,7 @@ habilites modo producción ni Meta desde el panel por anticipado.
 
 - **Inventario:** filtra existencias y movimientos, exporta CSV, ajusta con motivo y libera reservas desde `/admin/inventario`. El servidor impide quedar por debajo de lo reservado.
 - **Envíos:** administra zonas jerárquicas, vigencias, tarifas, tiempos y métodos; valida una dirección con el cotizador de `/admin/envios`.
-- **Editor:** crea la página en `/admin/editor`, agrega bloques, guarda el borrador, abre la vista previa y publica. Restaurar siempre crea otra versión.
+- **Editor:** crea la página en `/admin/editor`, agrega bloques, guarda el borrador, abre la vista previa y publica. Restaurar siempre crea otra versión. El contenido de cada bloque se edita con campos guiados (texto, número, casilla, listas de beneficios/testimonios/preguntas); “Editar como JSON avanzado” sigue disponible para casos puntuales.
 - **Analítica:** selecciona fechas en `/admin/analitica`; “Negocio” usa pedidos reales y “Eventos técnicos” diagnostica instrumentación.
 - **Usuarios:** crea una cuenta con contraseña temporal, asigna un rol, revoca sesiones o cambia la contraseña. No puede suspenderse al último propietario activo.
 - **Simulador:** calibra sobre la imagen local, guarda como borrador y selecciona “Aprobar y activar” solo tras revisar el resultado.
@@ -79,3 +81,4 @@ habilites modo producción ni Meta desde el panel por anticipado.
 - **Configuración:** logos, favicon, Apple Touch Icon, Open Graph y QR se seleccionan desde Multimedia, con previsualización y eliminación.
 - **Imágenes:** productos, categorías, promociones, pop-ups y configuración visual admiten carga directa desde el equipo mediante el mismo adaptador local/R2 y conservan la validación de formato.
 - **Lenguaje operativo:** las acciones genéricas fueron reemplazadas por instrucciones concretas como “Añadir una nueva categoría” o “Añadir una nueva regla de envío”.
+- **Pedidos, productos y pagos:** las tres pantallas tienen filtro por texto y estado, miniatura de producto donde aplica, y badges de estado traducidos; ya no dependen de recordar el enum interno.

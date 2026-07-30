@@ -66,3 +66,60 @@ creación de recursos Cloudflare ni activación de pagos o eventos reales.
 - Matriz funcional y visual: `docs/PHASE_4_1_MATRIX.md`.
 - Pendientes externos: credenciales y pruebas sandbox de Mercado Pago/Meta/SMTP; creación y comprobación de D1/R2/Worker; dominio y contenido legal definitivo.
 - Estado de producción: **no aprobado**. La rama continúa aislada de `main`.
+
+# Auditoría final — `fase-4-claude-review` (2026-07-29)
+
+Auditoría funcional y visual de cierre sobre la base `d4081f6`, con
+recorrido real en navegador (sesión propia con rol propietario) además de
+lectura de código, y línea base completa antes y después de los cambios.
+
+## Verificación local (repetida al final)
+
+- `typecheck`, `lint`, build Next y build Cloudflare: correctos.
+- Vitest: 62/62 en 14 archivos. Playwright: 8/8 sobre base aislada.
+- Escaneo de secretos: 0 hallazgos en 361-362 archivos.
+- `npm audit --omit=dev`: sigue en 4 avisos moderados de la cadena Drizzle
+  Kit/esbuild (dependencia de desarrollo), sin cambios frente a la fase
+  anterior; no se aplicó `--force`.
+
+## Errores reales encontrados y corregidos
+
+- `/admin/productos/edicion-masiva` fallaba con "Error en el panel" al
+  cargar: una imagen de producto se guardó con un espacio final en la URL
+  (bug en `detail-actions.ts`, no en los datos) y `next/image` la rechazaba.
+  Corregido el parseo y el registro afectado en la base local.
+- `/admin/estado` marcaba "Migraciones" y "Almacenamiento" como correctos
+  de forma incondicional. Ahora ambos hacen una verificación real.
+- Varios estados de pedido, pago, recompensas, pop-ups, cupones,
+  promociones y contenido se mostraban en inglés crudo (`pending_payment`,
+  `draft`, etc.) en vez de traducidos. Corregido en `status-labels.ts` y en
+  los `recordTitle` de las pantallas afectadas.
+- Componente `admin-module-placeholder.tsx` sin ningún uso: eliminado.
+
+## Mejoras de UX/UI aplicadas
+
+- Edición masiva de productos rediseñada como tabla compacta (encabezado y
+  selección fijos, miniatura expandible) en vez de tarjetas verticales por
+  producto.
+- `/admin/pagos`, `/admin/pedidos` y `/admin/productos` — las últimas
+  pantallas con tablas sin estilo ni estado vacío — ahora usan el mismo
+  lenguaje visual que el resto del panel (filtros, badges, miniaturas,
+  estados vacíos reales).
+- El editor visual reemplaza el JSON crudo de cada bloque por campos
+  guiados (texto, número, casilla, listas repetibles, selector de origen
+  de colección), con un modo JSON avanzado opcional.
+- Imágenes de producto unificadas a recorte cuadrado (1:1) en catálogo,
+  tarjetas, ficha de producto y colecciones del home.
+
+Detalle completo con rutas, hallazgos y pendientes: `docs/PHASE_4_1_MATRIX.md`.
+
+## Pendiente
+
+- Todo lo listado como pendiente externo/humano arriba sigue igual: no se
+  crearon recursos Cloudflare, no se probaron credenciales de Mercado
+  Pago/Meta/SMTP, no hay contenido ni dominio definitivo.
+- Galería de imágenes múltiples en la ficha de producto pública (hoy solo
+  se muestra la portada) y traducción completa de nombres de entidad en
+  `/admin/auditoria` quedan como mejoras futuras, no como bloqueos.
+- Esta auditoría **no aprueba producción, no hace merge y no constituye
+  autorización para desplegar**. Queda pendiente de revisión humana.
