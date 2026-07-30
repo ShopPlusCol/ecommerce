@@ -47,7 +47,10 @@ export function ShippingQuoteSimulator() {
               <article className="rounded-lg bg-surface-sunken p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4" />Regla aplicada</div>
                 <p className="mt-2 text-2xl font-semibold">${state.quote.fee.toLocaleString("es-CO")}</p>
-                <p className="mt-1 text-xs text-text-muted">Nivel: {state.quote.ruleLevel} · ID: {state.quote.ruleId}</p>
+                <p className="mt-1 text-xs text-text-muted">
+                  {state.quote.feeSource ? `Heredada de ${state.quote.feeSource.zoneName}` : "Tarifa propia de la zona resuelta"} · Nivel: {state.quote.ruleLevel}
+                </p>
+                <p className="mt-1 text-xs text-text-muted">ID de regla: {state.quote.ruleId}</p>
               </article>
               <article className="rounded-lg bg-surface-sunken p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold"><WalletCards className="h-4 w-4" />Métodos permitidos</div>
@@ -55,7 +58,9 @@ export function ShippingQuoteSimulator() {
               </article>
               <article className="rounded-lg bg-surface-sunken p-4">
                 <p className="text-sm font-semibold">Condiciones</p>
-                <p className="mt-2 text-sm">{state.quote.estimatedBusinessDaysMin}–{state.quote.estimatedBusinessDaysMax} días hábiles</p>
+                <p className="mt-2 text-sm">
+                  {state.quote.sameDayEligible ? "Mismo día disponible ahora" : `${state.quote.estimatedBusinessDaysMin}–${state.quote.estimatedBusinessDaysMax} días hábiles`}
+                </p>
                 <p className="mt-1 text-sm">{state.quote.requiresAdvancePayment ? `Anticipo requerido${state.quote.advancePercentage ? `: ${state.quote.advancePercentage}%` : ""}` : "Sin anticipo obligatorio"}</p>
                 {state.quote.customerMessage ? <p className="mt-2 text-xs text-text-muted">{state.quote.customerMessage}</p> : null}
               </article>

@@ -17,12 +17,14 @@ export type AdminShippingQuoteState = {
     ruleId: string;
     ruleLevel: string;
     fee: number;
+    feeSource: { zoneId: string; zoneName: string } | null;
     freeShippingThreshold: number | null;
     methods: Array<{ id: PaymentMethodId; label: string }>;
     requiresAdvancePayment: boolean;
     advancePercentage: number | null;
     estimatedBusinessDaysMin: number;
     estimatedBusinessDaysMax: number;
+    sameDayEligible: boolean;
     customerMessage: string;
   };
 };
@@ -66,12 +68,14 @@ export async function quoteShippingAdminAction(
         ruleId: quote.ruleId,
         ruleLevel: quote.ruleLevel,
         fee: quote.fee.amount,
+        feeSource: quote.feeSource,
         freeShippingThreshold: quote.freeShippingThreshold?.amount ?? null,
         methods: methods.map((id) => ({ id, label: PAYMENT_METHOD_LABELS[id] })),
         requiresAdvancePayment: quote.requiresAdvancePayment,
         advancePercentage: quote.advancePercentage,
         estimatedBusinessDaysMin: quote.estimatedBusinessDaysMin,
         estimatedBusinessDaysMax: quote.estimatedBusinessDaysMax,
+        sameDayEligible: quote.sameDayEligible,
         customerMessage: quote.customerMessage,
       },
     };
