@@ -20,6 +20,7 @@ import {
   ReleaseExpiredReservationsButton,
   ReservationReleaseForm,
 } from "./inventory-forms";
+import { BulkInventoryEditor } from "./bulk-inventory-editor";
 
 export const metadata: Metadata = { title: "Inventario" };
 
@@ -140,6 +141,15 @@ export default async function AdminInventoryPage({
           );
         })}
       </section>
+      <BulkInventoryEditor
+        rows={stockRows.map(({ item, product }) => ({
+          itemId: item.id,
+          productName: product.name,
+          sku: product.sku,
+          quantityOnHand: item.quantityOnHand,
+          available: inventoryAvailable(item),
+        }))}
+      />
       <form className="mb-5 grid gap-3 rounded-xl border border-border bg-surface-raised p-4 md:grid-cols-[minmax(220px,1fr)_180px_190px_auto]">
         <label className="grid gap-1 text-xs font-semibold">Buscar<input name="q" defaultValue={params.q} placeholder="Producto, SKU o motivo" className="h-10 rounded-md border border-border px-3 text-sm font-normal" /></label>
         <label className="grid gap-1 text-xs font-semibold">Existencias<select name="stock" defaultValue={stockFilter} className="h-10 rounded-md border border-border px-3 text-sm font-normal"><option value="all">Todas</option><option value="low">Stock bajo</option><option value="out">Agotadas</option><option value="available">Disponibles</option></select></label>

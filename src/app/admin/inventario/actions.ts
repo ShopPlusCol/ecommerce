@@ -16,6 +16,87 @@ import {
 
 const movementTypeSchema = z.enum(["restock", "manual_adjustment", "return"]);
 
+const bulkAdjustmentSchema = z.object({
+  itemId: z.string().min(1),
+  productName: z.string().min(1),
+  type: movementTypeSchema,
+  delta: z.number().int(),
+  reason: z.string().trim().min(5).max(240),
+});
+
+export type BulkInventoryAdjustment = z.infer<typeof bulkAdjustmentSchema>;
+
+/** Aplica varios ajustes de inventario en una sola operación desde la tabla compacta. */
+export async function bulkAdjustInventoryAction(input: BulkInventoryAdjustment[]): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("inventory", "update");
+    const rows = z.array(bulkAdjustmentSchema).min(1, "Selecciona al menos un producto.").parse(input);
+    const db = await getRuntimeDb();
+    let updatedCount = 0;
+    const conflicts: string[] = [];
+
+    for (const row of rows) {
+      if (row.delta === 0) {
+        conflicts.push(`${row.productName} (el ajuste no puede ser cero)`);
+        continue;
+      }
+      if (row.type !== "manual_adjustment" && row.delta < 1) {
+        conflicts.push(`${row.productName} (entradas y devoluciones deben sumar unidades)`);
+        continue;
+      }
+      const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, row.itemId)).limit(1);
+      if (!item) {
+        conflicts.push(`${row.productName} (el registro ya no existe)`);
+        continue;
+      }
+      const validation = validateInventoryAdjustment(item, row.delta);
+      if (!validation.ok) {
+        conflicts.push(`${row.productName} (${validation.message})`);
+        continue;
+      }
+      const [updated] = await db
+        .update(inventoryItems)
+        .set({ quantityOnHand: validation.nextOnHand, updatedAt: new Date() })
+        .where(and(eq(inventoryItems.id, row.itemId), eq(inventoryItems.updatedAt, item.updatedAt)))
+        .returning();
+      if (!updated) {
+        conflicts.push(`${row.productName} (cambió en otra sesión, recarga e intenta de nuevo)`);
+        continue;
+      }
+      const [movement] = await db
+        .insert(inventoryMovements)
+        .values({
+          inventoryItemId: row.itemId,
+          type: row.type,
+          quantityDelta: row.delta,
+          reason: row.reason,
+          createdByUserId: session.user.id,
+        })
+        .returning();
+      await db.insert(auditLogs).values({
+        userId: session.user.id,
+        action: "inventory.bulk_adjust",
+        entityType: "inventory_item",
+        entityId: row.itemId,
+        before: { quantityOnHand: item.quantityOnHand, quantityReserved: item.quantityReserved },
+        after: { quantityOnHand: validation.nextOnHand, movementId: movement.id, type: row.type, delta: row.delta },
+        reason: row.reason,
+      });
+      updatedCount += 1;
+    }
+
+    revalidatePath("/admin/inventario");
+    revalidatePath("/catalogo");
+    revalidatePath("/", "layout");
+    if (conflicts.length) {
+      return { status: "error", message: `${updatedCount} ajuste(s) aplicado(s). Revisa: ${conflicts.join(", ")}.` };
+    }
+    return { status: "success", message: `${updatedCount} ajuste(s) aplicados correctamente.` };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function adjustInventoryAdminAction(
   _state: AdminActionState,
   formData: FormData,
