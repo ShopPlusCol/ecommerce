@@ -15,7 +15,7 @@ import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/p
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 import { DEPARTMENTS, MEDELLIN_NEIGHBORHOODS, citiesForDepartment, isMedellin } from "@/lib/colombia-locations";
-import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
+import { quoteShippingAction, createDemoOrderAction, listConfiguredNeighborhoodsAction } from "@/app/(store)/actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
@@ -49,6 +49,7 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
+  const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
@@ -110,6 +111,22 @@ export function CheckoutClient() {
     };
   }, [location.department, location.city, location.neighborhood, subtotalAmount]);
 
+  // Barrios con tarifa propia configurados en /admin/envios (sección 17.5).
+  React.useEffect(() => {
+    if (!location.city) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia la lista al cambiar de ciudad
+      setConfiguredNeighborhoods([]);
+      return;
+    }
+    let cancelled = false;
+    listConfiguredNeighborhoodsAction(location.city).then((names) => {
+      if (!cancelled) setConfiguredNeighborhoods(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.city]);
+
   const summary = React.useMemo(() => {
     if (!quote || !paymentMethod) return null;
     return computeOrderSummary(cart, { coupon, rewards, shippingQuote: quote, paymentMethod });
@@ -135,7 +152,12 @@ export function CheckoutClient() {
   }
 
   const cities = citiesForDepartment(location.department);
-  const showMedellinNeighborhoods = isMedellin(location.city);
+  const neighborhoodOptions = configuredNeighborhoods.length > 0
+    ? configuredNeighborhoods
+    : isMedellin(location.city)
+      ? MEDELLIN_NEIGHBORHOODS
+      : [];
+  const showNeighborhoodSelect = neighborhoodOptions.length > 0;
 
   const validate = (): boolean => {
     const next: Record<string, string> = {};
@@ -261,12 +283,12 @@ export function CheckoutClient() {
               />
             </div>
 
-            {showMedellinNeighborhoods ? (
+            {showNeighborhoodSelect ? (
               <SelectField
                 label="Barrio o sector"
                 value={location.neighborhood}
                 onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
-                options={MEDELLIN_NEIGHBORHOODS}
+                options={neighborhoodOptions}
                 placeholder="Selecciona…"
               />
             ) : (

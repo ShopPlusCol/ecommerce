@@ -30,6 +30,7 @@ import {
   orders,
   orderStatusHistory,
   payments,
+  shippingZones,
 } from "@/infrastructure/db/schema";
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { releaseExpiredReservations } from "@/modules/inventory/reservations";
@@ -107,6 +108,30 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
     .filter((method) => method !== "mercado_pago" || Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN))
     .filter((method) => !["transfer_full", "shipping_advance_transfer"].includes(method) || transferConfigured);
   return { ok: true, quote, methods };
+}
+
+/**
+ * Barrios con zona de envío propia configurada para una ciudad (sección
+ * 17.5): permite que el checkout ofrezca exactamente los barrios que el
+ * administrador dio de alta, en vez de una lista fija en el código.
+ */
+export async function listConfiguredNeighborhoodsAction(city: string): Promise<string[]> {
+  const normalizedCity = city.trim();
+  if (!normalizedCity) return [];
+  const db = await getRuntimeDb();
+  const rows = await db
+    .select({ neighborhood: shippingZones.neighborhood })
+    .from(shippingZones)
+    .where(
+      and(
+        eq(shippingZones.level, "neighborhood"),
+        eq(shippingZones.status, "active"),
+        sql`lower(${shippingZones.city}) = lower(${normalizedCity})`,
+      ),
+    );
+  return [...new Set(rows.map((row) => row.neighborhood).filter((value): value is string => Boolean(value)))].sort((a, b) =>
+    a.localeCompare(b, "es-CO"),
+  );
 }
 
 /**
