@@ -82,3 +82,44 @@ habilites modo producción ni Meta desde el panel por anticipado.
 - **Imágenes:** productos, categorías, promociones, pop-ups y configuración visual admiten carga directa desde el equipo mediante el mismo adaptador local/R2 y conservan la validación de formato.
 - **Lenguaje operativo:** las acciones genéricas fueron reemplazadas por instrucciones concretas como “Añadir una nueva categoría” o “Añadir una nueva regla de envío”.
 - **Pedidos, productos y pagos:** las tres pantallas tienen filtro por texto y estado, miniatura de producto donde aplica, y badges de estado traducidos; ya no dependen de recordar el enum interno.
+
+# Operación añadida en Ronda 2 (2026-07-30)
+
+- **Multimedia (`/admin/medios`):** puedes seleccionar varios archivos a la
+  vez; cada uno se sube apenas lo eliges, conserva un nombre reconocible
+  (basado en el nombre original) y se muestra como miniatura cuadrada.
+  Eliminar un archivo ya no exige escribir un motivo.
+- **Imágenes en productos y pop-ups:** en la ficha de producto (individual y
+  edición masiva) y en pop-ups, seleccionar un archivo lo sube de inmediato;
+  no hace falta un botón "Subir" separado.
+- **Recompensas — envío gratis por zona (`/admin/recompensas`):** el campo
+  "Ciudades/departamentos donde aplica" limita una recompensa de tipo
+  "Envío gratis" a las zonas que elijas (barrios no incluidos, solo ciudad/
+  departamento/país); si lo dejas vacío, aplica en todo el país. El cliente
+  solo ve el envío gratis cuando su dirección coincide con una zona
+  elegida, y el pedido se revalida en el servidor antes de confirmarse.
+- **Límite de compra por categoría (`/admin/productos`):** en el detalle de
+  producto y en edición masiva puedes fijar "Categoría límite" y "Máximo por
+  unidad de categoría"; por ejemplo, si el cliente tiene 1 unidad de esa
+  categoría en el carrito, este producto no pasará de esa cantidad. El
+  carrito ajusta la cantidad automáticamente al llegar al tope.
+- **Inventario (`/admin/inventario`):** además del ajuste individual, hay un
+  bloque de ajuste masivo: escribe el ajuste (+/−) y el motivo en cada fila
+  y solo se guardan las filas con ambos campos completos.
+- **Pop-ups (`/admin/popups`):** ahora sí se muestran en la tienda. Configura
+  imagen, texto, cupón opcional, rutas donde aparece/no aparece, frecuencia
+  (una vez por sesión, una vez por período o siempre) y el disparador
+  (retraso en segundos, porcentaje de scroll o intención de salida).
+- **Barrios de Medellín (`/admin/envios`):** ya no están fijos en el código.
+  Crea una zona con Nivel "Barrio" y su Ciudad para que aparezca como opción
+  en el checkout de esa ciudad; si además le agregas una regla de envío
+  propia, esa tarifa reemplaza a la de la ciudad para ese barrio.
+- **Editor visual (`/admin/editor/[id]`):** cada bloque tiene un asa de
+  arrastre (⠿) junto al título; arrástralo sobre otro bloque para
+  reordenar. Los botones ↑/↓ siguen disponibles como alternativa sin mouse.
+- **Configuración (`/admin/configuracion`):** guardar marca, transferencia
+  manual o privacidad ahora muestra un mensaje de confirmación visible bajo
+  el botón; antes guardaba en silencio.
+- **Zonas de peligro (`/admin/pedidos`, `/admin/clientes`):** "Limpiar
+  todos los pedidos/clientes" está ahora colapsado por defecto; haz clic en
+  el título para expandirlo antes de usarlo.

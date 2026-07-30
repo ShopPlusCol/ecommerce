@@ -123,3 +123,74 @@ Detalle completo con rutas, hallazgos y pendientes: `docs/PHASE_4_1_MATRIX.md`.
   `/admin/auditoria` quedan como mejoras futuras, no como bloqueos.
 - Esta auditoría **no aprueba producción, no hace merge y no constituye
   autorización para desplegar**. Queda pendiente de revisión humana.
+
+# Ronda 2 — diez mejoras solicitadas (2026-07-30)
+
+Diez pedidos puntuales del propietario sobre `fase-4-claude-review`
+(`d4081f6` en adelante), cada uno implementado, verificado en navegador con
+datos reales y confirmado contra la base de datos, con commits propios.
+
+## Cambios entregados
+
+- **Multimedia:** carga múltiple de archivos en un solo envío, nombre de
+  archivo original conservado (con sufijo solo si hay colisión), miniaturas
+  cuadradas y eliminación sin exigir un motivo obligatorio.
+- **Carga instantánea de imágenes:** el editor individual y masivo de
+  productos, y los pop-ups, suben el archivo apenas se selecciona (sin botón
+  "Subir" aparte); se corrigió además el panel "Más detalles" del editor
+  masivo, que se rompía visualmente por vivir dentro de una tabla con scroll
+  horizontal.
+- **Recompensas — envío gratis por zona:** `reward_rules.eligible_zone_ids`
+  (migración `0010`) permite restringir una recompensa de envío gratis a
+  ciudades/departamentos concretos desde `/admin/recompensas`; el motor de
+  recompensas solo la desbloquea si el destino coincide, evaluado tanto en
+  checkout (cliente) como en la creación de pedido (servidor, autoritativo).
+- **Productos — límite por categoría en el carrito:** un producto puede
+  configurarse con un máximo de unidades permitidas por cada unidad de una
+  categoría elegida presente en el carrito (`products.limit_category_id` y
+  `max_units_per_category_unit`, migración `0009`); se aplica al agregar y al
+  cambiar cantidad, en cliente y servidor.
+- **Inventario:** nueva herramienta de ajuste masivo (motivo + delta por
+  fila) y vista principal compactada, siguiendo el mismo patrón visual que
+  la edición masiva de productos.
+- **Pop-ups:** no existía ningún componente que los mostrara en la tienda;
+  se construyó el disparador (retraso, scroll, intención de salida,
+  frecuencia por sesión/período) y se corrigió `includedPaths` para que
+  comparar contra una URL completa no impidiera nunca la coincidencia.
+- **Envíos — barrios de Medellín:** la lista de barrios del checkout ahora
+  se lee de las zonas de nivel "Barrio" configuradas en `/admin/envios`
+  (con tarifa propia opcional), en vez de una lista fija en código.
+- **Editor visual — arrastrar y soltar:** cada bloque tiene un asa de
+  arrastre (⠿) para reordenar con una guía visual de destino, persistido en
+  un solo viaje al servidor (`reorderBlocksAction`); los botones ↑/↓ se
+  conservan como alternativa accesible sin mouse/touch.
+- **Configuración:** los tres formularios de guardado (marca, transferencia
+  manual, privacidad) ahora usan `useActionState` y muestran una
+  confirmación visible; antes guardaban sin ningún indicio en pantalla.
+- **Zonas de peligro:** "Limpiar todos los pedidos/clientes" vive ahora
+  detrás de un `<details>` colapsado por defecto, en vez de ocupar espacio
+  permanente en la pantalla.
+
+## Verificación local (repetida al final de la ronda)
+
+- `typecheck`, `lint`, build Next y build Cloudflare (`cf:build`): correctos.
+- Vitest: 65/65 en 14 archivos. Playwright: 8/8 sobre base aislada (se
+  ajustó un E2E para abrir primero la zona de peligro, ahora colapsada).
+- Escaneo de secretos: 0 hallazgos en 369 archivos.
+- `npm audit`: sin cambios frente a las fases anteriores (4 avisos
+  moderados de la cadena Drizzle Kit/esbuild, 17 en total con ESLint/
+  minimatch y OpenNext/node-minify; todas son dependencias de build/dev,
+  ninguna corrección disponible sin salto de versión mayor).
+- Cada cambio se probó manualmente en navegador con datos reales (subida de
+  archivos, pedido completo a Medellín vs. Bogotá para envío por zona,
+  arrastrar bloques y recargar para confirmar persistencia, etc.) y los
+  datos de prueba se limpiaron de la base local al terminar.
+
+## Pendiente
+
+- `PROJECT_MAP.md` es generado automáticamente ("no editar a mano"); no se
+  modificó a mano en esta ronda.
+- Todo lo ya listado como pendiente externo/humano en las secciones
+  anteriores sigue igual.
+- Esta ronda **no aprueba producción, no hace merge y no constituye
+  autorización para desplegar**. Queda pendiente de revisión humana.

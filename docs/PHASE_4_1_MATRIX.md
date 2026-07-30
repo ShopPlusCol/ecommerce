@@ -90,3 +90,21 @@ de los cambios. Detalle de hallazgos y correcciones en `PHASE_STATUS.md`.
 - `/admin/auditoria` traduce las acciones más frecuentes, pero algunas
   siguen mostrando el nombre técnico de la entidad (p. ej.
   "ShippingRule · update") en vez de una frase totalmente en español.
+
+# Ronda 2 — diez mejoras solicitadas (2026-07-30)
+
+| Pedido | Ruta y controles reales | Persistencia | Verificación |
+|---|---|---|---|
+| Multimedia: multi-carga, nombre original, cuadrícula, borrado sin motivo | `/admin/medios` | Almacenamiento local/R2; `media:*` | Subida real de varios archivos, miniaturas revisadas |
+| Carga instantánea de imagen en todos lados | Editor de producto individual, edición masiva, pop-ups | Igual que arriba | Selección de archivo dispara la subida sin botón aparte |
+| Envío gratis restringido por zona | `/admin/recompensas`; `reward_rules.eligible_zone_ids` (migración `0010`) | `evaluateRewards` con `zoneIds`; autoritativo en cliente y servidor | Pedido real a Medellín (gratis) vs. Bogotá (tarifa normal) |
+| Límite de unidades por categoría en carrito | `/admin/productos` y edición masiva; `products.limit_category_id`/`max_units_per_category_unit` (migración `0009`) | `maxAllowedByPurchaseLimit` en cliente y servidor | Unitarios + clamp verificado en carrito |
+| Inventario compacto + ajuste masivo | `/admin/inventario` | `inventory_items`; `inventory:*` | Ajuste por fila con motivo obligatorio |
+| Pop-ups funcionales | `/(store)` vía `<PromoPopup>`; `/admin/popups` | `popups`; `promotions:*` | Disparo por retraso/scroll/salida probado en navegador |
+| Barrios de Medellín configurables | `/admin/envios` (zonas nivel "Barrio") → checkout | `shipping_zones`; `shipping:*` | Lista del checkout coincide con zonas configuradas |
+| Editor visual: arrastrar y soltar | `/admin/editor/[id]`; asa ⠿ + `reorderBlocksAction` | Reordena `page_sections.order` en un viaje | Arrastre real, orden persiste tras recargar |
+| Confirmación visible al guardar en Configuración | `/admin/configuracion` | `settings:*` vía `useActionState` | Mensaje de éxito visible tras guardar cada formulario |
+| Zonas de peligro colapsadas | `/admin/pedidos`, `/admin/clientes` | Sin cambio de datos, solo presentación | E2E ajustado para abrir el `<details>` antes de interactuar |
+
+Detalle narrativo de cada cambio, hallazgos y verificación repetida de línea
+base: `PHASE_STATUS.md`.
