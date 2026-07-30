@@ -1,6 +1,7 @@
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEntitySection } from "@/components/admin/admin-entity-section";
 import type { AdminEntityField } from "@/components/admin/admin-entity-form";
+import { adminStatusLabel } from "@/modules/admin/status-labels";
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { promotions } from "@/infrastructure/db/schema";
@@ -22,7 +23,7 @@ export default async function Page() {
   return (
     <>
       <AdminPageHeader title="Promociones" description="Campañas agrupadas con vigencia, recursos y beneficios relacionados." />
-      <AdminEntitySection entity="promotion" title="Promociones" description="Duplicar siempre crea un borrador sin fechas activas." fields={fields} records={rows.map((row) => ({ id: row.id, name: row.name, description: row.description, bannerImageUrl: row.bannerImageUrl, relatedCouponIds: row.relatedCouponIds?.join(", ") ?? "", relatedRewardRuleIds: row.relatedRewardRuleIds?.join(", ") ?? "", startsAt: row.startsAt, endsAt: row.endsAt, status: row.status }))} recordTitle={(record) => `${record.name} · ${record.status}`} />
+      <AdminEntitySection entity="promotion" title="Promociones" description="Duplicar siempre crea un borrador sin fechas activas." fields={fields} records={rows.map((row) => ({ id: row.id, name: row.name, description: row.description, bannerImageUrl: row.bannerImageUrl, relatedCouponIds: row.relatedCouponIds?.join(", ") ?? "", relatedRewardRuleIds: row.relatedRewardRuleIds?.join(", ") ?? "", startsAt: row.startsAt, endsAt: row.endsAt, status: row.status }))} recordTitle={(record) => `${record.name} · ${adminStatusLabel(String(record.status))}`} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEntitySection } from "@/components/admin/admin-entity-section";
 import type { AdminEntityField } from "@/components/admin/admin-entity-form";
+import { adminStatusLabel } from "@/modules/admin/status-labels";
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { rewardRules } from "@/infrastructure/db/schema";
@@ -29,7 +30,7 @@ export default async function Page() {
   return (
     <>
       <AdminPageHeader title="Recompensas" description="Metas progresivas y beneficios calculados nuevamente en servidor." />
-      <AdminEntitySection entity="rewardRule" title="Recompensas" description="Configura mensajes, meta, beneficio, límites y prioridad." fields={fields} records={rows.map((row) => ({ id: row.id, name: row.name, progressMessage: row.progressMessage, unlockedMessage: row.unlockedMessage, conditionType: row.conditionType, targetValue: row.targetValue, rewardType: row.rewardType, rewardValue: row.rewardValue, rewardProductId: row.rewardProductId, priority: row.priority, combinable: row.combinable, startsAt: row.startsAt, endsAt: row.endsAt, usageLimitTotal: row.usageLimitTotal, usageLimitPerCustomer: row.usageLimitPerCustomer, status: row.status }))} recordTitle={(record) => `${record.name} · ${record.conditionType} · ${record.status}`} />
+      <AdminEntitySection entity="rewardRule" title="Recompensas" description="Configura mensajes, meta, beneficio, límites y prioridad." fields={fields} records={rows.map((row) => ({ id: row.id, name: row.name, progressMessage: row.progressMessage, unlockedMessage: row.unlockedMessage, conditionType: row.conditionType, targetValue: row.targetValue, rewardType: row.rewardType, rewardValue: row.rewardValue, rewardProductId: row.rewardProductId, priority: row.priority, combinable: row.combinable, startsAt: row.startsAt, endsAt: row.endsAt, usageLimitTotal: row.usageLimitTotal, usageLimitPerCustomer: row.usageLimitPerCustomer, status: row.status }))} recordTitle={(record) => `${record.name} · ${adminStatusLabel(String(record.conditionType))} · ${adminStatusLabel(String(record.status))}`} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEntitySection } from "@/components/admin/admin-entity-section";
 import type { AdminEntityField } from "@/components/admin/admin-entity-form";
+import { adminStatusLabel } from "@/modules/admin/status-labels";
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { coupons } from "@/infrastructure/db/schema";
@@ -30,7 +31,7 @@ export default async function Page() {
   return (
     <>
       <AdminPageHeader title="Cupones" description="Reglas de descuento revalidadas en servidor durante cada checkout." />
-      <AdminEntitySection entity="coupon" title="Cupones" description="Códigos únicos, límites, atribución, vigencia y combinabilidad." fields={fields} records={rows.map((row) => ({ id: row.id, code: row.code, discountType: row.discountType, discountValue: row.discountValue, startsAt: row.startsAt, endsAt: row.endsAt, usageLimitTotal: row.usageLimitTotal, usageLimitPerCustomer: row.usageLimitPerCustomer, minPurchaseAmount: row.minPurchaseAmount, minQuantity: row.minQuantity, firstOrderOnly: row.firstOrderOnly, combinable: row.combinable, priority: row.priority, status: row.status, attributedTo: row.attributedTo, internalTags: row.internalTags?.join(", ") ?? "", internalNotes: row.internalNotes }))} recordTitle={(record) => `${record.code} · ${record.discountValue} · ${record.status}`} />
+      <AdminEntitySection entity="coupon" title="Cupones" description="Códigos únicos, límites, atribución, vigencia y combinabilidad." fields={fields} records={rows.map((row) => ({ id: row.id, code: row.code, discountType: row.discountType, discountValue: row.discountValue, startsAt: row.startsAt, endsAt: row.endsAt, usageLimitTotal: row.usageLimitTotal, usageLimitPerCustomer: row.usageLimitPerCustomer, minPurchaseAmount: row.minPurchaseAmount, minQuantity: row.minQuantity, firstOrderOnly: row.firstOrderOnly, combinable: row.combinable, priority: row.priority, status: row.status, attributedTo: row.attributedTo, internalTags: row.internalTags?.join(", ") ?? "", internalNotes: row.internalNotes }))} recordTitle={(record) => `${record.code} · ${record.discountValue} · ${adminStatusLabel(String(record.status))}`} />
     </>
   );
 }

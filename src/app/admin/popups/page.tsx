@@ -1,6 +1,7 @@
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEntitySection } from "@/components/admin/admin-entity-section";
 import type { AdminEntityField } from "@/components/admin/admin-entity-form";
+import { adminStatusLabel } from "@/modules/admin/status-labels";
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { coupons, popups } from "@/infrastructure/db/schema";
@@ -32,7 +33,7 @@ export default async function Page() {
   return (
     <>
       <AdminPageHeader title="Pop-ups" description="Segmentación por ruta, frecuencia, disparadores y programación." />
-      <AdminEntitySection entity="popup" title="Pop-ups" description="Los borradores y pausados nunca se muestran en la tienda." fields={fields} records={rows.map((row) => ({ id: row.id, name: row.name, imageUrlMobile: row.imageUrlMobile, imageUrlDesktop: row.imageUrlDesktop, title: row.title, body: row.body, ctaLabel: row.ctaLabel, ctaHref: row.ctaHref, couponId: row.couponId, includedPaths: row.includedPaths?.join(", ") ?? "", excludedPaths: row.excludedPaths?.join(", ") ?? "", frequency: row.frequency, delaySeconds: row.delaySeconds, triggerOnScrollPercent: row.triggerOnScrollPercent, triggerOnExitIntent: row.triggerOnExitIntent, priority: row.priority, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt }))} recordTitle={(record) => `${record.name} · ${record.frequency} · ${record.status}`} />
+      <AdminEntitySection entity="popup" title="Pop-ups" description="Los borradores y pausados nunca se muestran en la tienda." fields={fields} records={rows.map((row) => ({ id: row.id, name: row.name, imageUrlMobile: row.imageUrlMobile, imageUrlDesktop: row.imageUrlDesktop, title: row.title, body: row.body, ctaLabel: row.ctaLabel, ctaHref: row.ctaHref, couponId: row.couponId, includedPaths: row.includedPaths?.join(", ") ?? "", excludedPaths: row.excludedPaths?.join(", ") ?? "", frequency: row.frequency, delaySeconds: row.delaySeconds, triggerOnScrollPercent: row.triggerOnScrollPercent, triggerOnExitIntent: row.triggerOnExitIntent, priority: row.priority, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt }))} recordTitle={(record) => `${record.name} · ${adminStatusLabel(String(record.frequency))} · ${adminStatusLabel(String(record.status))}`} />
     </>
   );
 }

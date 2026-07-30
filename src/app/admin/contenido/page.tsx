@@ -1,6 +1,7 @@
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEntitySection } from "@/components/admin/admin-entity-section";
 import type { AdminEntityField } from "@/components/admin/admin-entity-form";
+import { adminStatusLabel } from "@/modules/admin/status-labels";
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { faqs, testimonials } from "@/infrastructure/db/schema";
@@ -29,8 +30,8 @@ export default async function Page() {
   return (
     <>
       <AdminPageHeader title="Contenido" description="Preguntas frecuentes y testimonios publicados desde una fuente persistente." />
-      <AdminEntitySection entity="faq" title="Preguntas frecuentes" description="Ordena y publica respuestas visibles en la tienda." fields={faqFields} records={faqRows.map((row) => ({ ...row }))} recordTitle={(record) => `${record.question} · ${record.status}`} />
-      <AdminEntitySection entity="testimonial" title="Testimonios" description="Solo los publicados pueden aparecer en bloques públicos." fields={testimonialFields} records={testimonialRows.map((row) => ({ ...row }))} recordTitle={(record) => `${record.customerName} · ${record.rating ?? "sin calificación"} · ${record.status}`} />
+      <AdminEntitySection entity="faq" title="Preguntas frecuentes" description="Ordena y publica respuestas visibles en la tienda." fields={faqFields} records={faqRows.map((row) => ({ ...row }))} recordTitle={(record) => `${record.question} · ${adminStatusLabel(String(record.status))}`} />
+      <AdminEntitySection entity="testimonial" title="Testimonios" description="Solo los publicados pueden aparecer en bloques públicos." fields={testimonialFields} records={testimonialRows.map((row) => ({ ...row }))} recordTitle={(record) => `${record.customerName} · ${record.rating ?? "sin calificación"} · ${adminStatusLabel(String(record.status))}`} />
     </>
   );
 }
