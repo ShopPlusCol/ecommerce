@@ -4,14 +4,16 @@ import { WhatsAppFloatButton } from "@/components/store/whatsapp-float-button";
 import { StoreProviders } from "@/components/store/store-providers";
 import { ConsentBanner } from "@/components/store/consent-banner";
 import { MaintenanceNotice } from "@/components/store/maintenance-notice";
+import { PromoPopup } from "@/components/store/promo-popup";
 import { promotionsRepository } from "@/lib/container";
 import { getBrandSettings } from "@/modules/settings/brand";
 
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   // Reglas de recompensa cargadas en servidor (contrato definitivo) para el
   // cálculo inmediato de la barra de progreso en el cliente.
-  const [rewardRules, brand] = await Promise.all([
+  const [rewardRules, popups, brand] = await Promise.all([
     promotionsRepository.listActiveRewardRules(),
+    promotionsRepository.listActivePopups(),
     getBrandSettings(),
   ]);
   const maintenance = process.env.MAINTENANCE_MODE === "true";
@@ -23,6 +25,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       <SiteFooter brand={brand} />
       <WhatsAppFloatButton brand={brand} />
       <ConsentBanner />
+      {maintenance || popups.length === 0 ? null : <PromoPopup popups={popups} />}
     </StoreProviders>
   );
 }

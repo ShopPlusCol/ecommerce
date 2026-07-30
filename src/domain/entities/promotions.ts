@@ -38,3 +38,24 @@ export type RewardRule = {
   priority: number;
   status: "draft" | "active" | "paused";
 };
+
+export type PopupFrequency = "once_per_session" | "once_per_period" | "always";
+
+/** Sección 14: pop-ups y banners. Solo expone lo necesario para mostrarlo en la tienda. */
+export type Popup = {
+  id: string;
+  imageUrlMobile: string | null;
+  imageUrlDesktop: string | null;
+  title: string | null;
+  body: string | null;
+  ctaLabel: string | null;
+  ctaHref: string | null;
+  couponCode: string | null;
+  includedPaths: string[];
+  excludedPaths: string[];
+  frequency: PopupFrequency;
+  delaySeconds: number;
+  triggerOnScrollPercent: number | null;
+  triggerOnExitIntent: boolean;
+  priority: number;
+};
