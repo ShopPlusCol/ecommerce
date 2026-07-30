@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { money } from "@/domain/value-objects/money";
-import { resolveShippingQuote, type ShippingRuleConfig, type ShippingZoneNode } from "@/domain/services/shipping";
+import { resolveEffectiveZoneConfig, resolveShippingQuote, type ShippingRuleConfig, type ShippingZoneNode } from "@/domain/services/shipping";
 
 function zone(overrides: Partial<ShippingZoneNode> & { id: string; name: string; level: ShippingZoneNode["level"] }): ShippingZoneNode {
   return {
@@ -245,5 +245,37 @@ describe("resolveShippingQuote — valores por defecto cuando nada en la cadena 
     expect(quote?.estimatedBusinessDaysMin).toBe(1);
     expect(quote?.estimatedBusinessDaysMax).toBe(3);
     expect(quote?.sameDayEligible).toBe(false);
+  });
+});
+
+describe("resolveEffectiveZoneConfig — para el panel de administración (propia vs. heredada)", () => {
+  it("devuelve null si la zona no existe", () => {
+    expect(resolveEffectiveZoneConfig(baseZones, baseRules, "no-existe")).toBeNull();
+  });
+
+  it("marca un campo propio sin inheritedFrom", () => {
+    const config = resolveEffectiveZoneConfig(baseZones, baseRules, "z-medellin");
+    expect(config?.fee.value).toEqual(money(8_000));
+    expect(config?.fee.inheritedFrom).toBeNull();
+  });
+
+  it("marca un campo heredado con la zona ancestro de origen", () => {
+    const config = resolveEffectiveZoneConfig(baseZones, baseRules, "z-bello");
+    expect(config?.fee.value).toEqual(money(15_000));
+    expect(config?.fee.inheritedFrom).toEqual(antioquia);
+  });
+
+  it("effectivelyActive es false si algún ancestro está inactivo, aunque la zona misma esté activa", () => {
+    const inactiveAntioquia = { ...antioquia, status: "inactive" as const };
+    const zones = [country, inactiveAntioquia, medellin, bello, poblado];
+    const config = resolveEffectiveZoneConfig(zones, baseRules, "z-medellin");
+    expect(config?.zone.status).toBe("active");
+    expect(config?.effectivelyActive).toBe(false);
+  });
+
+  it("un campo sin valor propio ni heredado queda en null sin inheritedFrom", () => {
+    const config = resolveEffectiveZoneConfig(baseZones, baseRules, "z-co");
+    expect(config?.coverage.value).toBeNull();
+    expect(config?.coverage.inheritedFrom).toBeNull();
   });
 });

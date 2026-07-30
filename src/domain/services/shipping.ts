@@ -149,3 +149,74 @@ export function resolveShippingQuote(
     allowedPaymentMethods: firstOwn(chain, rulesByZoneId, "allowedPaymentMethods")?.value,
   };
 }
+
+type EffectiveField<K extends keyof ShippingRuleConfig> = {
+  value: ShippingRuleConfig[K] | null;
+  /** Ancestro del que se heredó el valor; null si es propio de la zona o si nadie en la cadena lo define. */
+  inheritedFrom: ShippingZoneNode | null;
+};
+
+export type EffectiveZoneConfig = {
+  zone: ShippingZoneNode;
+  /** La zona y todos sus ancestros (ella incluida), del más específico al más general. */
+  chain: ShippingZoneNode[];
+  /** true si la zona misma y todos sus ancestros están activos (sección 17.4). */
+  effectivelyActive: boolean;
+  fee: EffectiveField<"fee">;
+  freeShippingThreshold: EffectiveField<"freeShippingThreshold">;
+  coverage: EffectiveField<"coverage">;
+  cashOnDeliveryAllowed: EffectiveField<"cashOnDeliveryAllowed">;
+  requiresAdvancePayment: EffectiveField<"requiresAdvancePayment">;
+  advancePercentage: EffectiveField<"advancePercentage">;
+  sameDayAvailable: EffectiveField<"sameDayAvailable">;
+  sameDayCutoffHour: EffectiveField<"sameDayCutoffHour">;
+  estimatedBusinessDaysMin: EffectiveField<"estimatedBusinessDaysMin">;
+  estimatedBusinessDaysMax: EffectiveField<"estimatedBusinessDaysMax">;
+  allowedPaymentMethods: EffectiveField<"allowedPaymentMethods">;
+  customerMessage: EffectiveField<"customerMessage">;
+};
+
+/**
+ * Arma, para una zona puntual del panel de administración, el valor
+ * efectivo de cada campo heredable y de dónde viene (propio vs. heredado de
+ * qué ancestro) — misma lógica de herencia que resolveShippingQuote, para
+ * que el panel nunca muestre algo distinto de lo que calcula el checkout.
+ */
+export function resolveEffectiveZoneConfig(
+  zones: ShippingZoneNode[],
+  rules: ShippingRuleConfig[],
+  zoneId: string,
+): EffectiveZoneConfig | null {
+  const byId = new Map(zones.map((z) => [z.id, z]));
+  const target = byId.get(zoneId);
+  if (!target) return null;
+
+  const chain = ancestorChain(zones, target);
+  const rulesByZoneId = new Map(rules.map((r) => [r.zoneId, r]));
+
+  function field<K extends keyof ShippingRuleConfig>(key: K): EffectiveField<K> {
+    const result = firstOwn(chain, rulesByZoneId, key);
+    return {
+      value: result?.value ?? null,
+      inheritedFrom: result && result.source.id !== target!.id ? result.source : null,
+    };
+  }
+
+  return {
+    zone: target,
+    chain,
+    effectivelyActive: chain.every((z) => z.status === "active"),
+    fee: field("fee"),
+    freeShippingThreshold: field("freeShippingThreshold"),
+    coverage: field("coverage"),
+    cashOnDeliveryAllowed: field("cashOnDeliveryAllowed"),
+    requiresAdvancePayment: field("requiresAdvancePayment"),
+    advancePercentage: field("advancePercentage"),
+    sameDayAvailable: field("sameDayAvailable"),
+    sameDayCutoffHour: field("sameDayCutoffHour"),
+    estimatedBusinessDaysMin: field("estimatedBusinessDaysMin"),
+    estimatedBusinessDaysMax: field("estimatedBusinessDaysMax"),
+    allowedPaymentMethods: field("allowedPaymentMethods"),
+    customerMessage: field("customerMessage"),
+  };
+}
