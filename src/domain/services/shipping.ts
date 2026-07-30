@@ -20,7 +20,11 @@ export type ShippingRuleWithZone = {
     department: string | null;
     city: string | null;
     neighborhood: string | null;
+    /** Para zonas nivel "neighborhood": barrios que comparten esta fila (grupo). */
+    neighborhoodNames?: string[] | null;
   };
+  /** Si es verdadero, esta regla significa "sin cobertura" (sección 17.5): no se debe inventar una tarifa de un nivel más amplio. */
+  blocksDelivery?: boolean;
   fee: Money;
   freeShippingThreshold: Money | null;
   cashOnDeliveryAllowed: boolean;
@@ -39,7 +43,8 @@ export type ShippingRuleWithZone = {
   status: "draft" | "active" | "inactive";
 };
 
-function normalize(value: string | null | undefined): string {
+/** Normaliza texto (minúsculas, sin tildes) para comparar destinos/nombres de barrio sin distinguir mayúsculas ni acentos. */
+export function normalize(value: string | null | undefined): string {
   return (value ?? "")
     .trim()
     .toLowerCase()
@@ -53,7 +58,13 @@ function ruleMatchesDestination(rule: ShippingRuleWithZone, dest: ShippingDestin
   if (normalize(zone.country) !== normalize(dest.country)) return false;
   if (zone.department && normalize(zone.department) !== normalize(dest.department)) return false;
   if (zone.city && normalize(zone.city) !== normalize(dest.city)) return false;
-  if (zone.neighborhood && normalize(zone.neighborhood) !== normalize(dest.neighborhood)) return false;
+  if (zone.level === "neighborhood") {
+    const names = zone.neighborhoodNames && zone.neighborhoodNames.length > 0 ? zone.neighborhoodNames : zone.neighborhood ? [zone.neighborhood] : [];
+    if (names.length === 0) return false;
+    const target = normalize(dest.neighborhood);
+    if (!target) return false;
+    if (!names.some((name) => normalize(name) === target)) return false;
+  }
   return true;
 }
 
@@ -88,6 +99,9 @@ export function resolveShippingQuote(
 
   const winner = candidates[0];
   if (!winner) return null;
+  // "Sin cobertura" (sección 17.5): la zona más específica gana, pero en vez
+  // de heredar la tarifa de un nivel más amplio, no hay envío disponible.
+  if (winner.blocksDelivery) return null;
 
   const qualifiesForFreeShipping =
     winner.freeShippingThreshold !== null && cartTotal.amount >= winner.freeShippingThreshold.amount;

@@ -19,7 +19,8 @@ export class DrizzleShippingResolver implements ShippingRateResolver {
       .map(({ rule, zone }) => ({
         ruleId: rule.id,
         zoneId: zone.id,
-        zone: { level: zone.level, country: zone.country, department: zone.department, city: zone.city, neighborhood: zone.neighborhood },
+        zone: { level: zone.level, country: zone.country, department: zone.department, city: zone.city, neighborhood: zone.neighborhood, neighborhoodNames: zone.neighborhoodNames },
+        blocksDelivery: rule.blocksDelivery,
         fee: money(rule.fee + rule.surcharge),
         freeShippingThreshold: rule.freeShippingThreshold === null ? null : money(rule.freeShippingThreshold),
         cashOnDeliveryAllowed: rule.cashOnDeliveryAllowed,

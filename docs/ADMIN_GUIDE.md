@@ -110,10 +110,20 @@ habilites modo producción ni Meta desde el panel por anticipado.
   imagen, texto, cupón opcional, rutas donde aparece/no aparece, frecuencia
   (una vez por sesión, una vez por período o siempre) y el disparador
   (retraso en segundos, porcentaje de scroll o intención de salida).
-- **Barrios de Medellín (`/admin/envios`):** ya no están fijos en el código.
-  Crea una zona con Nivel "Barrio" y su Ciudad para que aparezca como opción
-  en el checkout de esa ciudad; si además le agregas una regla de envío
-  propia, esa tarifa reemplaza a la de la ciudad para ese barrio.
+- **Grupos de barrios (`/admin/envios`, sección "Barrios por ciudad"):** cada
+  ciudad con una zona configurada tiene su propio tablero. Escribe uno o
+  varios nombres de barrio separados por coma en el cuadro (ej. "Guayabal,
+  Castropol") y pulsa "Añadir": aparecen como pastillas en la pestaña activa.
+  Arrastra una pastilla y suéltala sobre otra pestaña para mover ese barrio
+  de grupo. Cada grupo tiene su propia tarifa, tiempos de entrega y mensaje
+  al cliente — un grupo de un solo barrio funciona como tarifa individual.
+  La pestaña **"Sin grupo"** es para barrios que se entregan pero sin tarifa
+  propia (usan la tarifa general de la ciudad); la pestaña **"Sin
+  cobertura"** es para barrios donde no se hace envío — el checkout no
+  ofrece esos barrios como opción. Los barrios de cualquier grupo (salvo
+  "Sin cobertura") aparecen automáticamente en el desplegable del checkout
+  de esa ciudad; si una ciudad no tiene ningún barrio configurado, el
+  checkout pide el barrio como texto libre obligatorio.
 - **Editor visual (`/admin/editor/[id]`):** cada bloque tiene un asa de
   arrastre (⠿) junto al título; arrástralo sobre otro bloque para
   reordenar. Los botones ↑/↓ siguen disponibles como alternativa sin mouse.

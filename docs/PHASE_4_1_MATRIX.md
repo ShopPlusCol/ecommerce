@@ -108,3 +108,16 @@ de los cambios. Detalle de hallazgos y correcciones en `PHASE_STATUS.md`.
 
 Detalle narrativo de cada cambio, hallazgos y verificación repetida de línea
 base: `PHASE_STATUS.md`.
+
+# Grupos de barrios con tarifa propia (2026-07-30)
+
+| Capacidad | Ruta y controles reales | Persistencia | Verificación |
+|---|---|---|---|
+| Grupos de barrios por ciudad | `/admin/envios`; pestañas por grupo, pegar barrios separados por coma, arrastrar pastillas entre grupos | `shipping_zones.neighborhood_names`/`group_kind` (migración `0011`) | 12 pruebas Playwright incluyendo arrastre real; uso real del propietario con 224 barrios |
+| Tarifa compartida o individual | Tarifa/tiempos/mensaje integrados en la pestaña del grupo (un grupo de 1 barrio = tarifa individual) | `shipping_rules` vinculada al grupo | Pedido real a un barrio del grupo cobra la tarifa del grupo, no la de ciudad |
+| Barrios sin cobertura | Pestaña reservada "Sin cobertura" por ciudad | `shipping_rules.blocks_delivery` gana por especificidad y no hereda tarifa | Unitarios de `resolveShippingQuote`; el barrio no aparece en el checkout |
+| Barrio obligatorio sin grupos configurados | Checkout: `Input` en vez de `SelectField` | Sin cambio de esquema, solo validación de formulario | Playwright: envío sin barrio muestra el error y no se confirma el pedido |
+
+Superset del renglón "Barrios de Medellín configurables" de la ronda 2:
+ahora aplica a cualquier ciudad, admite grupos con varios barrios y agrega
+sin cobertura. Detalle completo en `PHASE_STATUS.md`.

@@ -120,7 +120,7 @@ export async function listConfiguredNeighborhoodsAction(city: string): Promise<s
   if (!normalizedCity) return [];
   const db = await getRuntimeDb();
   const rows = await db
-    .select({ neighborhood: shippingZones.neighborhood })
+    .select({ neighborhoodNames: shippingZones.neighborhoodNames, groupKind: shippingZones.groupKind })
     .from(shippingZones)
     .where(
       and(
@@ -129,9 +129,13 @@ export async function listConfiguredNeighborhoodsAction(city: string): Promise<s
         sql`lower(${shippingZones.city}) = lower(${normalizedCity})`,
       ),
     );
-  return [...new Set(rows.map((row) => row.neighborhood).filter((value): value is string => Boolean(value)))].sort((a, b) =>
-    a.localeCompare(b, "es-CO"),
-  );
+  // Los barrios "sin cobertura" no se ofrecen como opción en el checkout
+  // (sección 17.5); el resto (incluido "sin grupo") sí, porque son
+  // entregables aunque no tengan tarifa propia.
+  const names = rows
+    .filter((row) => row.groupKind !== "no_coverage")
+    .flatMap((row) => row.neighborhoodNames ?? []);
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b, "es-CO"));
 }
 
 /**

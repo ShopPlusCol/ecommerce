@@ -17,6 +17,20 @@ export const shippingZones = sqliteTable(
     department: text("department"),
     city: text("city"),
     neighborhood: text("neighborhood"),
+    /**
+     * Para zonas de nivel "neighborhood": lista de barrios que comparten esta
+     * fila (un "grupo"). Reemplaza a `neighborhood` (que se conserva solo por
+     * compatibilidad) como fuente de verdad para la coincidencia del checkout
+     * y para las tarifas por grupo de barrios (sección 17.5).
+     */
+    neighborhoodNames: text("neighborhood_names", { mode: "json" }).$type<string[]>(),
+    /**
+     * Marca los dos grupos reservados por ciudad que administra el tablero de
+     * `/admin/envios`: "unassigned" (barrios sin grupo propio, usan la tarifa
+     * de ciudad) y "no_coverage" (barrios sin servicio). El resto son grupos
+     * personalizados creados por el propietario.
+     */
+    groupKind: text("group_kind", { enum: ["custom", "unassigned", "no_coverage"] }).notNull().default("custom"),
     status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
     ...timestampColumns,
   },
@@ -55,6 +69,13 @@ export const shippingRules = sqliteTable(
     customerMessage: text("customer_message"),
     internalInstructions: text("internal_instructions"),
     priority: integer("priority").notNull().default(0),
+    /**
+     * Cuando es verdadero, esta regla no representa una tarifa: significa
+     * "sin cobertura" para su zona/grupo. Si gana la resolución (zona más
+     * específica), el checkout no debe heredar la tarifa de un nivel más
+     * amplio; debe responder "sin tarifa disponible" (sección 17.5).
+     */
+    blocksDelivery: integer("blocks_delivery", { mode: "boolean" }).notNull().default(false),
     status: text("status", { enum: ["draft", "active", "inactive"] }).notNull().default("draft"),
     startsAt: integer("starts_at", { mode: "timestamp_ms" }),
     endsAt: integer("ends_at", { mode: "timestamp_ms" }),

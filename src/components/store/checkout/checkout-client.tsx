@@ -15,7 +15,7 @@ import { evaluateRewards } from "@/domain/services/rewards";
 import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
-import { DEPARTMENTS, MEDELLIN_NEIGHBORHOODS, citiesForDepartment, isMedellin } from "@/lib/colombia-locations";
+import { DEPARTMENTS, citiesForDepartment } from "@/lib/colombia-locations";
 import { quoteShippingAction, createDemoOrderAction, listConfiguredNeighborhoodsAction } from "@/app/(store)/actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
@@ -165,11 +165,7 @@ export function CheckoutClient() {
   }
 
   const cities = citiesForDepartment(location.department);
-  const neighborhoodOptions = configuredNeighborhoods.length > 0
-    ? configuredNeighborhoods
-    : isMedellin(location.city)
-      ? MEDELLIN_NEIGHBORHOODS
-      : [];
+  const neighborhoodOptions = configuredNeighborhoods;
   const showNeighborhoodSelect = neighborhoodOptions.length > 0;
 
   const validate = (): boolean => {
@@ -179,6 +175,7 @@ export function CheckoutClient() {
     if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
     if (!location.department) next.department = "Selecciona el departamento.";
     if (!location.city) next.city = "Selecciona la ciudad o municipio.";
+    if (!showNeighborhoodSelect && location.neighborhood.trim().length < 2) next.neighborhood = "Escribe tu barrio o sector.";
     if (location.addressLine.trim().length < 3) next.addressLine = "Ingresa la dirección.";
     if (!quote) next.quote = "Necesitamos una dirección con cobertura para calcular el envío.";
     if (!paymentMethod) next.paymentMethod = "Selecciona un método de pago.";
@@ -231,7 +228,7 @@ export function CheckoutClient() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1fr_360px]">
+    <form onSubmit={onSubmit} noValidate className="grid gap-8 lg:grid-cols-[1fr_360px]">
       <div className="flex flex-col gap-6">
         {/* Contacto */}
         <Card>
@@ -306,9 +303,11 @@ export function CheckoutClient() {
               />
             ) : (
               <Input
-                label="Barrio o sector (opcional)"
+                label="Barrio o sector"
+                required
                 value={location.neighborhood}
                 onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
+                error={errors.neighborhood}
               />
             )}
 

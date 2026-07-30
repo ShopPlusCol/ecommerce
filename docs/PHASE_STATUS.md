@@ -194,3 +194,54 @@ datos reales y confirmado contra la base de datos, con commits propios.
   anteriores sigue igual.
 - Esta ronda **no aprueba producción, no hace merge y no constituye
   autorización para desplegar**. Queda pendiente de revisión humana.
+
+# Grupos de barrios con tarifa propia (2026-07-30)
+
+Pedido puntual del propietario: la lista de barrios del checkout debía
+poder editarse (agregar/quitar), agruparse con una tarifa compartida o
+individual, y permitir marcar barrios sin cobertura — con una interfaz de
+pastillas donde se pegan varios barrios separados por coma a la vez.
+
+## Diseño
+
+- Una zona de nivel "Barrio" ahora puede representar un **grupo** de uno o
+  más barrios (`shipping_zones.neighborhood_names`, migración `0011`), en
+  vez de un solo nombre por fila. Los barrios existentes se migraron
+  automáticamente como grupos de un solo barrio.
+- Cada ciudad tiene dos grupos reservados, creados bajo demanda: **Sin
+  grupo** (barrios entregables sin tarifa propia; usan la tarifa general de
+  la ciudad) y **Sin cobertura** (barrios sin servicio; su regla tiene
+  `blocks_delivery = true` y hace que el checkout responda "sin tarifa
+  disponible" en vez de heredar la tarifa de un nivel más amplio).
+- `/admin/envios` tiene un tablero nuevo por ciudad con pestañas = grupos;
+  cada pestaña integra nombre, tarifa/tiempos/mensaje y las pastillas de
+  barrios, con una caja para pegar varios a la vez ("Guayabal, Castropol")
+  y arrastre de pastillas entre pestañas para mover un barrio de grupo.
+- El checkout deja de usar la lista fija `MEDELLIN_NEIGHBORHOODS`: si la
+  ciudad tiene barrios configurados se ofrece el desplegable real; si no
+  tiene ninguno, el campo de texto libre ahora es **obligatorio** (antes
+  era opcional) para cualquier ciudad, no solo Medellín.
+- Se corrigió un bug preexistente al implementar esto: el formulario de
+  checkout mezclaba el atributo nativo `required` de HTML con mensajes de
+  error personalizados en español; el navegador bloqueaba el envío antes
+  de que el JS pudiera mostrar su propio mensaje. Se agregó `noValidate`
+  al formulario para que el mensaje en español sea siempre el que se ve.
+
+## Verificación
+
+- `typecheck`, `lint`, build Next y build Cloudflare: correctos.
+- Vitest: 70/70 (se agregaron pruebas de coincidencia por grupo y de
+  bloqueo por "sin cobertura" en `shipping.test.ts`).
+- Playwright: 12/12, incluida una prueba nueva de arrastrar-y-soltar real
+  (`neighborhood-groups.spec.ts`) que crea un grupo, pega barrios, fija
+  tarifa, la verifica en un pedido real, confirma que "sin cobertura" no
+  aparece como opción y que una ciudad sin barrios exige el campo de texto.
+- Verificado además en uso real: el propietario creó un grupo con 224
+  barrios reales de Medellín y le asignó tarifa desde el panel durante
+  esta misma sesión de trabajo.
+
+## Pendiente
+
+- Esta funcionalidad **no aprueba producción, no hace merge y no
+  constituye autorización para desplegar**. Queda pendiente de revisión
+  humana.

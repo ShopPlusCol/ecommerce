@@ -151,3 +151,53 @@ describe("resolveShippingQuote — jerarquía país › depto › ciudad › bar
     expect(resolveShippingQuote([limited], target, money(150_001))).toBeNull();
   });
 });
+
+describe("resolveShippingQuote — grupos de barrios y sin cobertura (sección 17.5)", () => {
+  const groupRule = rule({
+    ruleId: "oriente",
+    fee: money(7_000),
+    zone: { level: "neighborhood", country: "CO", department: "Antioquia", city: "Medellín", neighborhood: null, neighborhoodNames: ["Guayabal", "Castropol"] },
+  });
+
+  it("coincide con cualquier barrio del grupo, sin importar tildes/mayúsculas", () => {
+    const target = { country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "castropol" };
+    expect(resolveShippingQuote([city, groupRule], target, money(50_000))?.ruleId).toBe("oriente");
+  });
+
+  it("un barrio fuera del grupo no coincide y cae a la ciudad", () => {
+    const target = { country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "Laureles" };
+    expect(resolveShippingQuote([city, groupRule], target, money(50_000))?.ruleId).toBe("medellin");
+  });
+
+  it("una zona de grupo sin barrios (recién creada) nunca coincide", () => {
+    const empty = rule({
+      ruleId: "vacio",
+      fee: money(1),
+      zone: { level: "neighborhood", country: "CO", department: "Antioquia", city: "Medellín", neighborhood: null, neighborhoodNames: [] },
+    });
+    const target = { country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "Guayabal" };
+    expect(resolveShippingQuote([city, empty], target, money(50_000))?.ruleId).toBe("medellin");
+  });
+
+  it("sin cobertura: gana por especificidad pero no hereda la tarifa de ciudad", () => {
+    const noCoverage = rule({
+      ruleId: "sin-cobertura",
+      fee: money(0),
+      blocksDelivery: true,
+      zone: { level: "neighborhood", country: "CO", department: "Antioquia", city: "Medellín", neighborhood: null, neighborhoodNames: ["Zona Rural"] },
+    });
+    const target = { country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "Zona Rural" };
+    expect(resolveShippingQuote([city, noCoverage], target, money(50_000))).toBeNull();
+  });
+
+  it("sin cobertura no afecta a otros barrios de la misma ciudad", () => {
+    const noCoverage = rule({
+      ruleId: "sin-cobertura",
+      fee: money(0),
+      blocksDelivery: true,
+      zone: { level: "neighborhood", country: "CO", department: "Antioquia", city: "Medellín", neighborhood: null, neighborhoodNames: ["Zona Rural"] },
+    });
+    const target = { country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "Laureles" };
+    expect(resolveShippingQuote([city, noCoverage], target, money(50_000))?.ruleId).toBe("medellin");
+  });
+});
