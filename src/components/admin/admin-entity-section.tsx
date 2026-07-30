@@ -7,8 +7,6 @@ const entityCopy: Record<string, { add: string; create: string; empty: string }>
   colorFamily: { add: "Añadir una nueva familia de color", create: "Crear familia de color", empty: "Todavía no tienes familias de color." },
   collection: { add: "Añadir una nueva colección", create: "Crear colección", empty: "Todavía no tienes colecciones." },
   coupon: { add: "Añadir un nuevo cupón", create: "Crear cupón", empty: "Todavía no tienes cupones." },
-  shippingZone: { add: "Añadir una nueva zona", create: "Crear zona", empty: "Todavía no tienes zonas de envío." },
-  shippingRule: { add: "Añadir una nueva regla de envío", create: "Crear regla de envío", empty: "Todavía no tienes reglas de envío." },
   faq: { add: "Añadir una nueva pregunta frecuente", create: "Crear pregunta frecuente", empty: "Todavía no tienes preguntas frecuentes." },
   testimonial: { add: "Añadir un nuevo testimonio", create: "Crear testimonio", empty: "Todavía no tienes testimonios." },
   rewardRule: { add: "Añadir una nueva recompensa", create: "Crear recompensa", empty: "Todavía no tienes recompensas." },

@@ -16,8 +16,6 @@ import {
   popups,
   promotions,
   rewardRules,
-  shippingRules,
-  shippingZones,
   testimonials,
 } from "@/infrastructure/db/schema";
 
@@ -26,8 +24,6 @@ const requestSchema = z.object({
     "category",
     "colorFamily",
     "collection",
-    "shippingZone",
-    "shippingRule",
     "promotion",
     "coupon",
     "rewardRule",
@@ -43,8 +39,6 @@ const permissions: Record<z.infer<typeof requestSchema>["entity"], string> = {
   category: "catalog",
   colorFamily: "catalog",
   collection: "catalog",
-  shippingZone: "shipping",
-  shippingRule: "shipping",
   promotion: "promotions",
   coupon: "promotions",
   rewardRule: "promotions",
@@ -57,8 +51,6 @@ const paths: Record<z.infer<typeof requestSchema>["entity"], string> = {
   category: "/admin/categorias",
   colorFamily: "/admin/categorias",
   collection: "/admin/colecciones",
-  shippingZone: "/admin/envios",
-  shippingRule: "/admin/envios",
   promotion: "/admin/promociones",
   coupon: "/admin/cupones",
   rewardRule: "/admin/recompensas",
@@ -189,48 +181,6 @@ export async function adminEntityAction(
           const values = { name: text(formData, "name", true)!, slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).parse(text(formData, "slug", true)), description: text(formData, "description"), type: z.enum(["manual", "dynamic"]).parse(text(formData, "type", true)), featured: bool(formData, "featured"), startsAt: date(formData, "startsAt"), endsAt: date(formData, "endsAt"), updatedAt: now };
           if (request.operation === "create") { const [created] = await db.insert(collections).values(values).returning(); entityId = created.id; after = created; }
           else { [before] = await db.select().from(collections).where(eq(collections.id, request.id!)).limit(1); await db.update(collections).set(values).where(eq(collections.id, request.id!)); after = values; }
-        }
-        break;
-      }
-      case "shippingZone": {
-        const zoneName = text(formData, "name", true)!;
-        const zoneLevel = z.enum(["country", "department", "city", "neighborhood"]).parse(text(formData, "level", true));
-        // El campo "Ciudad"/"Departamento" es un texto aparte del "Nombre" de
-        // la zona (para poder nombrarla distinto), pero si se deja vacío se
-        // autocompleta con el nombre: de lo contrario la zona no coincide con
-        // ningún destino real y desaparece silenciosamente de "Barrios por
-        // ciudad" / la resolución de tarifas.
-        const values = {
-          name: zoneName,
-          level: zoneLevel,
-          country: text(formData, "country") ?? "CO",
-          department: zoneLevel === "department" ? text(formData, "department") ?? zoneName : text(formData, "department"),
-          city: zoneLevel === "city" ? text(formData, "city") ?? zoneName : text(formData, "city"),
-          neighborhood: text(formData, "neighborhood"),
-          status: z.enum(["active", "inactive"]).parse(text(formData, "status", true)),
-          updatedAt: now,
-        };
-        if (request.operation === "create") { const [created] = await db.insert(shippingZones).values(values).returning(); entityId = created.id; after = created; }
-        else if (request.operation === "update") { [before] = await db.select().from(shippingZones).where(eq(shippingZones.id, request.id!)).limit(1); await db.update(shippingZones).set(values).where(eq(shippingZones.id, request.id!)); after = values; }
-        else if (request.operation === "archive") { [before] = await db.select().from(shippingZones).where(eq(shippingZones.id, request.id!)).limit(1); await db.update(shippingZones).set({ status: "inactive", updatedAt: now }).where(eq(shippingZones.id, request.id!)); after = { status: "inactive" }; }
-        else throw new Error("Duplica reglas concretas, no zonas completas.");
-        break;
-      }
-      case "shippingRule": {
-        const allowedPaymentMethods = z.array(z.enum(["mercado_pago", "cash_on_delivery", "shipping_advance_transfer", "transfer_full"])).min(1, "Selecciona al menos un método de pago.").parse(formData.getAll("allowedPaymentMethods"));
-        const values = { zoneId: text(formData, "zoneId", true)!, name: text(formData, "name", true)!, fee: integer(formData, "fee"), freeShippingThreshold: optionalInteger(formData, "freeShippingThreshold"), cashOnDeliveryAllowed: bool(formData, "cashOnDeliveryAllowed"), requiresAdvancePayment: bool(formData, "requiresAdvancePayment"), advancePercentage: optionalInteger(formData, "advancePercentage"), sameDayAvailable: bool(formData, "sameDayAvailable"), sameDayCutoffHour: optionalInteger(formData, "sameDayCutoffHour"), estimatedBusinessDaysMin: integer(formData, "estimatedBusinessDaysMin", 1), estimatedBusinessDaysMax: integer(formData, "estimatedBusinessDaysMax", 3), surcharge: integer(formData, "surcharge"), minOrderAmount: optionalInteger(formData, "minOrderAmount"), maxOrderAmount: optionalInteger(formData, "maxOrderAmount"), allowedPaymentMethods, customerMessage: text(formData, "customerMessage"), internalInstructions: text(formData, "internalInstructions"), priority: integer(formData, "priority"), status: z.enum(["draft", "active", "inactive"]).parse(text(formData, "status", true)), startsAt: date(formData, "startsAt"), endsAt: date(formData, "endsAt"), updatedAt: now };
-        if (values.estimatedBusinessDaysMax < values.estimatedBusinessDaysMin) throw new Error("El plazo máximo no puede ser menor que el mínimo.");
-        if (values.minOrderAmount !== null && values.maxOrderAmount !== null && values.maxOrderAmount < values.minOrderAmount) throw new Error("El pedido máximo no puede ser menor que el mínimo.");
-        if (values.startsAt && values.endsAt && values.endsAt <= values.startsAt) throw new Error("La fecha de fin debe ser posterior al inicio.");
-        if (values.requiresAdvancePayment && (!values.advancePercentage || values.advancePercentage < 1 || values.advancePercentage > 100)) throw new Error("Define un porcentaje de anticipo entre 1 y 100.");
-        if (values.cashOnDeliveryAllowed && !values.allowedPaymentMethods.includes("cash_on_delivery")) throw new Error("Si habilitas contraentrega, inclúyela entre los métodos permitidos.");
-        if (values.requiresAdvancePayment && values.allowedPaymentMethods.includes("cash_on_delivery")) throw new Error("Una regla con anticipo no puede permitir contraentrega total.");
-        if (request.operation === "create") { const [created] = await db.insert(shippingRules).values(values).returning(); entityId = created.id; after = created; }
-        else if (request.operation === "update") { [before] = await db.select().from(shippingRules).where(eq(shippingRules.id, request.id!)).limit(1); await db.update(shippingRules).set(values).where(eq(shippingRules.id, request.id!)); after = values; }
-        else if (request.operation === "archive") { [before] = await db.select().from(shippingRules).where(eq(shippingRules.id, request.id!)).limit(1); await db.update(shippingRules).set({ status: "inactive", updatedAt: now }).where(eq(shippingRules.id, request.id!)); after = { status: "inactive" }; }
-        else {
-          const [source] = await db.select().from(shippingRules).where(eq(shippingRules.id, request.id!)).limit(1); if (!source) throw new Error("La regla ya no existe.");
-          const [created] = await db.insert(shippingRules).values({ ...source, id: undefined, name: `${source.name} (copia)`, status: "draft", createdAt: now, updatedAt: now }).returning(); entityId = created.id; after = created;
         }
         break;
       }
