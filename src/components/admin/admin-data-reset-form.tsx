@@ -23,14 +23,14 @@ export function AdminDataResetForm({
   const enabled = typed === confirmation && acknowledged && !pending;
 
   return (
-    <section className="mt-8 rounded-xl border border-danger/30 bg-danger/5 p-5">
-      <div className="flex items-start gap-3">
+    <details className="mt-8 rounded-xl border border-danger/30 bg-danger/5 p-5">
+      <summary className="flex cursor-pointer list-none items-start gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
         <div>
           <h2 className="font-semibold text-danger">{title}</h2>
           <p className="mt-1 text-sm text-text-muted">{description}</p>
         </div>
-      </div>
+      </summary>
       <form
         action={formAction}
         className="mt-4 grid max-w-2xl gap-3"
@@ -71,6 +71,6 @@ export function AdminDataResetForm({
           <p role={state.status === "error" ? "alert" : "status"} className={`text-sm ${state.status === "error" ? "text-danger" : "text-success"}`}>{state.message}</p>
         ) : null}
       </form>
-    </section>
+    </details>
   );
 }

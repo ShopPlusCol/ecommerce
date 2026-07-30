@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
-import { deleteMediaAction, updateMediaAction, uploadMediaAction } from "./actions";
+import { deleteMediaAction, updateMediaAction, uploadMediaInlineAction } from "./actions";
 
 function ActionMessage({
   state,
@@ -21,22 +22,58 @@ function ActionMessage({
 }
 
 export function MediaUploadForm() {
-  const [state, action, pending] = useActionState(uploadMediaAction, INITIAL_ADMIN_ACTION_STATE);
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [result, setResult] = useState<{ status: "idle" | "success" | "error"; message: string }>({ status: "idle", message: "" });
+
+  const uploadFiles = async (files: FileList) => {
+    setUploading(true);
+    setResult({ status: "idle", message: "" });
+    let saved = 0;
+    const errors: string[] = [];
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      setProgress(files.length > 1 ? `Cargando ${index + 1} de ${files.length}: ${file.name}` : `Cargando ${file.name}…`);
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("altText", "");
+      const response = await uploadMediaInlineAction(formData);
+      if (response.status === "success") saved += 1;
+      else errors.push(`${file.name}: ${response.message}`);
+    }
+    setUploading(false);
+    setProgress("");
+    if (inputRef.current) inputRef.current.value = "";
+    if (errors.length) {
+      setResult({ status: "error", message: `${saved} archivo(s) cargado(s). Con error: ${errors.join(" · ")}` });
+    } else {
+      setResult({ status: "success", message: `${saved} archivo(s) cargado(s) correctamente.` });
+    }
+    router.refresh();
+  };
+
   return (
-    <form action={action} className="grid gap-3 rounded-lg border border-border bg-surface-raised p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+    <div className="grid gap-3 rounded-lg border border-border bg-surface-raised p-4">
       <label className="grid gap-1 text-sm font-medium">
-        Archivo
-        <input name="file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" required className="h-11 rounded-md border border-border bg-surface p-2 text-sm" />
+        Archivos (puedes seleccionar varios a la vez)
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          disabled={uploading}
+          onChange={(event) => {
+            if (event.target.files && event.target.files.length > 0) uploadFiles(event.target.files);
+          }}
+          className="h-11 rounded-md border border-border bg-surface p-2 text-sm disabled:opacity-60"
+        />
       </label>
-      <label className="grid gap-1 text-sm font-medium">
-        Texto alternativo
-        <input name="altText" maxLength={180} placeholder="Describe lo visible en la imagen" className="h-11 rounded-md border border-border bg-surface px-3" />
-      </label>
-      <button disabled={pending} className="h-11 rounded-md bg-brand px-5 font-semibold text-white disabled:opacity-60">
-        {pending ? "Cargando…" : "Cargar archivo"}
-      </button>
-      <div className="md:col-span-3"><ActionMessage state={state} /></div>
-    </form>
+      <p className="text-xs text-text-muted">La carga inicia apenas seleccionas los archivos; el nombre y el texto alternativo se pueden editar después de cada uno.</p>
+      {progress ? <p role="status" className="text-sm text-text-muted">{progress}</p> : null}
+      <ActionMessage state={result} />
+    </div>
   );
 }
 
@@ -60,14 +97,17 @@ export function MediaEditForm({ id, altText }: { id: string; altText: string }) 
 export function MediaDeleteForm({ id }: { id: string }) {
   const [state, action, pending] = useActionState(deleteMediaAction, INITIAL_ADMIN_ACTION_STATE);
   return (
-    <form action={action} className="mt-3 grid gap-2 border-t border-border pt-3">
+    <form
+      action={action}
+      className="mt-3 border-t border-border pt-3"
+      onSubmit={(event) => {
+        if (!window.confirm("¿Eliminar este archivo de forma permanente?")) event.preventDefault();
+      }}
+    >
       <input type="hidden" name="id" value={id} />
-      <label className="grid gap-1 text-xs font-semibold">
-        Motivo para eliminar
-        <input name="reason" required minLength={5} maxLength={300} placeholder="Ej. archivo duplicado" className="h-9 rounded-md border border-border px-2 text-sm font-normal" />
-      </label>
-      <button disabled={pending} className="h-9 rounded-md border border-danger/30 text-sm font-semibold text-danger disabled:opacity-60">
-        {pending ? "Eliminando…" : "Eliminar de forma segura"}
+      <input type="hidden" name="reason" value="Eliminado desde la biblioteca multimedia." />
+      <button disabled={pending} className="h-9 w-full rounded-md border border-danger/30 text-sm font-semibold text-danger disabled:opacity-60">
+        {pending ? "Eliminando…" : "Eliminar"}
       </button>
       <ActionMessage state={state} />
     </form>

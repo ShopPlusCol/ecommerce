@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { eq, or } from "drizzle-orm";
 import { z } from "zod";
@@ -22,6 +21,36 @@ import {
 } from "@/infrastructure/db/schema";
 
 const altTextSchema = z.string().trim().max(180, "El texto alternativo admite máximo 180 caracteres.");
+
+function slugifyFileName(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const slug = base
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return slug || "archivo";
+}
+
+function humanizeFileName(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+  return base.replace(/[-_]+/g, " ").trim();
+}
+
+async function uniqueStorageKey(db: Awaited<ReturnType<typeof getRuntimeDb>>, folder: string, slug: string, extension: string) {
+  let candidate = `${folder}/${slug}.${extension}`;
+  let suffix = 2;
+  while (true) {
+    const [existing] = await db.select({ id: mediaAssets.id }).from(mediaAssets).where(eq(mediaAssets.storageKey, candidate)).limit(1);
+    if (!existing) return candidate;
+    candidate = `${folder}/${slug}-${suffix}.${extension}`;
+    suffix += 1;
+  }
+}
 
 export type InlineMediaUploadResult =
   | { status: "success"; message: string; asset: { id: string; url: string; altText: string } }
@@ -59,7 +88,9 @@ async function persistMediaFile(file: File, altText: string, userId: string) {
   try {
     const validated = validateMedia(new Uint8Array(await file.arrayBuffer()), file.type);
     const extension = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1].replace("+xml", "");
-    const key = `${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${extension}`;
+    const db = await getRuntimeDb();
+    const folder = new Date().toISOString().slice(0, 7);
+    const key = await uniqueStorageKey(db, folder, slugifyFileName(file.name), extension);
     const storage = await getStorageProvider();
     const stored = await storage.upload({
       key,
@@ -67,7 +98,7 @@ async function persistMediaFile(file: File, altText: string, userId: string) {
       contentType: validated.contentType,
     });
     storedKey = stored.key;
-    const db = await getRuntimeDb();
+    const resolvedAltText = altText || humanizeFileName(file.name);
     const [asset] = await db
       .insert(mediaAssets)
       .values({
@@ -75,7 +106,7 @@ async function persistMediaFile(file: File, altText: string, userId: string) {
         url: stored.url,
         contentType: stored.contentType,
         sizeBytes: stored.size,
-        altText,
+        altText: resolvedAltText,
         width: validated.width,
         height: validated.height,
         uploadedByUserId: userId,
@@ -116,21 +147,6 @@ function parseMediaInput(formData: FormData) {
     throw new Error("Selecciona un archivo para cargar.");
   }
   return { file, altText };
-}
-
-export async function uploadMediaAction(
-  _previousState: AdminActionState,
-  formData: FormData,
-): Promise<AdminActionState> {
-  try {
-    const session = await requirePermission("media", "create");
-    const { file, altText } = parseMediaInput(formData);
-    await persistMediaFile(file, altText, session.user.id);
-    revalidatePath("/admin/medios");
-    return { status: "success", message: "Archivo cargado y registrado correctamente." };
-  } catch (error) {
-    return actionError(error);
-  }
 }
 
 export async function uploadMediaInlineAction(formData: FormData): Promise<InlineMediaUploadResult> {
@@ -184,7 +200,7 @@ export async function deleteMediaAction(
   try {
     const session = await requirePermission("media", "delete");
     const id = z.string().min(1).parse(formData.get("id"));
-    const reason = z.string().trim().min(5, "Explica el motivo del borrado.").max(300).parse(formData.get("reason"));
+    const reason = z.string().trim().max(300).parse(formData.get("reason") ?? "") || "Sin motivo indicado.";
     const db = await getRuntimeDb();
     const [asset] = await db.select().from(mediaAssets).where(eq(mediaAssets.id, id)).limit(1);
     if (!asset) return { status: "error", message: "El archivo ya no existe." };

@@ -41,12 +41,7 @@ export function ProductEditor({
     setImages((current) => current.some((row) => row.url === image.url) ? current : [...current, image]);
   };
 
-  const uploadImage = async () => {
-    const file = uploadRef.current?.files?.[0];
-    if (!file) {
-      setUploadMessage("Selecciona una imagen desde tu equipo.");
-      return;
-    }
+  const uploadImage = async (file: File) => {
     setUploading(true);
     setUploadMessage("");
     const formData = new FormData();
@@ -125,13 +120,25 @@ export function ProductEditor({
               Añadir a la galería
             </button>
           </div>
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="min-w-0 rounded-md border border-border p-2 text-sm" aria-label="Subir imagen del producto" />
-            <button type="button" onClick={uploadImage} disabled={uploading} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-4 text-sm font-semibold disabled:opacity-60">
-              {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-              {uploading ? "Subiendo…" : "Subir desde el equipo"}
-            </button>
-          </div>
+          <label className="flex items-center gap-2 rounded-md border border-dashed border-border-strong p-2 text-sm text-text-muted">
+            {uploading ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" /> : <ImagePlus className="h-4 w-4 shrink-0" />}
+            <input
+              ref={uploadRef}
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/svg+xml"
+              disabled={uploading}
+              onChange={async (event) => {
+                const files = event.target.files ? Array.from(event.target.files) : [];
+                for (const file of files) {
+                  await uploadImage(file);
+                }
+              }}
+              className="min-w-0 flex-1 text-sm file:mr-2 file:rounded file:border-0 file:bg-surface-sunken file:px-2 file:py-1 file:text-xs file:font-semibold disabled:opacity-60"
+              aria-label="Subir imágenes del producto"
+            />
+            <span className="shrink-0 text-xs">{uploading ? "Subiendo…" : "Se suben al elegirlas"}</span>
+          </label>
           {uploadMessage ? <p role="status" className="text-sm text-text-muted">{uploadMessage}</p> : null}
           {images.length ? (
             <div className="grid gap-2">

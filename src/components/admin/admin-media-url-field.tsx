@@ -32,12 +32,7 @@ export function AdminMediaUrlField({
     onChange?.(url);
   };
 
-  const upload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) {
-      setMessage("Selecciona una imagen desde tu equipo.");
-      return;
-    }
+  const upload = async (file: File) => {
     setUploading(true);
     setMessage("");
     const formData = new FormData();
@@ -45,7 +40,7 @@ export function AdminMediaUrlField({
     formData.set("altText", label);
     const result = await uploadMediaInlineAction(formData);
     setUploading(false);
-    setMessage(result.message);
+    setMessage(result.status === "success" ? "Imagen cargada y seleccionada." : result.message);
     if (result.status === "success") {
       update(result.asset.url);
       if (fileRef.current) fileRef.current.value = "";
@@ -84,24 +79,22 @@ export function AdminMediaUrlField({
         )}
       </label>
       {name ? <input type="hidden" name={name} value={selected} /> : null}
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <label className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border-strong p-2 text-sm text-text-muted">
+        {uploading ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" /> : <ImagePlus className="h-4 w-4 shrink-0" />}
         <input
           ref={fileRef}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/svg+xml"
-          className="min-w-0 flex-1 rounded-md border border-border bg-surface p-2 text-sm"
+          disabled={uploading}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) upload(file);
+          }}
+          className="min-w-0 flex-1 text-sm file:mr-2 file:rounded file:border-0 file:bg-surface-sunken file:px-2 file:py-1 file:text-xs file:font-semibold disabled:opacity-60"
           aria-label={`Subir ${label.toLocaleLowerCase("es-CO")}`}
         />
-        <button
-          type="button"
-          onClick={upload}
-          disabled={uploading}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-semibold disabled:opacity-60"
-        >
-          {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-          {uploading ? "Subiendo…" : "Subir y usar"}
-        </button>
-      </div>
+        <span className="shrink-0 text-xs">{uploading ? "Subiendo…" : "Se sube al elegirla"}</span>
+      </label>
       {selected ? (
         <div className="flex items-center gap-3">
           <div className="grid h-20 w-28 place-items-center overflow-hidden rounded-md border border-border bg-surface-sunken">

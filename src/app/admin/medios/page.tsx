@@ -56,7 +56,7 @@ export default async function AdminMediaPage({
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((asset) => (
             <li key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface-raised">
-              <div className="relative aspect-[4/3] bg-surface-sunken">
+              <div className="relative aspect-square bg-surface-sunken">
                 <Image src={asset.url} alt={asset.altText ?? ""} fill sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-contain" unoptimized />
               </div>
               <div className="p-4">

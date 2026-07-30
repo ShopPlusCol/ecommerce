@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, PackageX, Save, Search, SquarePen, Star } from "lucide-react";
 import { AdminMediaUrlField } from "@/components/admin/admin-media-url-field";
 import { chipVariants } from "@/components/ui/chip";
@@ -44,6 +44,7 @@ export function BulkProductEditor({
       !normalized || [row.name, row.sku, row.slug].some((value) => value.toLocaleLowerCase("es-CO").includes(normalized)),
     );
   }, [query, rows]);
+  const expandedRow = rows.find((row) => row.id === expanded) ?? null;
 
   const patchRow = (id: string, patch: Partial<EditableProduct>) => {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -169,8 +170,7 @@ export function BulkProductEditor({
                   const isSelected = selected.has(row.id);
                   const isExpanded = expanded === row.id;
                   return (
-                    <Fragment key={row.id}>
-                      <tr className={cn("border-b border-border align-middle", isSelected ? "bg-brand-soft/25" : "hover:bg-surface-sunken/40")}>
+                    <tr key={row.id} className={cn("border-b border-border align-middle", isSelected ? "bg-brand-soft/25" : "hover:bg-surface-sunken/40")}>
                         <td className={cn("sticky left-0 z-[5] border-b border-border px-3 py-1.5", isSelected ? "bg-brand-soft/25" : "bg-surface-raised")}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row.id)} aria-label={`Seleccionar ${row.name}`} className="h-4 w-4 accent-brand" />
                         </td>
@@ -221,62 +221,62 @@ export function BulkProductEditor({
                           </div>
                         </td>
                       </tr>
-                      {isExpanded ? (
-                        <tr className="border-b border-border bg-surface-sunken/40">
-                          <td className="sticky left-0 bg-surface-sunken/40" />
-                          <td colSpan={11} className="p-4">
-                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
-                              <label className="grid gap-1 text-xs font-semibold text-text-muted">
-                                Slug
-                                <input className={cellInput} value={row.slug} onChange={(event) => patchRow(row.id, { slug: event.target.value })} />
-                              </label>
-                              <label className="grid gap-1 text-xs font-semibold text-text-muted lg:col-span-1">
-                                Descripción corta
-                                <textarea
-                                  className="min-h-20 rounded-md border border-border bg-surface p-2 text-sm font-normal"
-                                  maxLength={240}
-                                  value={row.shortDescription}
-                                  onChange={(event) => patchRow(row.id, { shortDescription: event.target.value })}
-                                />
-                              </label>
-                              <div className="lg:row-span-2">
-                                <AdminMediaUrlField name={undefined} label="Imagen principal" value={row.imageUrl} assets={media} onChange={(imageUrl) => patchRow(row.id, { imageUrl, imageAlt: row.imageAlt || row.name })} />
-                              </div>
-                              <div className="grid gap-1.5 text-xs font-semibold text-text-muted lg:col-span-2">
-                                Categorías
-                                <div className="flex flex-wrap gap-1.5">
-                                  {categories.map((category) => {
-                                    const checked = row.categoryIds.includes(category.id);
-                                    return (
-                                      <button
-                                        key={category.id}
-                                        type="button"
-                                        onClick={() =>
-                                          patchRow(row.id, {
-                                            categoryIds: checked
-                                              ? row.categoryIds.filter((id) => id !== category.id)
-                                              : [...row.categoryIds, category.id],
-                                          })
-                                        }
-                                        aria-pressed={checked}
-                                        className={cn(chipVariants({ variant: checked ? "brand" : "neutral" }), "cursor-pointer font-normal transition-colors")}
-                                      >
-                                        {category.name}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          {expandedRow ? (
+            <div className="border-t border-border bg-surface-sunken/40 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Más detalles de {expandedRow.name}</p>
+                <button type="button" onClick={() => setExpanded(null)} className="text-xs font-semibold text-text-muted hover:text-text">Cerrar</button>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
+                <label className="grid gap-1 text-xs font-semibold text-text-muted">
+                  Slug
+                  <input className={cellInput} value={expandedRow.slug} onChange={(event) => patchRow(expandedRow.id, { slug: event.target.value })} />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-text-muted lg:col-span-1">
+                  Descripción corta
+                  <textarea
+                    className="min-h-20 rounded-md border border-border bg-surface p-2 text-sm font-normal"
+                    maxLength={240}
+                    value={expandedRow.shortDescription}
+                    onChange={(event) => patchRow(expandedRow.id, { shortDescription: event.target.value })}
+                  />
+                </label>
+                <div className="lg:row-span-2">
+                  <AdminMediaUrlField name={undefined} label="Imagen principal" value={expandedRow.imageUrl} assets={media} onChange={(imageUrl) => patchRow(expandedRow.id, { imageUrl, imageAlt: expandedRow.imageAlt || expandedRow.name })} />
+                </div>
+                <div className="grid gap-1.5 text-xs font-semibold text-text-muted lg:col-span-2">
+                  Categorías
+                  <div className="flex flex-wrap gap-1.5">
+                    {categories.map((category) => {
+                      const checked = expandedRow.categoryIds.includes(category.id);
+                      return (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() =>
+                            patchRow(expandedRow.id, {
+                              categoryIds: checked
+                                ? expandedRow.categoryIds.filter((id) => id !== category.id)
+                                : [...expandedRow.categoryIds, category.id],
+                            })
+                          }
+                          aria-pressed={checked}
+                          className={cn(chipVariants({ variant: checked ? "brand" : "neutral" }), "cursor-pointer font-normal transition-colors")}
+                        >
+                          {category.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-border p-10 text-center">

@@ -6,11 +6,9 @@ import { mediaAssets } from "@/infrastructure/db/schema";
 import { getBrandSettings } from "@/modules/settings/brand";
 import { getManualTransferSettings } from "@/modules/settings/manual-transfer";
 import { getPrivacySettings } from "@/modules/settings/privacy";
-import { MediaSettingField } from "./media-setting-field";
-import { saveBrandSettingsAction, saveManualTransferSettingsAction, savePrivacySettingsAction } from "./actions";
+import { BrandSettingsForm, ManualTransferSettingsForm, PrivacySettingsForm } from "./config-forms";
 
 export const metadata: Metadata = { title: "Configuración" };
-const control = "mt-1 h-10 w-full rounded-md border border-border bg-surface px-3";
 
 export default async function AdminSettingsPage() {
   const [brand, transfer, privacy, media] = await Promise.all([
@@ -20,14 +18,23 @@ export default async function AdminSettingsPage() {
     (await getRuntimeDb()).select().from(mediaAssets),
   ]);
   const assets = media.map((asset) => ({ url: asset.url, label: asset.altText || asset.storageKey }));
-  const fields = [
-    ["name", "Nombre visible"], ["tagline", "Tagline"], ["description", "Descripción"],
-    ["altText", "Texto alternativo"], ["email", "Correo"], ["whatsapp", "WhatsApp"],
-    ["instagram", "Instagram"], ["facebook", "Facebook"], ["tiktok", "TikTok"],
-  ] as const;
-  return <><AdminPageHeader title="Configuración" description="Identidad, recursos visuales, pagos, privacidad y portabilidad organizados para operación diaria." /><nav className="mb-5 flex flex-wrap gap-2" aria-label="Secciones de configuración"><a href="#marca" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Marca</a><a href="#pagos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Transferencias</a><a href="#privacidad" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Privacidad</a><a href="#datos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Datos</a></nav>
-    <form id="marca" action={saveBrandSettingsAction} className="grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6 sm:grid-cols-2"><h2 className="text-lg font-semibold sm:col-span-2">Marca y recursos visuales</h2><label className="text-sm font-semibold">Modo de marca<select name="mode" defaultValue={brand.mode} className={control}><option value="text">Texto</option><option value="image">Imagen</option><option value="image_text">Imagen y texto</option></select></label>{fields.map(([name, label]) => <label key={name} className="text-sm font-semibold">{label}<input name={name} defaultValue={brand[name] ?? ""} className={control} /></label>)}<MediaSettingField name="logoUrl" label="Logo principal" value={brand.logoUrl} assets={assets} /><MediaSettingField name="mobileLogoUrl" label="Logo móvil" value={brand.mobileLogoUrl} assets={assets} /><MediaSettingField name="footerLogoUrl" label="Logo del pie" value={brand.footerLogoUrl} assets={assets} /><MediaSettingField name="faviconUrl" label="Favicon" value={brand.faviconUrl} assets={assets} /><MediaSettingField name="appleTouchIconUrl" label="Apple Touch Icon" value={brand.appleTouchIconUrl} assets={assets} /><MediaSettingField name="openGraphImageUrl" label="Imagen Open Graph" value={brand.openGraphImageUrl} assets={assets} /><button className="h-11 rounded-md bg-brand px-4 font-semibold text-white sm:col-span-2">Guardar identidad visual</button></form>
-    <form id="pagos" action={saveManualTransferSettingsAction} className="mt-6 grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6 sm:grid-cols-2"><h2 className="text-lg font-semibold sm:col-span-2">Transferencia manual</h2>{([["bankName", "Banco"], ["accountType", "Tipo de cuenta"], ["accountNumber", "Número"], ["accountHolder", "Titular"], ["instructions", "Instrucciones"]] as const).map(([name, label]) => <label key={name} className="text-sm font-semibold">{label}<input name={name} defaultValue={transfer[name] ?? ""} className={control} /></label>)}<div className="sm:col-span-2"><MediaSettingField name="qrUrl" label="QR bancario" value={transfer.qrUrl} assets={assets} /></div><button className="h-11 rounded-md bg-brand px-4 font-semibold text-white sm:col-span-2">Guardar transferencia</button></form>
-    <form id="privacidad" action={savePrivacySettingsAction} className="mt-6 grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6 sm:grid-cols-2"><h2 className="text-lg font-semibold sm:col-span-2">Privacidad y retención</h2><label className="text-sm font-semibold">Versión de política<input type="date" name="policyVersion" defaultValue={privacy.policyVersion} required className={control} /></label><label className="text-sm font-semibold">Revisión legal<select name="legalReviewStatus" defaultValue={privacy.legalReviewStatus} className={control}><option value="pending">Pendiente</option><option value="reviewed">Revisada por el negocio</option></select></label><label className="text-sm font-semibold">Responsable<input name="controllerName" defaultValue={privacy.controllerName} required className={control} /></label><label className="text-sm font-semibold">Identificación legal<input name="legalId" defaultValue={privacy.legalId} className={control} /></label><label className="text-sm font-semibold sm:col-span-2">Domicilio<input name="address" defaultValue={privacy.address} className={control} /></label><label className="text-sm font-semibold sm:col-span-2">Correo de privacidad<input type="email" name="privacyEmail" defaultValue={privacy.privacyEmail} required className={control} /></label>{([["orderRetentionMonths", "Retención de pedidos (meses)"], ["proofRetentionMonths", "Retención de comprobantes (meses)"], ["auditRetentionMonths", "Retención de auditoría (meses)"]] as const).map(([name, label]) => <label key={name} className="text-sm font-semibold">{label}<input type="number" min="1" max="240" name={name} defaultValue={privacy[name]} required className={control} /></label>)}<p className="text-sm text-text-muted sm:col-span-2">La aplicación ayuda a aplicar privacidad y retención; no sustituye la revisión legal del negocio.</p><button className="h-11 rounded-md bg-brand px-4 font-semibold text-white sm:col-span-2">Guardar privacidad</button></form>
-    <section id="datos" className="mt-6 max-w-5xl rounded-xl border border-border bg-surface-raised p-6"><h2 className="text-lg font-semibold">Portabilidad de datos</h2><p className="mt-2 text-sm text-text-muted">Descarga una instantánea JSON del negocio. Excluye credenciales, contraseñas, sesiones, webhooks y archivos binarios.</p><Link href="/api/admin/exports/data" className="mt-4 inline-flex rounded-md border border-border px-4 py-2 font-semibold">Exportar datos de negocio</Link></section></>;
+  return (
+    <>
+      <AdminPageHeader title="Configuración" description="Identidad, recursos visuales, pagos, privacidad y portabilidad organizados para operación diaria." />
+      <nav className="mb-5 flex flex-wrap gap-2" aria-label="Secciones de configuración">
+        <a href="#marca" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Marca</a>
+        <a href="#pagos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Transferencias</a>
+        <a href="#privacidad" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Privacidad</a>
+        <a href="#datos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Datos</a>
+      </nav>
+      <BrandSettingsForm brand={brand} assets={assets} />
+      <ManualTransferSettingsForm transfer={transfer} assets={assets} />
+      <PrivacySettingsForm privacy={privacy} />
+      <section id="datos" className="mt-6 max-w-5xl rounded-xl border border-border bg-surface-raised p-6">
+        <h2 className="text-lg font-semibold">Portabilidad de datos</h2>
+        <p className="mt-2 text-sm text-text-muted">Descarga una instantánea JSON del negocio. Excluye credenciales, contraseñas, sesiones, webhooks y archivos binarios.</p>
+        <Link href="/api/admin/exports/data" className="mt-4 inline-flex rounded-md border border-border px-4 py-2 font-semibold">Exportar datos de negocio</Link>
+      </section>
+    </>
+  );
 }
