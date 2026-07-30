@@ -60,8 +60,10 @@ test("crea un pedido y adjunta un comprobante sin perder la confirmación", asyn
   await page.getByLabel("Nombre completo").fill("Cliente Prueba");
   await page.getByLabel("Teléfono").fill("3001234567");
   await page.getByLabel("Correo (opcional)").fill("cliente@example.test");
-  await page.getByLabel("Departamento").selectOption({ label: "Cundinamarca" });
-  await page.getByLabel("Ciudad o municipio").selectOption({ label: "Bogotá" });
+  await page.getByLabel("Departamento").fill("Antioquia");
+  await page.getByRole("option", { name: "Antioquia" }).click();
+  await page.getByLabel("Ciudad o municipio").fill("Medellín");
+  await page.getByRole("option", { name: "Medellín" }).click();
   await page.getByLabel("Barrio o sector").fill("Chapinero");
   await page.getByLabel("Dirección").fill("Calle 10 # 20-30");
   await expect(page.getByText(/Envío:/).first()).toBeVisible();

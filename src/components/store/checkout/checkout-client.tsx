@@ -15,8 +15,10 @@ import { evaluateRewards } from "@/domain/services/rewards";
 import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
-import { DEPARTMENTS, citiesForDepartment } from "@/lib/colombia-locations";
-import { quoteShippingAction, createDemoOrderAction, listConfiguredNeighborhoodsAction } from "@/app/(store)/actions";
+import { COLOMBIA_DEPARTMENTS } from "@/lib/colombia-departments";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
+import { listShippingCitiesAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
@@ -50,6 +52,7 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
+  const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -69,13 +72,34 @@ export function CheckoutClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length]);
 
-  // Cotización de envío cuando hay departamento + ciudad (sección 17).
+  // Ciudades/municipios configurados y activos para el departamento elegido
+  // (sección 17.3): si el departamento no tiene ninguna, el checkout no pide
+  // ciudad y usa directamente la configuración del departamento.
+  React.useEffect(() => {
+    if (!location.department) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia la lista al cambiar de departamento
+      setCities([]);
+      return;
+    }
+    let cancelled = false;
+    listShippingCitiesAction(location.department).then((names) => {
+      if (!cancelled) setCities(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.department]);
+
+  const cityRequired = cities.length > 0;
+
+  // Cotización de envío cuando hay departamento (y ciudad, si el
+  // departamento tiene ciudades configuradas) — sección 17.
   const subtotalAmount = computeSubtotal(cart).amount;
   React.useEffect(() => {
     // Efecto de obtención de datos: cotiza el envío en el servidor (sistema
     // externo) y refleja los estados de carga/resultado. El "setState" en el
     // cuerpo es intencional para el estado de carga inmediato.
-    if (!location.department || !location.city) {
+    if (!location.department || (cityRequired && !location.city)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset del estado de cotización externa
       setQuote(null);
       setQuoteStatus("idle");
@@ -110,9 +134,9 @@ export function CheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [location.department, location.city, location.neighborhood, subtotalAmount]);
+  }, [location.department, location.city, location.neighborhood, cityRequired, subtotalAmount]);
 
-  // Barrios con tarifa propia configurados en /admin/envios (sección 17.5).
+  // Barrios configurados y activos para la ciudad elegida (sección 17.3).
   React.useEffect(() => {
     if (!location.city) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia la lista al cambiar de ciudad
@@ -120,13 +144,13 @@ export function CheckoutClient() {
       return;
     }
     let cancelled = false;
-    listConfiguredNeighborhoodsAction(location.city).then((names) => {
+    listShippingNeighborhoodsAction(location.department, location.city).then((names) => {
       if (!cancelled) setConfiguredNeighborhoods(names);
     });
     return () => {
       cancelled = true;
     };
-  }, [location.city]);
+  }, [location.department, location.city]);
 
   // Con destino conocido, las recompensas se recalculan con las zonas que
   // cubren la dirección (sección 12): un envío gratis restringido a zonas
@@ -164,7 +188,6 @@ export function CheckoutClient() {
     );
   }
 
-  const cities = citiesForDepartment(location.department);
   const neighborhoodOptions = configuredNeighborhoods;
   const showNeighborhoodSelect = neighborhoodOptions.length > 0;
 
@@ -174,7 +197,7 @@ export function CheckoutClient() {
     if (contact.phone.replace(/\D/g, "").length < 7) next.phone = "Ingresa un teléfono válido.";
     if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
     if (!location.department) next.department = "Selecciona el departamento.";
-    if (!location.city) next.city = "Selecciona la ciudad o municipio.";
+    if (cityRequired && !location.city) next.city = "Selecciona la ciudad o municipio.";
     if (!showNeighborhoodSelect && location.neighborhood.trim().length < 2) next.neighborhood = "Escribe tu barrio o sector.";
     if (location.addressLine.trim().length < 3) next.addressLine = "Ingresa la dirección.";
     if (!quote) next.quote = "Necesitamos una dirección con cobertura para calcular el envío.";
@@ -272,34 +295,35 @@ export function CheckoutClient() {
           <CardContent className="flex flex-col gap-4">
             <StepHeading step={2} title="Ubicación y entrega" />
             <div className="grid gap-4 sm:grid-cols-2">
-              <SelectField
+              <SearchableSelect
                 label="Departamento"
                 required
                 value={location.department}
                 error={errors.department}
                 onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
-                options={DEPARTMENTS.map((d) => d.name)}
-                placeholder="Selecciona…"
+                options={COLOMBIA_DEPARTMENTS}
+                placeholder="Escribe para buscar…"
               />
-              <SelectField
-                label="Ciudad o municipio"
-                required
-                value={location.city}
-                error={errors.city}
-                disabled={!location.department}
-                onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
-                options={cities}
-                placeholder="Selecciona…"
-              />
+              {cityRequired ? (
+                <SearchableSelect
+                  label="Ciudad o municipio"
+                  required
+                  value={location.city}
+                  error={errors.city}
+                  onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
+                  options={cities}
+                  placeholder="Escribe para buscar…"
+                />
+              ) : null}
             </div>
 
             {showNeighborhoodSelect ? (
-              <SelectField
+              <SearchableSelect
                 label="Barrio o sector"
                 value={location.neighborhood}
                 onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
                 options={neighborhoodOptions}
-                placeholder="Selecciona…"
+                placeholder="Escribe para buscar…"
               />
             ) : (
               <Input
@@ -498,52 +522,3 @@ function StepHeading({ step, title }: { step: number; title: string }) {
   );
 }
 
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  required,
-  disabled,
-  error,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  placeholder?: string;
-  required?: boolean;
-  disabled?: boolean;
-  error?: string;
-}) {
-  const id = React.useId();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-text">
-        {label}
-        {required ? <span className="text-brand"> *</span> : null}
-      </label>
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        aria-invalid={Boolean(error) || undefined}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-control-md rounded-md border border-border-strong bg-surface-raised px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
-      >
-        <option value="">{placeholder ?? "Selecciona…"}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-      {error ? (
-        <p className="text-sm text-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}

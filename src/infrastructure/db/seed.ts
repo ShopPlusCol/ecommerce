@@ -345,21 +345,28 @@ async function seed() {
     .onConflictDoNothing();
 
   console.log("Sembrando zonas de envío de ejemplo...");
-  const [medellinZone, nationalZone] = await db
+  const [antioquiaZone, nationalZone] = await db
     .insert(shippingZones)
     .values([
-      { name: "Medellín", level: "city", department: "Antioquia", city: "Medellín" },
-      { name: "Resto de Colombia", level: "country", country: "CO" },
+      { name: "Antioquia", level: "department", country: "CO", status: "active" },
+      { name: "Resto de Colombia", level: "country", country: "CO", status: "active" },
     ])
     .onConflictDoNothing()
     .returning();
+
+  const [medellinZone] = antioquiaZone
+    ? await db
+        .insert(shippingZones)
+        .values([{ name: "Medellín", level: "city", parentZoneId: antioquiaZone.id, country: "CO", status: "active" }])
+        .onConflictDoNothing()
+        .returning()
+    : [];
 
   if (medellinZone) {
     await db
       .insert(shippingRules)
       .values({
         zoneId: medellinZone.id,
-        name: "Medellín - contraentrega mismo día",
         fee: 8_000,
         cashOnDeliveryAllowed: true,
         sameDayAvailable: true,
@@ -367,7 +374,6 @@ async function seed() {
         estimatedBusinessDaysMin: 0,
         estimatedBusinessDaysMax: 1,
         customerMessage: "Entrega el mismo día pidiendo antes de las 2:00 p.m.",
-        status: "active",
       })
       .onConflictDoNothing();
   }
@@ -377,7 +383,6 @@ async function seed() {
       .insert(shippingRules)
       .values({
         zoneId: nationalZone.id,
-        name: "Nacional - envío anticipado",
         fee: 15_000,
         cashOnDeliveryAllowed: false,
         requiresAdvancePayment: true,
@@ -385,7 +390,6 @@ async function seed() {
         estimatedBusinessDaysMin: 2,
         estimatedBusinessDaysMax: 5,
         customerMessage: "El envío se paga por anticipado; el pedido queda como saldo contraentrega.",
-        status: "active",
       })
       .onConflictDoNothing();
   }

@@ -30,7 +30,6 @@ import {
   orders,
   orderStatusHistory,
   payments,
-  shippingZones,
 } from "@/infrastructure/db/schema";
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { releaseExpiredReservations } from "@/modules/inventory/reservations";
@@ -40,7 +39,9 @@ import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit"
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
   department: z.string().min(1),
-  city: z.string().min(1),
+  // Vacío cuando el departamento no tiene ciudades configuradas (sección
+  // 17.3): el checkout no fuerza a elegir una ciudad que no existe.
+  city: z.string(),
   neighborhood: z.string().nullable(),
 });
 
@@ -108,34 +109,6 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
     .filter((method) => method !== "mercado_pago" || Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN))
     .filter((method) => !["transfer_full", "shipping_advance_transfer"].includes(method) || transferConfigured);
   return { ok: true, quote, methods };
-}
-
-/**
- * Barrios con zona de envío propia configurada para una ciudad (sección
- * 17.5): permite que el checkout ofrezca exactamente los barrios que el
- * administrador dio de alta, en vez de una lista fija en el código.
- */
-export async function listConfiguredNeighborhoodsAction(city: string): Promise<string[]> {
-  const normalizedCity = city.trim();
-  if (!normalizedCity) return [];
-  const db = await getRuntimeDb();
-  const rows = await db
-    .select({ neighborhoodNames: shippingZones.neighborhoodNames, groupKind: shippingZones.groupKind })
-    .from(shippingZones)
-    .where(
-      and(
-        eq(shippingZones.level, "neighborhood"),
-        eq(shippingZones.status, "active"),
-        sql`lower(${shippingZones.city}) = lower(${normalizedCity})`,
-      ),
-    );
-  // Los barrios "sin cobertura" no se ofrecen como opción en el checkout
-  // (sección 17.5); el resto (incluido "sin grupo") sí, porque son
-  // entregables aunque no tengan tarifa propia.
-  const names = rows
-    .filter((row) => row.groupKind !== "no_coverage")
-    .flatMap((row) => row.neighborhoodNames ?? []);
-  return [...new Set(names)].sort((a, b) => a.localeCompare(b, "es-CO"));
 }
 
 /**
