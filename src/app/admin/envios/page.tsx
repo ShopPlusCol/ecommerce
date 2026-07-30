@@ -18,8 +18,8 @@ export default async function Page() {
     { name: "name", label: "Nombre", required: true },
     { name: "level", label: "Nivel", type: "select", required: true, options: [{ value: "country", label: "País" }, { value: "department", label: "Departamento" }, { value: "city", label: "Ciudad" }] },
     { name: "country", label: "País", placeholder: "CO" },
-    { name: "department", label: "Departamento" },
-    { name: "city", label: "Ciudad" },
+    { name: "department", label: "Departamento", placeholder: "Vacío = usa el Nombre" },
+    { name: "city", label: "Ciudad", placeholder: "Vacío = usa el Nombre" },
     { name: "status", label: "Estado", type: "select", required: true, options: [{ value: "active", label: "Activa" }, { value: "inactive", label: "Inactiva" }] },
   ];
   const geoZonesForRules = zones.filter((zone) => zone.level !== "neighborhood");

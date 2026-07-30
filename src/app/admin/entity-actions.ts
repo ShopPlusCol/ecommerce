@@ -193,7 +193,23 @@ export async function adminEntityAction(
         break;
       }
       case "shippingZone": {
-        const values = { name: text(formData, "name", true)!, level: z.enum(["country", "department", "city", "neighborhood"]).parse(text(formData, "level", true)), country: text(formData, "country") ?? "CO", department: text(formData, "department"), city: text(formData, "city"), neighborhood: text(formData, "neighborhood"), status: z.enum(["active", "inactive"]).parse(text(formData, "status", true)), updatedAt: now };
+        const zoneName = text(formData, "name", true)!;
+        const zoneLevel = z.enum(["country", "department", "city", "neighborhood"]).parse(text(formData, "level", true));
+        // El campo "Ciudad"/"Departamento" es un texto aparte del "Nombre" de
+        // la zona (para poder nombrarla distinto), pero si se deja vacío se
+        // autocompleta con el nombre: de lo contrario la zona no coincide con
+        // ningún destino real y desaparece silenciosamente de "Barrios por
+        // ciudad" / la resolución de tarifas.
+        const values = {
+          name: zoneName,
+          level: zoneLevel,
+          country: text(formData, "country") ?? "CO",
+          department: zoneLevel === "department" ? text(formData, "department") ?? zoneName : text(formData, "department"),
+          city: zoneLevel === "city" ? text(formData, "city") ?? zoneName : text(formData, "city"),
+          neighborhood: text(formData, "neighborhood"),
+          status: z.enum(["active", "inactive"]).parse(text(formData, "status", true)),
+          updatedAt: now,
+        };
         if (request.operation === "create") { const [created] = await db.insert(shippingZones).values(values).returning(); entityId = created.id; after = created; }
         else if (request.operation === "update") { [before] = await db.select().from(shippingZones).where(eq(shippingZones.id, request.id!)).limit(1); await db.update(shippingZones).set(values).where(eq(shippingZones.id, request.id!)); after = values; }
         else if (request.operation === "archive") { [before] = await db.select().from(shippingZones).where(eq(shippingZones.id, request.id!)).limit(1); await db.update(shippingZones).set({ status: "inactive", updatedAt: now }).where(eq(shippingZones.id, request.id!)); after = { status: "inactive" }; }
