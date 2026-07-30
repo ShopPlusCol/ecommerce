@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { cn } from "@/lib/utils";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
 import { deleteZoneAction } from "./zone-actions";
@@ -24,6 +24,23 @@ function Pill({ label, tone }: { label: string; tone: "success" | "danger" | "wa
   );
 }
 
+/** Monta el contenido (el formulario de configuración) solo la primera vez que se abre, para no renderizar cientos de formularios ocultos cuando una ciudad tiene muchos barrios. */
+function LazyDetails({ defaultOpen, children }: { defaultOpen: boolean; children: ReactNode }) {
+  const [opened, setOpened] = useState(defaultOpen);
+  return (
+    <details
+      className="mt-3"
+      open={defaultOpen}
+      onToggle={(event) => {
+        if (event.currentTarget.open) setOpened(true);
+      }}
+    >
+      <summary className="cursor-pointer text-sm font-semibold text-brand">Configurar</summary>
+      <div className="mt-3 border-t border-border pt-3">{opened ? children : null}</div>
+    </details>
+  );
+}
+
 export type ZoneCardProps = {
   id: string;
   name: string;
@@ -41,6 +58,7 @@ export type ZoneCardProps = {
   childLabel: string;
   drillHref?: string;
   deleteWarning: string;
+  deletable?: boolean;
   children: ReactNode;
   defaultOpen?: boolean;
 };
@@ -62,6 +80,7 @@ export function ZoneCard({
   childLabel,
   drillHref,
   deleteWarning,
+  deletable = true,
   children,
   defaultOpen = false,
 }: ZoneCardProps) {
@@ -94,29 +113,28 @@ export function ZoneCard({
         ) : null}
       </div>
 
-      <details className="mt-3" open={defaultOpen}>
-        <summary className="cursor-pointer text-sm font-semibold text-brand">Configurar</summary>
-        <div className="mt-3 border-t border-border pt-3">{children}</div>
-      </details>
+      <LazyDetails defaultOpen={defaultOpen}>{children}</LazyDetails>
 
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
-        <form
-          action={action}
-          onSubmit={(event) => {
-            if (!window.confirm(`¿Eliminar "${name}"?${deleteWarning}`)) event.preventDefault();
-          }}
-        >
-          <input type="hidden" name="zoneId" value={id} />
-          <button type="submit" disabled={pending} className="text-xs font-semibold text-danger disabled:opacity-60">
-            {pending ? "Eliminando…" : "Eliminar zona"}
-          </button>
-        </form>
-        {state.status !== "idle" ? (
-          <p role={state.status === "error" ? "alert" : "status"} className={cn("text-xs", state.status === "error" ? "text-danger" : "text-success")}>
-            {state.message}
-          </p>
-        ) : null}
-      </div>
+      {deletable ? (
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <form
+            action={action}
+            onSubmit={(event) => {
+              if (!window.confirm(`¿Eliminar "${name}"?${deleteWarning}`)) event.preventDefault();
+            }}
+          >
+            <input type="hidden" name="zoneId" value={id} />
+            <button type="submit" disabled={pending} className="text-xs font-semibold text-danger disabled:opacity-60">
+              {pending ? "Eliminando…" : "Eliminar zona"}
+            </button>
+          </form>
+          {state.status !== "idle" ? (
+            <p role={state.status === "error" ? "alert" : "status"} className={cn("text-xs", state.status === "error" ? "text-danger" : "text-success")}>
+              {state.message}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

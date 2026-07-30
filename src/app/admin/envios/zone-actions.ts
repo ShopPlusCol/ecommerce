@@ -11,7 +11,7 @@ import { normalize } from "@/domain/services/shipping";
 
 type Db = Awaited<ReturnType<typeof getRuntimeDb>>;
 
-export const ZONE_LEVEL_LABELS = {
+const ZONE_LEVEL_LABELS = {
   country: "País",
   department: "Departamento",
   city: "Ciudad/Municipio",
