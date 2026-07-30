@@ -37,6 +37,7 @@ export class DrizzlePromotionsRepository implements PromotionsRepository {
         rewardType: row.rewardType,
         rewardValue: row.rewardValue,
         rewardProductId: row.rewardProductId,
+        eligibleZoneIds: row.eligibleZoneIds ?? null,
         priority: row.priority,
         status: row.status,
       }));

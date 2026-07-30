@@ -4,6 +4,15 @@ import { type Money, money, percentageOf, add, ZERO_COP } from "@/domain/value-o
 export type RewardContext = {
   subtotal: Money;
   totalUnits: number;
+  /**
+   * IDs de todas las zonas de envío que cubren el destino actual (país,
+   * departamento, ciudad y barrio, cuando apliquen). `undefined` significa
+   * que el destino todavía no se conoce (p. ej. el carrito antes de llegar
+   * a "Ubicación y entrega"); una recompensa con zonas restringidas no se
+   * confirma como envío gratis hasta que el destino se conozca, para no
+   * prometer un beneficio que luego se niegue (sección 4.4).
+   */
+  zoneIds?: string[];
 };
 
 export type UnlockedReward = {
@@ -60,10 +69,16 @@ export function evaluateRewards(rules: RewardRule[], ctx: RewardContext): Reward
     let ruleFreeShipping = false;
     let giftProductId: string | null = null;
 
+    const zoneRestricted = Boolean(rule.eligibleZoneIds && rule.eligibleZoneIds.length > 0);
+    const zoneEligible =
+      !zoneRestricted || (ctx.zoneIds?.some((id) => rule.eligibleZoneIds!.includes(id)) ?? false);
+
     switch (rule.rewardType) {
       case "free_shipping":
-        ruleFreeShipping = true;
-        freeShipping = true;
+        if (zoneEligible) {
+          ruleFreeShipping = true;
+          freeShipping = true;
+        }
         break;
       case "fixed_discount":
         discount = money(Math.max(0, Math.round(rule.rewardValue ?? 0)));

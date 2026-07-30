@@ -196,15 +196,20 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     if (validation.valid) coupon = validation.coupon;
   }
 
-  // Recompensas (autoritativas).
-  const rewardRules = await promotionsRepository.listActiveRewardRules();
-  const rewards = evaluateRewards(rewardRules, { subtotal, totalUnits: totalUnits(cart) });
-
-  // Envío.
+  // Envío (se resuelve antes que las recompensas: el envío gratis puede
+  // estar restringido a zonas específicas, sección 12).
   const quote = await shippingResolver.resolve(data.destination, subtotal);
   if (!quote) {
     return { ok: false, error: "No hay tarifa de envío para esta dirección. Escríbenos por WhatsApp." };
   }
+
+  // Recompensas (autoritativas).
+  const rewardRules = await promotionsRepository.listActiveRewardRules();
+  const rewards = evaluateRewards(rewardRules, {
+    subtotal,
+    totalUnits: totalUnits(cart),
+    zoneIds: quote.matchingZoneIds,
+  });
 
   // Método de pago válido para la zona.
   const transferConfigured = Boolean((await getManualTransferSettings()).accountNumber);

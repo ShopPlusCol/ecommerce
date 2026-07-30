@@ -4,6 +4,7 @@ import { resolveShippingQuote, type ShippingRuleWithZone } from "@/domain/servic
 
 function rule(overrides: Partial<ShippingRuleWithZone> & { ruleId: string }): ShippingRuleWithZone {
   return {
+    zoneId: overrides.ruleId,
     zone: { level: "country", country: "CO", department: null, city: null, neighborhood: null },
     fee: money(20_000),
     freeShippingThreshold: null,

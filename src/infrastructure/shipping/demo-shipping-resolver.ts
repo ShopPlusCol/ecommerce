@@ -20,6 +20,7 @@ function cityRule(
 ): ShippingRuleWithZone {
   return {
     ruleId: id,
+    zoneId: `zone-${id}`,
     zone: { level: "city", country: "CO", department: "Antioquia", city, neighborhood: null },
     fee: money(fee),
     freeShippingThreshold: money(150_000),
@@ -46,6 +47,7 @@ export const DEMO_SHIPPING_RULES: ShippingRuleWithZone[] = [
   // Excepción de barrio: El Poblado tiene tarifa reducida.
   {
     ruleId: "poblado",
+    zoneId: "zone-poblado",
     zone: { level: "neighborhood", country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "El Poblado" },
     fee: money(6_000),
     freeShippingThreshold: money(120_000),
@@ -62,6 +64,7 @@ export const DEMO_SHIPPING_RULES: ShippingRuleWithZone[] = [
   // Resto de Antioquia.
   {
     ruleId: "antioquia",
+    zoneId: "zone-antioquia",
     zone: { level: "department", country: "CO", department: "Antioquia", city: null, neighborhood: null },
     fee: money(13_000),
     freeShippingThreshold: null,
@@ -78,6 +81,7 @@ export const DEMO_SHIPPING_RULES: ShippingRuleWithZone[] = [
   // Resto de Colombia: envío anticipado, productos como saldo contra entrega.
   {
     ruleId: "nacional",
+    zoneId: "zone-nacional",
     zone: { level: "country", country: "CO", department: null, city: null, neighborhood: null },
     fee: money(16_000),
     freeShippingThreshold: null,

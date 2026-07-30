@@ -10,7 +10,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { OrderFinancialSummary } from "@/components/store/checkout/order-financial-summary";
 import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
-import { computeOrderSummary, computeSubtotal } from "@/domain/services/cart-pricing";
+import { computeOrderSummary, computeSubtotal, totalUnits as sumUnits } from "@/domain/services/cart-pricing";
+import { evaluateRewards } from "@/domain/services/rewards";
 import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
@@ -38,7 +39,7 @@ const EMPTY_LOCATION: LocationForm = {
 };
 
 export function CheckoutClient() {
-  const { cart, lines, coupon, rewards, totals, clearCart, isHydrated } = useCart();
+  const { cart, lines, coupon, rewards, rewardRules, totals, clearCart, isHydrated } = useCart();
   const { track, consent: analyticsConsent } = useAnalytics();
   const idempotencyKey = React.useRef(crypto.randomUUID());
 
@@ -127,10 +128,22 @@ export function CheckoutClient() {
     };
   }, [location.city]);
 
+  // Con destino conocido, las recompensas se recalculan con las zonas que
+  // cubren la dirección (sección 12): un envío gratis restringido a zonas
+  // solo se confirma aquí, nunca antes de tener una cotización real.
+  const zoneAwareRewards = React.useMemo(() => {
+    if (!quote) return rewards;
+    return evaluateRewards(rewardRules, {
+      subtotal: computeSubtotal(cart),
+      totalUnits: sumUnits(cart),
+      zoneIds: quote.matchingZoneIds,
+    });
+  }, [cart, rewardRules, rewards, quote]);
+
   const summary = React.useMemo(() => {
     if (!quote || !paymentMethod) return null;
-    return computeOrderSummary(cart, { coupon, rewards, shippingQuote: quote, paymentMethod });
-  }, [cart, coupon, rewards, quote, paymentMethod]);
+    return computeOrderSummary(cart, { coupon, rewards: zoneAwareRewards, shippingQuote: quote, paymentMethod });
+  }, [cart, coupon, zoneAwareRewards, quote, paymentMethod]);
 
   if (!isHydrated) {
     return <p className="text-sm text-text-muted">Cargando…</p>;

@@ -17,6 +17,8 @@ export type ShippingDestination = {
 export type ShippingQuote = {
   ruleId: string;
   ruleLevel: "country" | "department" | "city" | "neighborhood" | "exception";
+  /** IDs de todas las zonas (en cualquier nivel) que cubren el destino, para restringir recompensas por zona (sección 12). */
+  matchingZoneIds: string[];
   fee: Money;
   freeShippingThreshold: Money | null;
   cashOnDeliveryAllowed: boolean;

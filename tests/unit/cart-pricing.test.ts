@@ -41,6 +41,7 @@ const medellinQuote: ShippingQuote = {
   estimatedBusinessDaysMax: 1,
   sameDayCutoffHour: 14,
   customerMessage: "Entrega el mismo día",
+  matchingZoneIds: ["zone-medellin"],
 };
 
 const nationalQuote: ShippingQuote = {
@@ -55,6 +56,7 @@ const nationalQuote: ShippingQuote = {
   estimatedBusinessDaysMax: 5,
   customerMessage: "Envío anticipado",
   sameDayCutoffHour: null,
+  matchingZoneIds: ["zone-co"],
 };
 
 describe("computeSubtotal", () => {
@@ -165,6 +167,7 @@ describe("recompensa de envío gratis integrada al resumen", () => {
           rewardType: "free_shipping",
           rewardValue: null,
           rewardProductId: null,
+          eligibleZoneIds: null,
           priority: 1,
           status: "active",
         },

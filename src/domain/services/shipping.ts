@@ -13,6 +13,7 @@ const LEVEL_SPECIFICITY: Record<ShippingLevel, number> = {
 
 export type ShippingRuleWithZone = {
   ruleId: string;
+  zoneId: string;
   zone: {
     level: ShippingLevel;
     country: string;
@@ -94,6 +95,7 @@ export function resolveShippingQuote(
   return {
     ruleId: winner.ruleId,
     ruleLevel: winner.zone.level,
+    matchingZoneIds: [...new Set(candidates.map((candidate) => candidate.zoneId))],
     fee: qualifiesForFreeShipping ? { amount: 0, currency: "COP" } : winner.fee,
     freeShippingThreshold: winner.freeShippingThreshold,
     cashOnDeliveryAllowed: winner.cashOnDeliveryAllowed,

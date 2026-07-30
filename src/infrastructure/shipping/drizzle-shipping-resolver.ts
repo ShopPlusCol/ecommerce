@@ -18,6 +18,7 @@ export class DrizzleShippingResolver implements ShippingRateResolver {
       .filter(({ rule, zone }) => zone.status === "active" && (!rule.startsAt || rule.startsAt.getTime() <= now) && (!rule.endsAt || rule.endsAt.getTime() >= now))
       .map(({ rule, zone }) => ({
         ruleId: rule.id,
+        zoneId: zone.id,
         zone: { level: zone.level, country: zone.country, department: zone.department, city: zone.city, neighborhood: zone.neighborhood },
         fee: money(rule.fee + rule.surcharge),
         freeShippingThreshold: rule.freeShippingThreshold === null ? null : money(rule.freeShippingThreshold),

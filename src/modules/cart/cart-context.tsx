@@ -27,6 +27,7 @@ export type CartContextValue = {
   coupon: Coupon | null;
   totals: CartTotals;
   rewards: RewardEvaluation;
+  rewardRules: RewardRule[];
   totalUnits: number;
   isHydrated: boolean;
   drawerOpen: boolean;
@@ -196,6 +197,7 @@ export function CartProvider({
     coupon,
     totals,
     rewards,
+    rewardRules,
     totalUnits,
     isHydrated,
     drawerOpen,

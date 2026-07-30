@@ -35,6 +35,8 @@ export type RewardRule = {
   /** Monto/porcentaje según rewardType; null para free_shipping/free_product. */
   rewardValue: number | null;
   rewardProductId: string | null;
+  /** Si tiene valores, el beneficio (típicamente envío gratis) solo aplica cuando el destino coincide con alguna de estas zonas. */
+  eligibleZoneIds: string[] | null;
   priority: number;
   status: "draft" | "active" | "paused";
 };

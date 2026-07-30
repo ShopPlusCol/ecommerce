@@ -242,6 +242,7 @@ export const rewardRules: RewardRule[] = [
     rewardType: "free_shipping",
     rewardValue: null,
     rewardProductId: null,
+    eligibleZoneIds: null,
     priority: 10,
     status: "active",
   },
