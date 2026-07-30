@@ -77,6 +77,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: true,
     publishedAt: "2026-01-10T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-oslo",
@@ -97,6 +98,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: true,
     publishedAt: "2026-02-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-boreal",
@@ -116,6 +118,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: true,
     publishedAt: "2026-04-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-santorini",
@@ -135,6 +138,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: "2026-03-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-crimson-eclipse",
@@ -154,6 +158,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: "2026-09-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-liquido",
@@ -173,6 +178,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: "2026-01-10T00:00:00.000Z",
+    purchaseLimit: null,
   },
 ];
 

@@ -1,4 +1,4 @@
-import type { Cart } from "@/domain/entities/cart";
+import type { Cart, CartLine } from "@/domain/entities/cart";
 import type { Coupon } from "@/domain/entities/promotions";
 import type { RewardEvaluation } from "@/domain/services/rewards";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
@@ -146,6 +146,25 @@ export function clampQuantity(requested: number, maxStock: number, allowBackorde
   if (requested < 0) return 0;
   if (allowBackorder) return requested;
   return Math.min(requested, Math.max(0, maxStock));
+}
+
+/** Unidades en el carrito pertenecientes a una categoría (sección 11.2). */
+export function categoryUnitsInCart(lines: CartLine[], categoryId: string): number {
+  return lines
+    .filter((line) => !line.isGift && line.categoryIds.includes(categoryId))
+    .reduce((sum, line) => sum + line.quantity, 0);
+}
+
+/**
+ * Máximo permitido para una línea según su límite de venta cruzada, o `null`
+ * si el producto no tiene uno configurado. Se calcula contra el carrito
+ * completo (incluida la propia línea, por si su categoría coincidiera con la
+ * que habilita el límite) para que cliente y servidor coincidan siempre.
+ */
+export function maxAllowedByPurchaseLimit(line: CartLine, cartLines: CartLine[]): number | null {
+  if (!line.purchaseLimit) return null;
+  const categoryUnits = categoryUnitsInCart(cartLines, line.purchaseLimit.categoryId);
+  return Math.max(0, line.purchaseLimit.maxUnitsPerCategoryUnit * categoryUnits);
 }
 
 export { money };

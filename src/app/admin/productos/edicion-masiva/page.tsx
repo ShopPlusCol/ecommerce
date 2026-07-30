@@ -39,6 +39,8 @@ export default async function BulkProductEditPage() {
             compareAtPrice: product.compareAtPrice,
             shortDescription: product.shortDescription ?? "",
             colorFamilyId: product.colorFamilyId,
+            limitCategoryId: product.limitCategoryId,
+            maxUnitsPerCategoryUnit: product.maxUnitsPerCategoryUnit,
             categoryIds: relationRows.filter((relation) => relation.productId === product.id).map((relation) => relation.categoryId),
             imageUrl: primaryImage?.url ?? "",
             imageAlt: primaryImage?.altText ?? product.name,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { money } from "@/domain/value-objects/money";
 import type { Cart, CartLine } from "@/domain/entities/cart";
 import type { Coupon } from "@/domain/entities/promotions";
-import { computeCartTotals, computeOrderSummary, computeSubtotal, clampQuantity } from "@/domain/services/cart-pricing";
+import { computeCartTotals, computeOrderSummary, computeSubtotal, clampQuantity, maxAllowedByPurchaseLimit } from "@/domain/services/cart-pricing";
 import { evaluateRewards } from "@/domain/services/rewards";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 
@@ -21,6 +21,8 @@ function line(overrides: Partial<CartLine> = {}): CartLine {
     maxStock: 10,
     allowBackorder: false,
     isGift: false,
+    categoryIds: [],
+    purchaseLimit: null,
     ...overrides,
   };
 }
@@ -189,5 +191,30 @@ describe("clampQuantity — guardas de inventario", () => {
   });
   it("nunca es negativo", () => {
     expect(clampQuantity(-3, 10, false)).toBe(0);
+  });
+});
+
+describe("maxAllowedByPurchaseLimit — límite de venta cruzada (sección 11.2)", () => {
+  it("retorna null cuando el producto no tiene límite configurado", () => {
+    const accessory = line({ productId: "acc", purchaseLimit: null });
+    expect(maxAllowedByPurchaseLimit(accessory, [accessory])).toBeNull();
+  });
+
+  it("permite hasta N unidades por cada unidad de la categoría habilitante", () => {
+    const lens = line({ productId: "lens", quantity: 2, categoryIds: ["cat-lentes"] });
+    const accessory = line({
+      productId: "acc",
+      quantity: 5,
+      purchaseLimit: { categoryId: "cat-lentes", maxUnitsPerCategoryUnit: 1 },
+    });
+    expect(maxAllowedByPurchaseLimit(accessory, [lens, accessory])).toBe(2);
+  });
+
+  it("no permite ninguna unidad si la categoría habilitante no está en el carrito", () => {
+    const accessory = line({
+      productId: "acc",
+      purchaseLimit: { categoryId: "cat-lentes", maxUnitsPerCategoryUnit: 1 },
+    });
+    expect(maxAllowedByPurchaseLimit(accessory, [accessory])).toBe(0);
   });
 });

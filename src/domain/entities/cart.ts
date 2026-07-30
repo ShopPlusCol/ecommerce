@@ -1,4 +1,5 @@
 import type { Money } from "@/domain/value-objects/money";
+import type { PurchaseLimit } from "@/domain/entities/catalog";
 
 /**
  * Línea de carrito. Guarda una instantánea del precio y de los límites de
@@ -21,6 +22,8 @@ export type CartLine = {
   maxStock: number;
   allowBackorder: boolean;
   isGift: boolean;
+  categoryIds: string[];
+  purchaseLimit: PurchaseLimit | null;
 };
 
 export type Cart = {

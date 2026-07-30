@@ -13,6 +13,8 @@ const row = {
   shortDescription: "Descripción",
   colorFamilyId: null,
   categoryIds: ["category-1"],
+  limitCategoryId: null,
+  maxUnitsPerCategoryUnit: null,
   imageUrl: "/uploads/producto.webp",
   imageAlt: "Producto uno",
   lowStockThreshold: 5,

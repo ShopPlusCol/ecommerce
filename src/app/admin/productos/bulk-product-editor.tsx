@@ -274,6 +274,17 @@ export function BulkProductEditor({
                     })}
                   </div>
                 </div>
+                <label className="grid gap-1 text-xs font-semibold text-text-muted">
+                  Límite: categoría que lo habilita
+                  <select className={cellInput} value={expandedRow.limitCategoryId ?? ""} onChange={(event) => patchRow(expandedRow.id, { limitCategoryId: event.target.value || null })}>
+                    <option value="">Sin límite</option>
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-text-muted">
+                  Límite: unidades por unidad de esa categoría
+                  <input className={cellInput} type="number" min="0" value={expandedRow.maxUnitsPerCategoryUnit ?? ""} onChange={(event) => patchRow(expandedRow.id, { maxUnitsPerCategoryUnit: event.target.value ? Number(event.target.value) : null })} />
+                </label>
               </div>
             </div>
           ) : null}

@@ -56,6 +56,15 @@ export const products = sqliteTable(
     promoStartsAt: integer("promo_starts_at", { mode: "timestamp_ms" }),
     promoEndsAt: integer("promo_ends_at", { mode: "timestamp_ms" }),
     colorFamilyId: text("color_family_id").references(() => colorFamilies.id, { onDelete: "set null" }),
+    /**
+     * Límite de venta cruzada (sección 11.2): cuántas unidades de ESTE
+     * producto se pueden agregar por cada unidad de `limitCategoryId` en el
+     * carrito. Ambos deben tener valor para que el límite aplique; se valida
+     * en cliente (sección 4.2) y de nuevo en servidor antes de crear el
+     * pedido (sección 29), nunca solo en el navegador.
+     */
+    limitCategoryId: text("limit_category_id").references((): AnySQLiteColumn => categories.id, { onDelete: "set null" }),
+    maxUnitsPerCategoryUnit: integer("max_units_per_category_unit"),
     allowBackorder: integer("allow_backorder", { mode: "boolean" }).notNull().default(false),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     featured: integer("featured", { mode: "boolean" }).notNull().default(false),

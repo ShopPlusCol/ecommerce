@@ -21,6 +21,8 @@ const schema = z.object({
   compareAtPrice: z.union([z.literal(""), z.coerce.number().int().nonnegative()]).transform((value) => value === "" ? null : value),
   costPrice: z.union([z.literal(""), z.coerce.number().int().nonnegative()]).transform((value) => value === "" ? null : value),
   colorFamilyId: z.string().optional(),
+  limitCategoryId: z.string().optional(),
+  maxUnitsPerCategoryUnit: z.union([z.literal(""), z.coerce.number().int().positive()]).transform((value) => value === "" ? null : value),
   lowStockThreshold: z.coerce.number().int().nonnegative(),
   weightGrams: z.union([z.literal(""), z.coerce.number().int().positive()]).transform((value) => value === "" ? null : value),
   seoTitle: z.string().trim().max(120),
@@ -53,6 +55,7 @@ export async function updateProductDetailAction(
     const db = await getRuntimeDb();
     const [before] = await db.select().from(products).where(eq(products.id, parsed.id)).limit(1);
     if (!before) return { status: "error", message: "El producto ya no existe." };
+    const hasPurchaseLimit = Boolean(parsed.limitCategoryId) && parsed.maxUnitsPerCategoryUnit !== null;
     const [updated] = await db
       .update(products)
       .set({
@@ -66,6 +69,8 @@ export async function updateProductDetailAction(
         compareAtPrice: parsed.compareAtPrice,
         costPrice: parsed.costPrice,
         colorFamilyId: parsed.colorFamilyId || null,
+        limitCategoryId: hasPurchaseLimit ? parsed.limitCategoryId! : null,
+        maxUnitsPerCategoryUnit: hasPurchaseLimit ? parsed.maxUnitsPerCategoryUnit : null,
         allowBackorder: formData.get("allowBackorder") === "on",
         lowStockThreshold: parsed.lowStockThreshold,
         featured: formData.get("featured") === "on",

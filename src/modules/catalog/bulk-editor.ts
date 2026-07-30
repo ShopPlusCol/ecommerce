@@ -14,6 +14,8 @@ export const bulkProductUpdateSchema = z.object({
   shortDescription: z.string().trim().max(240),
   colorFamilyId: z.string().nullable(),
   categoryIds: z.array(z.string().min(1)),
+  limitCategoryId: z.string().nullable(),
+  maxUnitsPerCategoryUnit: z.number().int().positive().nullable(),
   imageUrl: z.string().trim(),
   imageAlt: z.string().trim().max(180),
   lowStockThreshold: z.number().int().nonnegative(),

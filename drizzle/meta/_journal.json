@@ -64,6 +64,13 @@
       "when": 1785365752296,
       "tag": "0008_bent_stick",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1785378640426,
+      "tag": "0009_perpetual_anthem",
+      "breakpoints": true
     }
   ]
 }

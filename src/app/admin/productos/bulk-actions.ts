@@ -48,6 +48,8 @@ export async function bulkUpdateProductsAction(input: BulkProductUpdate[]): Prom
             compareAtPrice: row.compareAtPrice,
             shortDescription: row.shortDescription || null,
             colorFamilyId: row.colorFamilyId,
+            limitCategoryId: row.limitCategoryId && row.maxUnitsPerCategoryUnit ? row.limitCategoryId : null,
+            maxUnitsPerCategoryUnit: row.limitCategoryId && row.maxUnitsPerCategoryUnit ? row.maxUnitsPerCategoryUnit : null,
             lowStockThreshold: row.lowStockThreshold,
             featured: row.featured,
             allowBackorder: row.allowBackorder,

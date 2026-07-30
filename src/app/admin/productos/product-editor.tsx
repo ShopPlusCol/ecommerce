@@ -97,6 +97,12 @@ export function ProductEditor({
         <label className="grid gap-1 text-sm font-medium">Colecciones<select className="min-h-32 rounded-md border p-2" name="collectionIds" multiple defaultValue={selectedCollectionIds}>{collections.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
       </section>
       <section className="grid gap-4 rounded-xl border border-border bg-surface-raised p-5 md:grid-cols-2">
+        <h2 className="md:col-span-2">Límite de venta cruzada</h2>
+        <p className="text-sm text-text-muted md:col-span-2">Opcional. Limita cuántas unidades de este producto se pueden agregar según cuántas unidades de una categoría haya en el carrito (ej. máximo 1 solución por cada par de lentes). Deja ambos campos vacíos para no aplicar límite.</p>
+        <label className="grid gap-1 text-sm font-medium">Categoría que habilita el límite<select className={input} name="limitCategoryId" defaultValue={String(product.limitCategoryId ?? "")}><option value="">Sin límite</option>{categories.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm font-medium">Unidades máximas por cada unidad de esa categoría<input className={input} name="maxUnitsPerCategoryUnit" type="number" min="0" defaultValue={product.maxUnitsPerCategoryUnit === null || product.maxUnitsPerCategoryUnit === undefined ? "" : Number(product.maxUnitsPerCategoryUnit)} /></label>
+      </section>
+      <section className="grid gap-4 rounded-xl border border-border bg-surface-raised p-5 md:grid-cols-2">
         <h2 className="md:col-span-2">Imágenes y SEO</h2>
         <div className="grid gap-3 rounded-lg border border-border p-4 md:col-span-2">
           <div>

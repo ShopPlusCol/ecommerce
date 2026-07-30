@@ -7,6 +7,7 @@ import type { Coupon, RewardRule } from "@/domain/entities/promotions";
 import {
   computeCartTotals,
   clampQuantity,
+  maxAllowedByPurchaseLimit,
   totalUnits as sumUnits,
   type CartTotals,
 } from "@/domain/services/cart-pricing";
@@ -108,14 +109,19 @@ export function CartProvider({
     setLines((prev) => {
       const existing = prev.find((l) => lineKey(l.productId, l.variantId) === key);
       if (existing) {
-        const nextQty = clampQuantity(existing.quantity + quantity, product.stock, product.allowBackorder);
+        const stockClamped = clampQuantity(existing.quantity + quantity, product.stock, product.allowBackorder);
+        const limitMax = maxAllowedByPurchaseLimit(existing, prev);
+        const nextQty = limitMax === null ? stockClamped : Math.min(stockClamped, limitMax);
         return prev.map((l) =>
           lineKey(l.productId, l.variantId) === key ? { ...l, quantity: nextQty, maxStock: product.stock } : l,
         );
       }
-      const clamped = clampQuantity(quantity, product.stock, product.allowBackorder);
+      const stockClamped = clampQuantity(quantity, product.stock, product.allowBackorder);
+      const candidate = productToCartLine(product, stockClamped);
+      const limitMax = maxAllowedByPurchaseLimit(candidate, prev);
+      const clamped = limitMax === null ? stockClamped : Math.min(stockClamped, limitMax);
       if (clamped <= 0) return prev;
-      return [...prev, productToCartLine(product, clamped)];
+      return [...prev, { ...candidate, quantity: clamped }];
     });
     setLastAddedKey(key);
     setDrawerOpen(true);
@@ -127,7 +133,9 @@ export function CartProvider({
       setLines((prev) => {
         const target = prev.find((l) => lineKey(l.productId, l.variantId) === key);
         if (!target) return prev;
-        const clamped = clampQuantity(quantity, target.maxStock, target.allowBackorder);
+        const stockClamped = clampQuantity(quantity, target.maxStock, target.allowBackorder);
+        const limitMax = maxAllowedByPurchaseLimit(target, prev);
+        const clamped = limitMax === null ? stockClamped : Math.min(stockClamped, limitMax);
         if (clamped <= 0) {
           removedRef.current = { line: target, index: prev.findIndex((l) => lineKey(l.productId, l.variantId) === key) };
           setCanUndo(true);

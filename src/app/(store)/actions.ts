@@ -8,7 +8,7 @@ import { money } from "@/domain/value-objects/money";
 import type { Cart, CartLine } from "@/domain/entities/cart";
 import { validateCoupon } from "@/domain/services/coupons";
 import { evaluateRewards } from "@/domain/services/rewards";
-import { computeSubtotal, computeOrderSummary, totalUnits } from "@/domain/services/cart-pricing";
+import { computeSubtotal, computeOrderSummary, maxAllowedByPurchaseLimit, totalUnits } from "@/domain/services/cart-pricing";
 import { availablePaymentMethods } from "@/domain/services/payments";
 import { productToCartLine } from "@/modules/cart/cart-line";
 import { catalogRepository, promotionsRepository, shippingResolver } from "@/lib/container";
@@ -172,7 +172,20 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     return { ok: false, error: "Los productos del carrito ya no están disponibles." };
   }
 
-  const cart: Cart = { lines, couponCode: data.couponCode };
+  // Límite de venta cruzada (sección 11.2): revalida contra el carrito
+  // reconstruido, nunca contra lo que envió el navegador.
+  for (const targetLine of lines) {
+    const maxAllowed = maxAllowedByPurchaseLimit(targetLine, lines);
+    if (maxAllowed !== null && targetLine.quantity > maxAllowed) {
+      targetLine.quantity = maxAllowed;
+    }
+  }
+  const nonZeroLines = lines.filter((line) => line.quantity > 0);
+  if (nonZeroLines.length === 0) {
+    return { ok: false, error: "Los productos del carrito superan el límite permitido para tu combinación actual." };
+  }
+
+  const cart: Cart = { lines: nonZeroLines, couponCode: data.couponCode };
   const subtotal = computeSubtotal(cart);
 
   // Cupón (autoritativo).
