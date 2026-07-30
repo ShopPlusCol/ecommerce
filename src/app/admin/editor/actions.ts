@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, gt, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getRuntimeDb } from "@/infrastructure/db/client";
@@ -185,6 +185,48 @@ export async function blockOperationAction(_state: AdminActionState, formData: F
     await audit(session.user.id, `page.block.${operation}`, pageId, { blockId: block.id, order: block.order }, { version: version.versionNumber });
     editorPath(pageId);
     return { status: "success", message: operation === "delete" ? "Bloque eliminado del borrador." : operation === "duplicate" ? "Bloque duplicado." : "Orden actualizado." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function reorderBlocksAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("content", "update");
+    const pageId = z.string().min(1).parse(formData.get("pageId"));
+    let blockIds: string[];
+    try {
+      blockIds = z.array(z.string().min(1)).min(1).parse(JSON.parse(String(formData.get("order") ?? "")));
+    } catch {
+      throw new Error("Orden inválido.");
+    }
+    const { db, version } = await editableVersion(pageId, session.user.id);
+    const draftSections = await db.select().from(pageSections).where(eq(pageSections.pageVersionId, version.id)).orderBy(asc(pageSections.order));
+    if (blockIds.length !== draftSections.length) throw new Error("El número de bloques cambió; recarga la página e inténtalo de nuevo.");
+    const draftIds = new Set(draftSections.map((row) => row.id));
+    let finalIds: string[];
+    if (blockIds.every((id) => draftIds.has(id))) {
+      finalIds = blockIds;
+    } else {
+      // El primer cambio sobre un borrador recién copiado de la versión
+      // publicada reasigna IDs nuevos a cada bloque; el orden enviado por el
+      // cliente todavía referencia los IDs anteriores, así que se mapean por
+      // posición original (mismo patrón que updateBlockAction/blockOperationAction).
+      const sourceRows = await db.select().from(pageSections).where(inArray(pageSections.id, blockIds));
+      finalIds = blockIds.map((id) => {
+        const source = sourceRows.find((row) => row.id === id);
+        if (!source) throw new Error("Uno de los bloques ya no existe.");
+        const match = draftSections.find((row) => row.order === source.order);
+        if (!match) throw new Error("No fue posible localizar la copia editable del bloque.");
+        return match.id;
+      });
+    }
+    for (const [order, id] of finalIds.entries()) {
+      await db.update(pageSections).set({ order }).where(eq(pageSections.id, id));
+    }
+    await audit(session.user.id, "page.block.reorder", pageId, { previousOrder: draftSections.map((row) => row.id) }, { order: finalIds, version: version.versionNumber });
+    editorPath(pageId);
+    return { status: "success", message: "Orden actualizado." };
   } catch (error) {
     return actionError(error);
   }

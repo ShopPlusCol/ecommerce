@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, type ReactNode } from "react";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
 import { blockTypeLabels, blockTypes, type BlockType } from "@/modules/page-builder/editor";
 import {
@@ -273,12 +273,14 @@ export function BlockEditor({
   position,
   total,
   media,
+  dragHandle,
 }: {
   pageId: string;
   block: { id: string; blockType: string; config: Record<string, unknown>; visibleOnMobile: boolean; visibleOnDesktop: boolean };
   position: number;
   total: number;
   media: Array<{ url: string; label: string }>;
+  dragHandle?: ReactNode;
 }) {
   const [saveState, saveAction, saving] = useActionState(updateBlockAction, INITIAL_ADMIN_ACTION_STATE);
   const [operationState, operationAction, operating] = useActionState(blockOperationAction, INITIAL_ADMIN_ACTION_STATE);
@@ -311,7 +313,10 @@ export function BlockEditor({
   return (
     <article className="rounded-xl border border-border bg-surface-raised">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Bloque {position + 1} de {total}</p><h3 className="font-semibold">{blockTypeLabels[type] ?? block.blockType}</h3></div>
+        <div className="flex items-center gap-3">
+          {dragHandle}
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Bloque {position + 1} de {total}</p><h3 className="font-semibold">{blockTypeLabels[type] ?? block.blockType}</h3></div>
+        </div>
         <div className="flex flex-wrap gap-2" aria-label={`Orden y acciones de ${blockTypeLabels[type] ?? "bloque"}`}>
           <form action={operationAction}>{hidden}<input type="hidden" name="operation" value="up" /><button disabled={operating || position === 0} className="h-9 rounded-md border border-border px-3 text-sm disabled:opacity-40" aria-label="Subir bloque">↑</button></form>
           <form action={operationAction}>{hidden}<input type="hidden" name="operation" value="down" /><button disabled={operating || position === total - 1} className="h-9 rounded-md border border-border px-3 text-sm disabled:opacity-40" aria-label="Bajar bloque">↓</button></form>
