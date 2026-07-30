@@ -40,7 +40,8 @@ export async function updateProductDetailAction(
       return { status: "error", message: "El precio comparativo debe ser mayor que el precio de venta." };
     }
     const mediaRows = parsed.media.split("\n").map((line) => line.trim()).filter(Boolean).map((line, order) => {
-      const [url, ...altParts] = line.split("|");
+      const [rawUrl, ...altParts] = line.split("|");
+      const url = rawUrl.trim();
       if (!url?.startsWith("/")) {
         try { new URL(url); } catch { throw new Error(`La URL de imagen “${url}” no es válida.`); }
       }
