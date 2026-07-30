@@ -49,7 +49,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <div className="group flex flex-col">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-sunken">
+      <div className="relative aspect-square overflow-hidden rounded-2xl bg-surface-sunken">
         <Link href={`/productos/${product.slug}`} aria-label={product.name} tabIndex={-1}>
           {cover ? (
             <Image

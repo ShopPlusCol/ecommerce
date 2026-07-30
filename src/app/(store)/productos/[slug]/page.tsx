@@ -71,7 +71,7 @@ export default async function ProductPage({ params }: Params) {
       <Section spacing="sm">
         <Container className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
           <div className="lg:sticky lg:top-28 lg:self-start">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[24px] bg-surface-sunken shadow-sm">
+            <div className="relative aspect-square overflow-hidden rounded-[24px] bg-surface-sunken shadow-sm">
               {cover ? (
                 <Image src={cover.url} alt={cover.altText} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
               ) : null}
