@@ -7,16 +7,9 @@ import { actionError, type AdminActionState } from "@/modules/admin/action-state
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { auditLogs, shippingNeighborhoodGroupSettings, shippingRules, shippingZones } from "@/infrastructure/db/schema";
+import { BARRIO_GROUP_LABELS, memberGroupFromRule } from "./barrio-group-derivation";
 
 type Db = Awaited<ReturnType<typeof getRuntimeDb>>;
-
-export type BarrioGroupKind = "coverage" | "no_coverage" | "special_price";
-
-export const BARRIO_GROUP_LABELS: Record<BarrioGroupKind, string> = {
-  coverage: "Con cobertura",
-  no_coverage: "Sin cobertura",
-  special_price: "Precio especial",
-};
 
 const PAYMENT_METHODS = ["mercado_pago", "cash_on_delivery", "shipping_advance_transfer", "transfer_full"] as const;
 
@@ -49,12 +42,50 @@ function optionalInt(formData: FormData, key: string, options: { min?: number; m
   return value;
 }
 
-/** A qué grupo pertenece hoy un barrio, a partir de su propia fila `shipping_rules` (sin columna nueva: sección 2 del plan de la Ronda 4). */
-function memberGroup(rule: { coverage: string | null; fee: number | null } | undefined): BarrioGroupKind {
-  if (!rule) return "coverage";
-  if (rule.coverage === "unavailable") return "no_coverage";
-  if (rule.fee !== null) return "special_price";
-  return "coverage";
+type TargetGroup = "coverage" | "no_coverage" | "special_price";
+
+// Valores a escribir en la `shipping_rules` propia de un barrio al entrar a
+// `targetGroup`, o `null` si el grupo es "coverage" (heredar todo: se borra
+// la fila propia en vez de escribir). Compartido entre el movimiento de un
+// solo barrio y el movimiento en bloque de varios a la vez.
+async function buildRuleValues(db: Db, cityZoneId: string, targetGroup: TargetGroup, now: Date) {
+  if (targetGroup === "coverage") return null;
+  const [groupSettings] = await db
+    .select()
+    .from(shippingNeighborhoodGroupSettings)
+    .where(and(eq(shippingNeighborhoodGroupSettings.cityZoneId, cityZoneId), eq(shippingNeighborhoodGroupSettings.groupKind, targetGroup)))
+    .limit(1);
+  if (targetGroup === "special_price" && !groupSettings) {
+    throw new Error(`Configura primero la tarifa del grupo "${BARRIO_GROUP_LABELS.special_price}" antes de mover barrios a él.`);
+  }
+  return {
+    fee: groupSettings?.fee ?? null,
+    freeShippingThreshold: groupSettings?.freeShippingThreshold ?? null,
+    coverage: targetGroup === "no_coverage" ? ("unavailable" as const) : null,
+    cashOnDeliveryAllowed: groupSettings?.cashOnDeliveryAllowed ?? null,
+    requiresAdvancePayment: groupSettings?.requiresAdvancePayment ?? null,
+    advancePercentage: groupSettings?.advancePercentage ?? null,
+    sameDayAvailable: groupSettings?.sameDayAvailable ?? null,
+    sameDayCutoffHour: groupSettings?.sameDayCutoffHour ?? null,
+    estimatedBusinessDaysMin: groupSettings?.estimatedBusinessDaysMin ?? null,
+    estimatedBusinessDaysMax: groupSettings?.estimatedBusinessDaysMax ?? null,
+    allowedPaymentMethods: groupSettings?.allowedPaymentMethods ?? null,
+    customerMessage: groupSettings?.customerMessage ?? null,
+    updatedAt: now,
+  };
+}
+
+async function applyRuleValues(db: Db, zoneId: string, ruleValues: Awaited<ReturnType<typeof buildRuleValues>>) {
+  const [existingRule] = await db.select().from(shippingRules).where(eq(shippingRules.zoneId, zoneId)).limit(1);
+  if (ruleValues === null) {
+    if (existingRule) await db.delete(shippingRules).where(eq(shippingRules.id, existingRule.id));
+    return;
+  }
+  if (existingRule) {
+    await db.update(shippingRules).set(ruleValues).where(eq(shippingRules.id, existingRule.id));
+  } else {
+    await db.insert(shippingRules).values({ zoneId, ...ruleValues });
+  }
 }
 
 export async function moveBarrioToGroupAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
@@ -66,40 +97,8 @@ export async function moveBarrioToGroupAction(_state: AdminActionState, formData
     const barrio = await loadBarrio(db, zoneId);
     const now = new Date();
 
-    const [existingRule] = await db.select().from(shippingRules).where(eq(shippingRules.zoneId, zoneId)).limit(1);
-
-    if (targetGroup === "coverage") {
-      if (existingRule) await db.delete(shippingRules).where(eq(shippingRules.id, existingRule.id));
-    } else {
-      const [groupSettings] = await db
-        .select()
-        .from(shippingNeighborhoodGroupSettings)
-        .where(and(eq(shippingNeighborhoodGroupSettings.cityZoneId, barrio.parentZoneId!), eq(shippingNeighborhoodGroupSettings.groupKind, targetGroup)))
-        .limit(1);
-      if (targetGroup === "special_price" && !groupSettings) {
-        throw new Error(`Configura primero la tarifa del grupo "${BARRIO_GROUP_LABELS.special_price}" antes de mover barrios a él.`);
-      }
-      const ruleValues = {
-        fee: groupSettings?.fee ?? null,
-        freeShippingThreshold: groupSettings?.freeShippingThreshold ?? null,
-        coverage: targetGroup === "no_coverage" ? ("unavailable" as const) : null,
-        cashOnDeliveryAllowed: groupSettings?.cashOnDeliveryAllowed ?? null,
-        requiresAdvancePayment: groupSettings?.requiresAdvancePayment ?? null,
-        advancePercentage: groupSettings?.advancePercentage ?? null,
-        sameDayAvailable: groupSettings?.sameDayAvailable ?? null,
-        sameDayCutoffHour: groupSettings?.sameDayCutoffHour ?? null,
-        estimatedBusinessDaysMin: groupSettings?.estimatedBusinessDaysMin ?? null,
-        estimatedBusinessDaysMax: groupSettings?.estimatedBusinessDaysMax ?? null,
-        allowedPaymentMethods: groupSettings?.allowedPaymentMethods ?? null,
-        customerMessage: groupSettings?.customerMessage ?? null,
-        updatedAt: now,
-      };
-      if (existingRule) {
-        await db.update(shippingRules).set(ruleValues).where(eq(shippingRules.id, existingRule.id));
-      } else {
-        await db.insert(shippingRules).values({ zoneId, ...ruleValues });
-      }
-    }
+    const ruleValues = await buildRuleValues(db, barrio.parentZoneId!, targetGroup, now);
+    await applyRuleValues(db, zoneId, ruleValues);
 
     await db.insert(auditLogs).values({
       userId: session.user.id,
@@ -110,6 +109,39 @@ export async function moveBarrioToGroupAction(_state: AdminActionState, formData
     });
     refresh();
     return { status: "success", message: `"${barrio.name}" movido a "${BARRIO_GROUP_LABELS[targetGroup]}".` };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function moveBarriosToGroupAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("shipping", "update");
+    const cityZoneId = z.string().min(1).parse(formData.get("cityZoneId"));
+    const zoneIds = z.array(z.string().min(1)).min(1).parse(formData.getAll("zoneId"));
+    const targetGroup = z.enum(["coverage", "no_coverage", "special_price"]).parse(formData.get("targetGroup"));
+    const db = await getRuntimeDb();
+    const city = await loadCity(db, cityZoneId);
+    const now = new Date();
+
+    const ruleValues = await buildRuleValues(db, cityZoneId, targetGroup, now);
+    const names: string[] = [];
+    for (const zoneId of zoneIds) {
+      const barrio = await loadBarrio(db, zoneId);
+      if (barrio.parentZoneId !== cityZoneId) throw new Error(`"${barrio.name}" no pertenece a ${city.name}.`);
+      await applyRuleValues(db, zoneId, ruleValues);
+      names.push(barrio.name);
+    }
+
+    await db.insert(auditLogs).values({
+      userId: session.user.id,
+      action: "shippingZone.barrioGroup.moveMany",
+      entityType: "shippingZone",
+      entityId: cityZoneId,
+      after: { targetGroup, zoneIds, count: names.length },
+    });
+    refresh();
+    return { status: "success", message: `${names.length} barrio(s) movido(s) a "${BARRIO_GROUP_LABELS[targetGroup]}".` };
   } catch (error) {
     return actionError(error);
   }
@@ -182,7 +214,7 @@ export async function saveGroupSettingsAction(_state: AdminActionState, formData
       ? await db.select().from(shippingRules).where(inArray(shippingRules.zoneId, barrios.map((b) => b.id)))
       : [];
     const rulesByZoneId = new Map(existingRules.map((r) => [r.zoneId, r]));
-    const members = barrios.filter((barrio) => memberGroup(rulesByZoneId.get(barrio.id)) === groupKind);
+    const members = barrios.filter((barrio) => memberGroupFromRule(rulesByZoneId.get(barrio.id)) === groupKind);
 
     const ruleValues = { ...sharedValues, coverage: groupKind === "no_coverage" ? ("unavailable" as const) : null };
     for (const barrio of members) {

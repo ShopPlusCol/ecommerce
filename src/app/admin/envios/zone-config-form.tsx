@@ -7,7 +7,7 @@ import { updateZoneConfigAction } from "./zone-actions";
 
 type FieldMeta<T> = { own: T | null; effective: T | null; inheritedFromName: string | null };
 
-const PAYMENT_METHOD_OPTIONS: Array<{ value: "mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full"; label: string }> = [
+export const PAYMENT_METHOD_OPTIONS: Array<{ value: "mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full"; label: string }> = [
   { value: "mercado_pago", label: "Mercado Pago" },
   { value: "cash_on_delivery", label: "Pago contraentrega" },
   { value: "shipping_advance_transfer", label: "Anticipo del envío + saldo al recibir" },

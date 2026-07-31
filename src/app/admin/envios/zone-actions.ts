@@ -231,6 +231,26 @@ export async function deleteZoneAction(_state: AdminActionState, formData: FormD
   }
 }
 
+export async function deleteZonesBulkAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("shipping", "delete");
+    const zoneIds = z.array(z.string().min(1)).min(1).parse(formData.getAll("zoneId"));
+    const db = await getRuntimeDb();
+    const names: string[] = [];
+    for (const zoneId of zoneIds) {
+      const zone = await loadZone(db, zoneId);
+      if (zone.level === "country") throw new Error("La zona de respaldo nacional no se puede eliminar.");
+      await db.delete(shippingZones).where(eq(shippingZones.id, zoneId));
+      await db.insert(auditLogs).values({ userId: session.user.id, action: "shippingZone.delete", entityType: "shippingZone", entityId: zoneId, before: zone });
+      names.push(zone.name);
+    }
+    refresh();
+    return { status: "success", message: `${names.length} zona(s) eliminada(s) junto con sus zonas hijas.` };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export type ZoneSearchResult = {
   id: string;
   name: string;

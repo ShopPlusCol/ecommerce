@@ -1,14 +1,17 @@
+import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
 import { requirePermission } from "@/modules/auth/session";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { shippingNeighborhoodGroupSettings } from "@/infrastructure/db/schema";
 import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
-import { ZoneCard } from "../../zone-cards";
 import { ZoneConfigForm } from "../../zone-config-form";
 import { CreateZoneForm } from "../../create-zone-form";
 import { BulkNeighborhoodsForm } from "../../bulk-neighborhoods-form";
-import { FilterableZoneList } from "../../filterable-zone-list";
-import { buildZoneConfigFormProps, deleteWarningFor, summarizeZone } from "../../zone-view-model";
+import { buildZoneConfigFormProps } from "../../zone-view-model";
+import { BarrioPillsBoard, type BarrioGroupSettingsData } from "../../barrio-pills-board";
+import { memberGroupFromRule } from "../../barrio-group-derivation";
 
 export default async function CityPage({ params }: { params: Promise<{ departmentId: string; cityId: string }> }) {
   await requirePermission("shipping", "read");
@@ -19,6 +22,35 @@ export default async function CityPage({ params }: { params: Promise<{ departmen
   if (!department || !city) notFound();
 
   const barrios = zones.filter((zone) => zone.parentZoneId === city.id && zone.level === "neighborhood").sort((a, b) => a.name.localeCompare(b.name, "es-CO"));
+  const barrioPillData = barrios.map((barrio) => {
+    const rule = rules.find((r) => r.zoneId === barrio.id);
+    const fee = rule?.fee?.amount ?? null;
+    return {
+      id: barrio.id,
+      name: barrio.name,
+      fee,
+      group: memberGroupFromRule(rule ? { coverage: rule.coverage, fee } : undefined),
+    };
+  });
+
+  const db = await getRuntimeDb();
+  const groupSettingsRows = await db.select().from(shippingNeighborhoodGroupSettings).where(eq(shippingNeighborhoodGroupSettings.cityZoneId, city.id));
+  const groupSettings: Record<"no_coverage" | "special_price", BarrioGroupSettingsData | null> = { no_coverage: null, special_price: null };
+  for (const row of groupSettingsRows) {
+    groupSettings[row.groupKind] = {
+      fee: row.fee,
+      freeShippingThreshold: row.freeShippingThreshold,
+      cashOnDeliveryAllowed: row.cashOnDeliveryAllowed,
+      requiresAdvancePayment: row.requiresAdvancePayment,
+      advancePercentage: row.advancePercentage,
+      sameDayAvailable: row.sameDayAvailable,
+      sameDayCutoffHour: row.sameDayCutoffHour,
+      estimatedBusinessDaysMin: row.estimatedBusinessDaysMin,
+      estimatedBusinessDaysMax: row.estimatedBusinessDaysMax,
+      allowedPaymentMethods: row.allowedPaymentMethods,
+      customerMessage: row.customerMessage,
+    };
+  }
 
   return (
     <>
@@ -46,38 +78,7 @@ export default async function CityPage({ params }: { params: Promise<{ departmen
         </div>
       </section>
 
-      <FilterableZoneList
-        placeholder={`Buscar entre ${barrios.length} barrios de ${city.name}…`}
-        emptyLabel={barrios.length ? "Ningún barrio coincide con la búsqueda." : "Todavía no tienes barrios configurados en esta ciudad; mientras tanto, todos sus pedidos usan la configuración de la ciudad."}
-        items={barrios.map((barrio) => {
-          const summary = summarizeZone(barrio.id, zones, rules);
-          return {
-            id: barrio.id,
-            name: barrio.name,
-            node: (
-              <ZoneCard
-                id={barrio.id}
-                name={barrio.name}
-                status={summary.status}
-                effectivelyActive={summary.effectivelyActive}
-                feeLabel={summary.feeLabel}
-                feeOwn={summary.feeOwn}
-                coverageBlocked={summary.coverageBlocked}
-                coverageOwn={summary.coverageOwn}
-                cashOnDeliveryAllowed={summary.cashOnDeliveryAllowed}
-                cashOwn={summary.cashOwn}
-                sameDayAvailable={summary.sameDayAvailable}
-                sameDayOwn={summary.sameDayOwn}
-                childCount={0}
-                childLabel=""
-                deleteWarning={deleteWarningFor(barrio, zones)}
-              >
-                <ZoneConfigForm {...buildZoneConfigFormProps(barrio.id, zones, rules)} />
-              </ZoneCard>
-            ),
-          };
-        })}
-      />
+      <BarrioPillsBoard cityId={city.id} barrios={barrioPillData} groupSettings={groupSettings} />
     </>
   );
 }
