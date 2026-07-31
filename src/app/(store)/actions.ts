@@ -34,7 +34,10 @@ import {
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { releaseExpiredReservations } from "@/modules/inventory/reservations";
 import { getManualTransferSettings } from "@/modules/settings/manual-transfer";
+import { getShippingMessagesSettings } from "@/modules/settings/shipping-messages";
 import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit";
+import { resolveDestinationLabel, resolveRejectionMessage } from "@/domain/services/shipping";
+import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
 
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
@@ -95,6 +98,15 @@ export async function validateCouponAction(input: unknown): Promise<ValidateCoup
   return { ok: true, coupon: result.coupon };
 }
 
+/** Mensaje a mostrar cuando no hay tarifa/cobertura para un destino: el mensaje propio de su zona más específica si tiene uno, o el mensaje global personalizable con el nombre del destino. */
+async function resolveNoCoverageMessage(destination: z.infer<typeof destinationSchema>): Promise<string> {
+  const { zones, rules } = await loadShippingTree();
+  const ownMessage = resolveRejectionMessage(zones, rules, destination);
+  if (ownMessage) return ownMessage;
+  const template = (await getShippingMessagesSettings()).noCoverageTemplate;
+  return template.replace("{lugar}", resolveDestinationLabel(zones, destination));
+}
+
 /** Cotiza el envío para un destino (jerarquía de zonas, sección 17). */
 export async function quoteShippingAction(input: unknown): Promise<QuoteShippingResult> {
   const parsed = quoteSchema.safeParse(input);
@@ -102,7 +114,7 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
 
   const quote = await shippingResolver.resolve(parsed.data.destination, money(parsed.data.productsTotal));
   if (!quote) {
-    return { ok: false, reason: "Cotización requerida para esta dirección. Escríbenos por WhatsApp." };
+    return { ok: false, reason: await resolveNoCoverageMessage(parsed.data.destination) };
   }
   const transferConfigured = Boolean((await getManualTransferSettings()).accountNumber);
   const methods = availablePaymentMethods(quote)
@@ -177,7 +189,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   // estar restringido a zonas específicas, sección 12).
   const quote = await shippingResolver.resolve(data.destination, subtotal);
   if (!quote) {
-    return { ok: false, error: "No hay tarifa de envío para esta dirección. Escríbenos por WhatsApp." };
+    return { ok: false, error: await resolveNoCoverageMessage(data.destination) };
   }
 
   // Recompensas (autoritativas).

@@ -99,7 +99,9 @@ test.describe.serial("árbol de zonas de envío (Departamento → Ciudad → Bar
     await selectSearchable(page, "Departamento", departmentName);
     await selectSearchable(page, "Ciudad o municipio", cityName);
     await selectSearchable(page, "Barrio o sector", blockedNeighborhoodName);
-    await expect(page.getByText(/Cotización requerida/)).toBeVisible();
+    // Mensaje global personalizable de "sin cobertura" (sección de Ronda 4),
+    // que incluye el nombre del lugar resuelto.
+    await expect(page.getByText(new RegExp(`cobertura.*${blockedNeighborhoodName}`, "i"))).toBeVisible();
   });
 
   test("limpieza: elimina el departamento de prueba y sus zonas hijas", async ({ page }) => {

@@ -118,3 +118,20 @@ export async function savePrivacySettingsAction(_state: AdminActionState, formDa
     return actionError(error);
   }
 }
+
+export async function saveShippingMessagesSettingsAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("settings", "update");
+    const parsed = z.object({
+      noCoverageTemplate: z.string().trim().min(1, "Escribe un mensaje.").max(300).refine((value) => value.includes("{lugar}"), 'El mensaje debe incluir "{lugar}".'),
+    }).parse(Object.fromEntries(formData));
+    const db = await getRuntimeDb();
+    await db.insert(settings).values({ key: "shipping_messages", value: parsed, updatedByUserId: session.user.id })
+      .onConflictDoUpdate({ target: settings.key, set: { value: parsed, updatedByUserId: session.user.id, updatedAt: new Date() } });
+    await db.insert(auditLogs).values({ userId: session.user.id, action: "settings.shipping_messages.update", entityType: "setting", entityId: "shipping_messages", after: parsed });
+    revalidatePath("/admin/configuracion");
+    return { status: "success", message: "Mensaje de envíos guardado." };
+  } catch (error) {
+    return actionError(error);
+  }
+}

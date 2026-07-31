@@ -5,8 +5,9 @@ import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
 import type { BrandSettings } from "@/modules/settings/brand";
 import type { ManualTransferSettings } from "@/modules/settings/manual-transfer";
 import type { PrivacySettings } from "@/modules/settings/privacy";
+import type { ShippingMessagesSettings } from "@/modules/settings/shipping-messages";
 import { MediaSettingField } from "./media-setting-field";
-import { saveBrandSettingsAction, saveManualTransferSettingsAction, savePrivacySettingsAction } from "./actions";
+import { saveBrandSettingsAction, saveManualTransferSettingsAction, savePrivacySettingsAction, saveShippingMessagesSettingsAction } from "./actions";
 
 const control = "mt-1 h-10 w-full rounded-md border border-border bg-surface px-3";
 
@@ -124,6 +125,35 @@ export function PrivacySettingsForm({
       ))}
       <p className="text-sm text-text-muted sm:col-span-2">La aplicación ayuda a aplicar privacidad y retención; no sustituye la revisión legal del negocio.</p>
       <button disabled={pending} className="h-11 rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60 sm:col-span-2">{pending ? "Guardando…" : "Guardar privacidad"}</button>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function ShippingMessagesSettingsForm({
+  shippingMessages,
+}: {
+  shippingMessages: ShippingMessagesSettings;
+}) {
+  const [state, action, pending] = useActionState(saveShippingMessagesSettingsAction, INITIAL_ADMIN_ACTION_STATE);
+  return (
+    <form id="envios" action={action} className="mt-6 grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6">
+      <h2 className="text-lg font-semibold">Mensajes de envíos</h2>
+      <label className="text-sm font-semibold">
+        Mensaje cuando no hay cobertura
+        <textarea
+          name="noCoverageTemplate"
+          defaultValue={shippingMessages.noCoverageTemplate}
+          required
+          maxLength={300}
+          className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface p-3 text-sm font-normal"
+        />
+      </label>
+      <p className="text-sm text-text-muted">
+        Se muestra en el checkout cuando el destino no tiene cobertura y ese barrio/ciudad/departamento no tiene su propio mensaje personalizado. Usa{" "}
+        <code className="rounded bg-surface-sunken px-1 py-0.5 text-xs">{"{lugar}"}</code> donde quieras que aparezca el nombre del destino.
+      </p>
+      <button disabled={pending} className="h-11 w-fit rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">{pending ? "Guardando…" : "Guardar mensaje"}</button>
       <Feedback state={state} />
     </form>
   );

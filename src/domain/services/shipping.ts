@@ -54,7 +54,7 @@ function findChild(zones: ShippingZoneNode[], parentId: string, level: ShippingL
  * zonas configuradas, o ninguna coincide con el destino, se queda en el
  * nivel más específico que sí encontró.
  */
-function resolveTargetZone(zones: ShippingZoneNode[], destination: ShippingDestination): ShippingZoneNode | null {
+export function resolveTargetZone(zones: ShippingZoneNode[], destination: ShippingDestination): ShippingZoneNode | null {
   const department = zones.find((z) => z.level === "department" && normalize(z.name) === normalize(destination.department));
   if (!department) {
     return zones.find((z) => z.level === "country") ?? null;
@@ -148,6 +148,33 @@ export function resolveShippingQuote(
     customerMessage: firstOwn(chain, rulesByZoneId, "customerMessage")?.value ?? "",
     allowedPaymentMethods: firstOwn(chain, rulesByZoneId, "allowedPaymentMethods")?.value,
   };
+}
+
+/**
+ * Nombre de la zona configurada más específica que coincide con el destino
+ * (para mostrárselo al cliente en el mensaje de "sin cobertura"). Si no hubo
+ * ninguna coincidencia real (se cayó al respaldo nacional), arma el nombre
+ * desde el destino tal como lo escribió el cliente.
+ */
+export function resolveDestinationLabel(zones: ShippingZoneNode[], destination: ShippingDestination): string {
+  const target = resolveTargetZone(zones, destination);
+  if (target && target.level !== "country") return target.name;
+  const parts = [destination.neighborhood, destination.city].filter((part): part is string => Boolean(part && part.trim()));
+  if (parts.length) return parts.join(", ");
+  return destination.department.trim() || "tu ubicación";
+}
+
+/**
+ * Mensaje propio (heredable) para el destino, si alguna zona en su cadena
+ * de ancestros lo definió; `null` si ninguna — en ese caso el llamador debe
+ * usar el mensaje global personalizable en su lugar.
+ */
+export function resolveRejectionMessage(zones: ShippingZoneNode[], rules: ShippingRuleConfig[], destination: ShippingDestination): string | null {
+  const target = resolveTargetZone(zones, destination);
+  if (!target) return null;
+  const chain = ancestorChain(zones, target);
+  const rulesByZoneId = new Map(rules.map((r) => [r.zoneId, r]));
+  return firstOwn(chain, rulesByZoneId, "customerMessage")?.value ?? null;
 }
 
 type EffectiveField<K extends keyof ShippingRuleConfig> = {
