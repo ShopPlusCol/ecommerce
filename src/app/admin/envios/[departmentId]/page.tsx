@@ -7,6 +7,7 @@ import { ZoneCard, ZoneEmptyState } from "../zone-cards";
 import { ZoneConfigForm } from "../zone-config-form";
 import { CreateZoneForm } from "../create-zone-form";
 import { BulkZonesForm } from "../bulk-zones-form";
+import { BulkZoneQuickEdit } from "../bulk-zone-quick-edit";
 import { buildZoneConfigFormProps, deleteWarningFor, summarizeZone } from "../zone-view-model";
 
 export default async function DepartmentPage({ params }: { params: Promise<{ departmentId: string }> }) {
@@ -36,6 +37,8 @@ export default async function DepartmentPage({ params }: { params: Promise<{ dep
           <BulkZonesForm level="city" parentZoneId={department.id} label="Ciudades/municipios (separados por coma o uno por línea)" placeholder="Medellín, Envigado, Itagüí" />
         </div>
       </section>
+
+      {cities.length ? <BulkZoneQuickEdit items={cities.map((c) => buildZoneConfigFormProps(c.id, zones, rules))} zoneLabel="ciudades/municipios" /> : null}
 
       <div className="grid gap-3">
         {cities.length ? (

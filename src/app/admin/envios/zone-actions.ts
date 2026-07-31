@@ -264,6 +264,68 @@ export async function deleteZonesBulkAction(_state: AdminActionState, formData: 
   }
 }
 
+export type BulkZoneConfigRow = {
+  zoneId: string;
+  fee?: number;
+  coverage?: "available" | "unavailable";
+  estimatedBusinessDaysMin?: number;
+  estimatedBusinessDaysMax?: number;
+};
+
+const bulkZoneConfigRowSchema = z.object({
+  zoneId: z.string().min(1),
+  fee: z.number().int().min(0).optional(),
+  coverage: z.enum(["available", "unavailable"]).optional(),
+  estimatedBusinessDaysMin: z.number().int().min(0).optional(),
+  estimatedBusinessDaysMax: z.number().int().min(0).optional(),
+});
+
+// Edición rápida masiva: a diferencia de `updateZoneConfigAction`, aquí cada
+// campo ausente en una fila significa "no tocar" (no "volver a heredado") —
+// solo se escriben en `shipping_rules` los campos que la fila trae.
+export async function bulkUpdateZoneConfigAction(input: BulkZoneConfigRow[]): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("shipping", "update");
+    const rows = z.array(bulkZoneConfigRowSchema).min(1).parse(input);
+    const db = await getRuntimeDb();
+    const now = new Date();
+    let updated = 0;
+
+    for (const row of rows) {
+      const zone = await loadZone(db, row.zoneId);
+      if (row.estimatedBusinessDaysMin !== undefined && row.estimatedBusinessDaysMax !== undefined && row.estimatedBusinessDaysMax < row.estimatedBusinessDaysMin) {
+        throw new Error(`"${zone.name}": el plazo máximo no puede ser menor que el mínimo.`);
+      }
+      const patch: Partial<typeof shippingRules.$inferInsert> = { updatedAt: now };
+      if (row.fee !== undefined) patch.fee = row.fee;
+      if (row.coverage !== undefined) patch.coverage = row.coverage;
+      if (row.estimatedBusinessDaysMin !== undefined) patch.estimatedBusinessDaysMin = row.estimatedBusinessDaysMin;
+      if (row.estimatedBusinessDaysMax !== undefined) patch.estimatedBusinessDaysMax = row.estimatedBusinessDaysMax;
+      if (Object.keys(patch).length === 1) continue;
+
+      const [existingRule] = await db.select().from(shippingRules).where(eq(shippingRules.zoneId, row.zoneId)).limit(1);
+      if (existingRule) {
+        await db.update(shippingRules).set(patch).where(eq(shippingRules.id, existingRule.id));
+      } else {
+        await db.insert(shippingRules).values({ zoneId: row.zoneId, ...patch });
+      }
+      updated++;
+    }
+
+    await db.insert(auditLogs).values({
+      userId: session.user.id,
+      action: "shippingZone.bulkUpdateConfig",
+      entityType: "shippingZone",
+      entityId: rows[0].zoneId,
+      after: { count: updated, rows },
+    });
+    refresh();
+    return { status: "success", message: `${updated} zona(s) actualizada(s).` };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export type ZoneSearchResult = {
   id: string;
   name: string;

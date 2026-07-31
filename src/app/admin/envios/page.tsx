@@ -6,6 +6,7 @@ import { ZoneCard, ZoneEmptyState } from "./zone-cards";
 import { ZoneConfigForm } from "./zone-config-form";
 import { CreateZoneForm } from "./create-zone-form";
 import { BulkZonesForm } from "./bulk-zones-form";
+import { BulkZoneQuickEdit } from "./bulk-zone-quick-edit";
 import { ZoneSearchBox } from "./zone-search-box";
 import { buildZoneConfigFormProps, deleteWarningFor, summarizeZone } from "./zone-view-model";
 
@@ -32,6 +33,8 @@ export default async function Page() {
           <BulkZonesForm level="department" label="Departamentos (separados por coma o uno por línea)" placeholder="Antioquia, Valle del Cauca, Santander" />
         </div>
       </section>
+
+      {departments.length ? <BulkZoneQuickEdit items={departments.map((d) => buildZoneConfigFormProps(d.id, zones, rules))} zoneLabel="departamentos" /> : null}
 
       <div className="mb-8 grid gap-3">
         {departments.length ? (
