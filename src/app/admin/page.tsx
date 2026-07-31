@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
   itemRows.filter((item) => realIds.has(item.orderId)).forEach((item) => productTotals.set(item.name, (productTotals.get(item.name) ?? 0) + item.quantity));
   const topProducts = [...productTotals].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const integrationsPending = [
-    !process.env.MERCADO_PAGO_ACCESS_TOKEN,
+    !(process.env.MERCADO_PAGO_ACCESS_TOKEN && process.env.MERCADO_PAGO_WEBHOOK_SECRET),
     !(process.env.META_PIXEL_ID && process.env.META_CONVERSIONS_ACCESS_TOKEN),
     !(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD),
   ].filter(Boolean).length;

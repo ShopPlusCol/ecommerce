@@ -10,7 +10,10 @@ import { requirePermission } from "@/modules/auth/session";
 
 const providerSchema = z.enum(["mercado_pago", "meta_conversions_api", "whatsapp", "smtp"]);
 const requirements: Record<z.infer<typeof providerSchema>, Array<{ key: string; present: () => boolean }>> = {
-  mercado_pago: [{ key: "MERCADO_PAGO_ACCESS_TOKEN", present: () => Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN) }],
+  mercado_pago: [
+    { key: "MERCADO_PAGO_ACCESS_TOKEN", present: () => Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN) },
+    { key: "MERCADO_PAGO_WEBHOOK_SECRET", present: () => Boolean(process.env.MERCADO_PAGO_WEBHOOK_SECRET) },
+  ],
   meta_conversions_api: [
     { key: "META_CONVERSIONS_ACCESS_TOKEN", present: () => Boolean(process.env.META_CONVERSIONS_ACCESS_TOKEN) },
     { key: "META_PIXEL_ID", present: () => Boolean(process.env.META_PIXEL_ID) },

@@ -88,7 +88,7 @@ export async function getSystemStatus() {
     },
     external: {
       mercadoPago: {
-        configured: Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN),
+        configured: Boolean(process.env.MERCADO_PAGO_ACCESS_TOKEN && process.env.MERCADO_PAGO_WEBHOOK_SECRET),
         testMode: process.env.MERCADO_PAGO_TEST_MODE !== "false",
       },
       meta: {
@@ -96,7 +96,8 @@ export async function getSystemStatus() {
         enabled: integrations.some((item) => item.provider === "meta_conversions_api" && item.isEnabled),
       },
       smtp: { configured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) },
-      r2: { configured: Boolean(process.env.R2_BUCKET && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY) || target === "cloudflare" },
+      // R2 se vincula por binding (wrangler.jsonc), no por variables de entorno estilo S3: `storageCheck` ya prueba el binding con una operación real (checkStorage arriba).
+      r2: { configured: target === "cloudflare" && storageCheck.status === "ok" },
       d1: { configured: target === "cloudflare" },
       worker: { configured: target === "cloudflare" },
     },
