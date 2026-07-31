@@ -77,6 +77,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: true,
     publishedAt: "2026-01-10T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-oslo",
@@ -97,6 +98,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: true,
     publishedAt: "2026-02-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-boreal",
@@ -116,6 +118,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: true,
     publishedAt: "2026-04-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-santorini",
@@ -135,6 +138,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: "2026-03-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-crimson-eclipse",
@@ -154,6 +158,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: "2026-09-01T00:00:00.000Z",
+    purchaseLimit: null,
   },
   {
     id: "prod-liquido",
@@ -173,28 +178,7 @@ export const demoProducts: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: "2026-01-10T00:00:00.000Z",
-  },
-];
-
-export const demoFaqs: Array<{ question: string; answer: string }> = [
-  {
-    question: "¿Necesito fórmula médica para comprar?",
-    answer:
-      "No. Todos nuestros lentes son cosméticos, sin fórmula y sin aumento, pensados para cambiar el color de tus ojos.",
-  },
-  {
-    question: "¿El tono se verá igual que en la foto?",
-    answer:
-      "El resultado varía según la iluminación, la cámara y el color natural de tu iris. Las fotos son orientativas.",
-  },
-  {
-    question: "¿Cómo pago el envío en Medellín?",
-    answer:
-      "En Medellín y el Área Metropolitana puedes pagar contraentrega. En el resto de Colombia, el envío se paga por anticipado.",
-  },
-  {
-    question: "¿Puedo cambiar de tono si no me gusta?",
-    answer: "Sí, revisa nuestra política de cambios y devoluciones para conocer los plazos y condiciones.",
+    purchaseLimit: null,
   },
 ];
 

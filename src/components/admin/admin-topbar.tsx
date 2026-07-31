@@ -1,21 +1,46 @@
-import { LogOut, Search, UserCircle } from "lucide-react";
-import { logoutAction } from "@/app/acceso-admin/actions";
+import { Menu, PanelLeftClose, PanelLeftOpen, Search, UserCircle } from "lucide-react";
+import { AdminLogoutButton } from "@/components/admin/admin-logout-button";
 
-export function AdminTopbar({ name }: { name: string }) {
+export function AdminTopbar({
+  name,
+  onOpenNavigation,
+  onToggleCollapsed,
+  collapsed,
+}: {
+  name: string;
+  onOpenNavigation: () => void;
+  onToggleCollapsed: () => void;
+  collapsed: boolean;
+}) {
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-surface-raised px-6">
-      <div className="flex items-center gap-2 text-text-subtle">
-        <Search className="h-4 w-4" aria-hidden="true" />
-        <span className="text-sm">Buscar pedidos, productos, clientes… (Fase 3)</span>
-      </div>
-      <div className="flex items-center gap-2 text-sm text-text-muted">
+    <header className="sticky top-0 z-20 flex min-h-16 items-center gap-3 border-b border-border bg-surface-raised/95 px-4 backdrop-blur sm:px-6">
+      <button
+        type="button"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-border lg:hidden"
+        onClick={onOpenNavigation}
+        aria-label="Abrir navegación"
+      >
+        <Menu className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <button type="button" className="hidden h-10 w-10 place-items-center rounded-md border border-border lg:grid" onClick={onToggleCollapsed} aria-label={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"} title={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"}>
+        {collapsed ? <PanelLeftOpen className="h-5 w-5" aria-hidden="true" /> : <PanelLeftClose className="h-5 w-5" aria-hidden="true" />}
+      </button>
+      <form action="/admin/buscar" className="relative min-w-0 flex-1 lg:max-w-xl">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-subtle" aria-hidden="true" />
+        <label htmlFor="admin-global-search" className="sr-only">Buscar en el administrador</label>
+        <input
+          id="admin-global-search"
+          name="q"
+          type="search"
+          minLength={2}
+          placeholder="Buscar pedidos, productos o clientes"
+          className="h-10 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm text-text placeholder:text-text-subtle"
+        />
+      </form>
+      <div className="ml-auto flex shrink-0 items-center gap-2 text-sm text-text-muted">
         <UserCircle className="h-6 w-6" aria-hidden="true" />
-        <span>{name}</span>
-        <form action={logoutAction}>
-          <button type="submit" className="rounded-md p-2 hover:bg-surface-sunken" aria-label="Cerrar sesión">
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </form>
+        <span className="hidden max-w-36 truncate sm:inline">{name}</span>
+        <AdminLogoutButton />
       </div>
     </header>
   );

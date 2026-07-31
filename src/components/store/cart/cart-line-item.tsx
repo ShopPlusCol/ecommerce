@@ -7,6 +7,7 @@ import type { CartLine } from "@/domain/entities/cart";
 import { formatMoney, multiply } from "@/domain/value-objects/money";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { useCart } from "@/modules/cart/cart-context";
+import { isVideoUrl } from "@/lib/media-type";
 
 export function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate?: () => void }) {
   const { setLineQuantity, removeLine } = useCart();
@@ -19,7 +20,9 @@ export function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate?
         onClick={onNavigate}
         className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-surface-sunken"
       >
-        {line.imageUrl ? (
+        {line.imageUrl && isVideoUrl(line.imageUrl) ? (
+          <video src={line.imageUrl} muted playsInline preload="metadata" aria-label={line.name} className="h-full w-full object-cover" />
+        ) : line.imageUrl ? (
           <Image src={line.imageUrl} alt={line.name} fill sizes="80px" className="object-cover" />
         ) : null}
       </Link>

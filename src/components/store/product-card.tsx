@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FavoriteButton } from "@/components/store/favorite-button";
 import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
+import { isVideoUrl } from "@/lib/media-type";
 
 const BADGE_LABEL: Record<Product["badges"][number], string> = {
   nuevo: "Nuevo",
@@ -49,9 +50,18 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <div className="group flex flex-col">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-sunken">
+      <div className="relative aspect-square overflow-hidden rounded-2xl bg-surface-sunken">
         <Link href={`/productos/${product.slug}`} aria-label={product.name} tabIndex={-1}>
-          {cover ? (
+          {cover && isVideoUrl(cover.url) ? (
+            <video
+              src={cover.url}
+              muted
+              playsInline
+              preload="metadata"
+              aria-label={cover.altText}
+              className="h-full w-full object-cover transition-transform duration-slow ease-standard group-hover:scale-[1.04]"
+            />
+          ) : cover ? (
             <Image
               src={cover.url}
               alt={cover.altText}

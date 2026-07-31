@@ -1,43 +1,64 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { getRuntimeDb } from "@/infrastructure/db/client";
+import { mediaAssets } from "@/infrastructure/db/schema";
 import { getBrandSettings } from "@/modules/settings/brand";
-import { saveBrandSettingsAction } from "./actions";
-import { saveManualTransferSettingsAction } from "./actions";
 import { getManualTransferSettings } from "@/modules/settings/manual-transfer";
+import { getPrivacySettings } from "@/modules/settings/privacy";
+import { getShippingMessagesSettings } from "@/modules/settings/shipping-messages";
+import { getPaymentMethodsSettings } from "@/modules/settings/payment-methods";
+import { getSiteTextsSettings } from "@/modules/settings/site-texts";
+import { getCheckoutFieldsSettings } from "@/modules/settings/checkout-fields";
+import {
+  BrandSettingsForm,
+  ManualTransferSettingsForm,
+  PrivacySettingsForm,
+  ShippingMessagesSettingsForm,
+  PaymentMethodsSettingsForm,
+  SiteTextsSettingsForm,
+  CheckoutFieldsSettingsForm,
+} from "./config-forms";
 
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function AdminSettingsPage() {
-  const [brand, transfer] = await Promise.all([getBrandSettings(), getManualTransferSettings()]);
-  const fields = [
-    ["name", "Nombre visible"], ["tagline", "Tagline"], ["description", "Descripción"],
-    ["logoUrl", "URL logo principal"], ["mobileLogoUrl", "URL logo móvil"],
-    ["footerLogoUrl", "URL logo footer"], ["faviconUrl", "URL favicon"],
-    ["appleTouchIconUrl", "URL Apple Touch Icon"], ["openGraphImageUrl", "URL imagen Open Graph"],
-    ["altText", "Texto alternativo"], ["email", "Correo"], ["whatsapp", "WhatsApp"],
-    ["instagram", "Instagram"], ["facebook", "Facebook"], ["tiktok", "TikTok"],
-  ] as const;
+  const [brand, transfer, privacy, shippingMessages, paymentMethods, siteTexts, checkoutFields, media] = await Promise.all([
+    getBrandSettings(),
+    getManualTransferSettings(),
+    getPrivacySettings(),
+    getShippingMessagesSettings(),
+    getPaymentMethodsSettings(),
+    getSiteTextsSettings(),
+    getCheckoutFieldsSettings(),
+    (await getRuntimeDb()).select().from(mediaAssets),
+  ]);
+  const assets = media.map((asset) => ({ url: asset.url, label: asset.altText || asset.storageKey }));
   return (
     <>
-      <AdminPageHeader title="Configuración" description="Identidad y canales públicos persistidos." />
-      <form action={saveBrandSettingsAction} className="grid max-w-3xl gap-4 rounded-lg border border-border bg-surface-raised p-6 sm:grid-cols-2">
-        <label className="text-sm font-medium">Modo de marca
-          <select name="mode" defaultValue={brand.mode} className="mt-1 w-full rounded-md border border-border bg-surface p-2">
-            <option value="text">Texto</option><option value="image">Imagen</option><option value="image_text">Imagen y texto</option>
-          </select>
-        </label>
-        {fields.map(([name, label]) => (
-          <label key={name} className="text-sm font-medium">{label}
-            <input name={name} defaultValue={brand[name] ?? ""} className="mt-1 w-full rounded-md border border-border bg-surface p-2" />
-          </label>
-        ))}
-        <button className="rounded-md bg-brand px-4 py-2 font-semibold text-white sm:col-span-2">Guardar configuración</button>
-      </form>
-      <form action={saveManualTransferSettingsAction} className="mt-6 grid max-w-3xl gap-4 rounded-lg border border-border bg-surface-raised p-6 sm:grid-cols-2">
-        <h2 className="font-semibold sm:col-span-2">Transferencia manual</h2>
-        {([["bankName", "Banco"], ["accountType", "Tipo de cuenta"], ["accountNumber", "Número"], ["accountHolder", "Titular"], ["qrUrl", "URL del QR"], ["instructions", "Instrucciones"]] as const).map(([name, label]) => <label key={name} className="text-sm font-medium">{label}<input name={name} defaultValue={transfer[name] ?? ""} className="mt-1 w-full rounded-md border border-border bg-surface p-2" /></label>)}
-        <button className="rounded-md bg-brand px-4 py-2 font-semibold text-white sm:col-span-2">Guardar transferencia</button>
-      </form>
+      <AdminPageHeader title="Configuración" description="Identidad, recursos visuales, pagos, privacidad y portabilidad organizados para operación diaria." />
+      <nav className="mb-5 flex flex-wrap gap-2" aria-label="Secciones de configuración">
+        <a href="#marca" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Marca</a>
+        <a href="#pagos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Transferencias</a>
+        <a href="#metodos-pago" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Métodos de pago</a>
+        <a href="#envios" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Envíos</a>
+        <a href="#textos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Textos del sitio</a>
+        <a href="#checkout" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Formulario de checkout</a>
+        <a href="#privacidad" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Privacidad</a>
+        <a href="#datos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Datos</a>
+      </nav>
+      <BrandSettingsForm brand={brand} assets={assets} />
+      <ManualTransferSettingsForm transfer={transfer} assets={assets} />
+      <PaymentMethodsSettingsForm paymentMethods={paymentMethods} />
+      <ShippingMessagesSettingsForm shippingMessages={shippingMessages} />
+      <SiteTextsSettingsForm siteTexts={siteTexts} />
+      <CheckoutFieldsSettingsForm fields={checkoutFields} />
+      <PrivacySettingsForm privacy={privacy} />
+      <section id="datos" className="mt-6 max-w-5xl rounded-xl border border-border bg-surface-raised p-6">
+        <h2 className="text-lg font-semibold">Portabilidad de datos</h2>
+        <p className="mt-2 text-sm text-text-muted">Descarga una instantánea JSON del negocio. Excluye credenciales, contraseñas, sesiones, webhooks y archivos binarios.</p>
+        <Link href="/api/admin/exports/data" className="mt-4 inline-flex rounded-md border border-border px-4 py-2 font-semibold">Exportar datos de negocio</Link>
+      </section>
     </>
   );
 }

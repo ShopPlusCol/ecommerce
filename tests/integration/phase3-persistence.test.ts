@@ -24,6 +24,7 @@ beforeEach(() => {
   applyMigration("0002_gifted_ultragirl.sql");
   applyMigration("0003_thick_stark_industries.sql");
   applyMigration("0004_robust_silverclaw.sql");
+  applyMigration("0009_perpetual_anthem.sql");
   db = drizzle(sqlite, { schema });
 });
 afterEach(() => sqlite.close());

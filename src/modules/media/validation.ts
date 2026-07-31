@@ -1,5 +1,8 @@
-const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
-const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
+const ALLOWED_IMAGE = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
+const ALLOWED_VIDEO = new Set(["video/mp4", "video/webm"]);
+const ALLOWED = new Set([...ALLOWED_IMAGE, ...ALLOWED_VIDEO]);
 
 export type ValidatedMedia = {
   contentType: string;
@@ -40,9 +43,33 @@ function sanitizeSvg(bytes: Uint8Array) {
   return new TextEncoder().encode(source.replace(/<\?xml[\s\S]*?\?>/gi, ""));
 }
 
+/** Caja "ftyp" del contenedor ISO-BMFF (MP4/MOV) dentro de los primeros bytes del archivo. */
+function isMp4(bytes: Uint8Array): boolean {
+  if (bytes.length < 12) return false;
+  return new TextDecoder().decode(bytes.slice(4, 8)) === "ftyp";
+}
+
+/** Firma EBML de Matroska/WebM. */
+function isWebm(bytes: Uint8Array): boolean {
+  return bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
+}
+
 export function validateMedia(bytes: Uint8Array, declaredType: string): ValidatedMedia {
-  if (!ALLOWED.has(declaredType)) throw new Error("Formato no permitido. Usa PNG, JPEG, WebP o SVG.");
-  if (!bytes.length || bytes.length > MAX_MEDIA_BYTES) throw new Error("El archivo debe pesar entre 1 byte y 8 MB.");
+  if (!ALLOWED.has(declaredType)) throw new Error("Formato no permitido. Usa PNG, JPEG, WebP, SVG, MP4 o WebM.");
+  const isVideo = ALLOWED_VIDEO.has(declaredType);
+  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (!bytes.length || bytes.length > maxBytes) {
+    throw new Error(`El archivo debe pesar entre 1 byte y ${maxBytes / (1024 * 1024)} MB.`);
+  }
+
+  if (isVideo) {
+    const mp4 = isMp4(bytes);
+    const webm = isWebm(bytes);
+    if ((declaredType === "video/mp4" && !mp4) || (declaredType === "video/webm" && !webm)) {
+      throw new Error("El contenido real no coincide con el tipo de video declarado.");
+    }
+    return { contentType: declaredType, body: bytes, width: null, height: null };
+  }
 
   const png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
   const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;

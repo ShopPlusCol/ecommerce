@@ -28,7 +28,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/src/infrastructure/db ./src/infrastructure/db
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
+RUN mkdir -p /app/.data /app/public/uploads && chown -R nextjs:nodejs /app/.data /app/public/uploads
 USER nextjs
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["npm", "run", "start"]

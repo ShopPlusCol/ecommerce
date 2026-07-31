@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import { getLocalDb } from "./client";
 import {
@@ -345,21 +345,37 @@ async function seed() {
     .onConflictDoNothing();
 
   console.log("Sembrando zonas de envío de ejemplo...");
-  const [medellinZone, nationalZone] = await db
-    .insert(shippingZones)
-    .values([
-      { name: "Medellín", level: "city", department: "Antioquia", city: "Medellín" },
-      { name: "Resto de Colombia", level: "country", country: "CO" },
-    ])
-    .onConflictDoNothing()
-    .returning();
+  // `onConflictDoNothing()` no evita duplicados aquí: el id es aleatorio y
+  // nunca choca, así que busca primero por nombre/nivel (p. ej. el
+  // departamento "Antioquia" que ya precarga la migración 0016) antes de
+  // insertar, para que sembrar dos veces (o sembrar sobre una base ya
+  // migrada) no cree zonas repetidas.
+  async function findOrCreateZone(values: { name: string; level: "department" | "city" | "country"; parentZoneId?: string; country: string; status: "active" }) {
+    const [existing] = await db
+      .select()
+      .from(shippingZones)
+      .where(
+        and(
+          eq(shippingZones.name, values.name),
+          eq(shippingZones.level, values.level),
+          values.parentZoneId ? eq(shippingZones.parentZoneId, values.parentZoneId) : isNull(shippingZones.parentZoneId),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing;
+    const [created] = await db.insert(shippingZones).values(values).returning();
+    return created;
+  }
+
+  const antioquiaZone = await findOrCreateZone({ name: "Antioquia", level: "department", country: "CO", status: "active" });
+  const nationalZone = await findOrCreateZone({ name: "Resto de Colombia", level: "country", country: "CO", status: "active" });
+  const medellinZone = await findOrCreateZone({ name: "Medellín", level: "city", parentZoneId: antioquiaZone.id, country: "CO", status: "active" });
 
   if (medellinZone) {
     await db
       .insert(shippingRules)
       .values({
         zoneId: medellinZone.id,
-        name: "Medellín - contraentrega mismo día",
         fee: 8_000,
         cashOnDeliveryAllowed: true,
         sameDayAvailable: true,
@@ -367,7 +383,6 @@ async function seed() {
         estimatedBusinessDaysMin: 0,
         estimatedBusinessDaysMax: 1,
         customerMessage: "Entrega el mismo día pidiendo antes de las 2:00 p.m.",
-        status: "active",
       })
       .onConflictDoNothing();
   }
@@ -377,7 +392,6 @@ async function seed() {
       .insert(shippingRules)
       .values({
         zoneId: nationalZone.id,
-        name: "Nacional - envío anticipado",
         fee: 15_000,
         cashOnDeliveryAllowed: false,
         requiresAdvancePayment: true,
@@ -385,7 +399,6 @@ async function seed() {
         estimatedBusinessDaysMin: 2,
         estimatedBusinessDaysMax: 5,
         customerMessage: "El envío se paga por anticipado; el pedido queda como saldo contraentrega.",
-        status: "active",
       })
       .onConflictDoNothing();
   }

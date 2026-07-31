@@ -32,6 +32,15 @@ export type ProductMedia = {
   isVideoPoster: boolean;
 };
 
+/**
+ * Límite de venta cruzada (sección 11.2): máximo de unidades de este
+ * producto por cada unidad de `categoryId` presente en el carrito.
+ */
+export type PurchaseLimit = {
+  categoryId: string;
+  maxUnitsPerCategoryUnit: number;
+};
+
 export type Product = {
   id: string;
   slug: string;
@@ -50,4 +59,5 @@ export type Product = {
   allowBackorder: boolean;
   featured: boolean;
   publishedAt: string | null;
+  purchaseLimit: PurchaseLimit | null;
 };

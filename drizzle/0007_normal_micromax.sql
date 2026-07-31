@@ -1,0 +1,1 @@
+ALTER TABLE `shipping_rules` ADD `allowed_payment_methods` text DEFAULT '["mercado_pago","cash_on_delivery","shipping_advance_transfer","transfer_full"]' NOT NULL;

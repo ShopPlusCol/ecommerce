@@ -8,18 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { OrderFinancialSummary } from "@/components/store/checkout/order-financial-summary";
 import { formatMoney } from "@/domain/value-objects/money";
+import { DEFAULT_PAYMENT_METHOD_COPY, type PaymentMethodId, type PaymentMethodCopy } from "@/domain/services/payments";
 import { readLastOrder } from "@/modules/checkout/last-order";
 import type { DemoOrder } from "@/modules/checkout/order-types";
 import {
   uploadTransferProofAction,
   type UploadTransferProofState,
 } from "@/app/(store)/checkout/transfer-actions";
+import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
 
 const INITIAL_PROOF_STATE: UploadTransferProofState = { status: "idle" };
 
 export function OrderConfirmationClient() {
   const [order, setOrder] = React.useState<DemoOrder | null>(null);
   const [ready, setReady] = React.useState(false);
+  const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
   const [proofState, proofAction, proofPending] = useActionState(
     uploadTransferProofAction,
     INITIAL_PROOF_STATE,
@@ -31,6 +34,16 @@ export function OrderConfirmationClient() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación desde almacenamiento del navegador
     setOrder(readLastOrder());
     setReady(true);
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getPaymentMethodsCopyAction().then((copy) => {
+      if (!cancelled) setPaymentMethodsCopy(copy);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!ready) {
@@ -81,7 +94,7 @@ export function OrderConfirmationClient() {
             ))}
           </ul>
           <div className="border-t border-border pt-4">
-            <OrderFinancialSummary summary={order.summary} />
+            <OrderFinancialSummary summary={order.summary} paymentMethods={paymentMethodsCopy} />
           </div>
         </CardContent>
       </Card>

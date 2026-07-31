@@ -20,7 +20,7 @@ const NAV_LINKS = [
 const ICON_BUTTON =
   "flex h-control-md w-control-md items-center justify-center rounded-full text-text transition-colors duration-fast hover:bg-surface-sunken";
 
-export function SiteHeader({ brand }: { brand: BrandSettings }) {
+export function SiteHeader({ brand, announcement }: { brand: BrandSettings; announcement: string }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
@@ -44,7 +44,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
       {/* Barra de anuncio editorial */}
       <div className="bg-text text-text-inverted">
         <p className="mx-auto max-w-(--content-max-width) px-[var(--content-padding-x)] py-2 text-center text-[11px] font-medium uppercase tracking-[0.14em]">
-          Envío el mismo día en Medellín · Lentes cosméticos sin fórmula
+          {announcement}
         </p>
       </div>
 
@@ -58,7 +58,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
         <div className="flex items-center">
           <button
             type="button"
-            className={cn(ICON_BUTTON, "-ml-2 md:hidden")}
+            className={cn(ICON_BUTTON, "-ml-2 lg:hidden")}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
             aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
@@ -67,7 +67,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          <nav className="hidden items-center gap-7 md:flex" aria-label="Navegación principal">
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -130,7 +130,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
         <nav
           id="mobile-nav"
           aria-label="Navegación móvil"
-          className="animate-fade-in border-t border-border bg-surface px-[var(--content-padding-x)] py-3 md:hidden"
+          className="animate-fade-in border-t border-border bg-surface px-[var(--content-padding-x)] py-3 lg:hidden"
         >
           <ul className="flex flex-col gap-0.5">
             {[...NAV_LINKS, { href: "/buscar", label: "Buscar" }, { href: "/favoritos", label: "Favoritos" }].map(

@@ -8,6 +8,9 @@ export type WhatsAppCartContext = {
   totals: CartTotals;
   destination?: { city: string; neighborhood: string | null } | null;
   couponCode?: string | null;
+  /** Texto inicial y nota de cierre, editables desde Configuración → Textos del sitio. */
+  intro: string;
+  closingNote: string;
 };
 
 /**
@@ -17,7 +20,7 @@ export type WhatsAppCartContext = {
  */
 export function buildWhatsAppCartMessage(ctx: WhatsAppCartContext): string {
   const lines: string[] = [];
-  lines.push("Hola, quiero realizar este pedido:");
+  lines.push(ctx.intro);
   lines.push("");
 
   for (const line of ctx.lines) {
@@ -47,18 +50,13 @@ export function buildWhatsAppCartMessage(ctx: WhatsAppCartContext): string {
   }
 
   lines.push("");
-  lines.push("(Este es un resumen de mi carrito, no un pedido pagado.)");
+  lines.push(ctx.closingNote);
 
   return lines.join("\n");
 }
 
+/** `phoneOverride` debería ser siempre `brand.whatsapp` (editable desde Configuración); el número de `siteConfig` solo aplica como respaldo si aún no se cargó la marca. */
 export function buildWhatsAppUrl(message: string, phoneOverride?: string): string {
   const phone = phoneOverride ?? siteConfig.contact.whatsappNumber;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-}
-
-/** Mensaje simple para el botón flotante (sin carrito). */
-export function buildWhatsAppInquiryUrl(): string {
-  const message = `Hola, tengo una pregunta sobre los lentes de ${siteConfig.brandName}.`;
-  return buildWhatsAppUrl(message);
 }

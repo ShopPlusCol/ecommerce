@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5e8e4"/><stop offset="1" stop-color="#d9b9ae"/></linearGradient></defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <ellipse cx="320" cy="265" rx="155" ry="195" fill="#b97765"/>
+  <path d="M165 230C180 70 460 45 480 235c-40-110-95-145-160-145s-125 38-155 140Z" fill="#34221f"/>
+  <ellipse cx="260" cy="245" rx="48" ry="24" fill="#fff8f3"/><ellipse cx="380" cy="245" rx="48" ry="24" fill="#fff8f3"/>
+  <circle cx="260" cy="245" r="17" fill="#4d3025"/><circle cx="380" cy="245" r="17" fill="#4d3025"/>
+  <circle cx="260" cy="245" r="7" fill="#15100f"/><circle cx="380" cy="245" r="7" fill="#15100f"/>
+  <path d="M255 355q65 45 130 0" fill="none" stroke="#7c2e42" stroke-width="12" stroke-linecap="round"/>
+  <text x="24" y="450" fill="#5e443d" font-family="sans-serif" font-size="18">Imagen local de demostración · no corresponde a una persona real</text>
+</svg>

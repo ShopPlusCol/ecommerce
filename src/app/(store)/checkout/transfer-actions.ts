@@ -10,6 +10,7 @@ import type { UploadResult } from "@/application/ports/storage-provider";
 import { getStorageProvider } from "@/infrastructure/storage";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { manualTransferProofs, mediaAssets, orders, payments } from "@/infrastructure/db/schema";
+import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit";
 
 export type UploadTransferProofState = {
   status: "idle" | "success" | "error";
@@ -20,6 +21,12 @@ export async function uploadTransferProofAction(
   _state: UploadTransferProofState,
   formData: FormData,
 ): Promise<UploadTransferProofState> {
+  try {
+    await enforceRateLimit("transfer_proof", 5, 10 * 60);
+  } catch (error) {
+    if (error instanceof RateLimitError) return { status: "error", message: error.message };
+    throw error;
+  }
   const orderNumber = String(formData.get("orderNumber") ?? "");
   const token = String(formData.get("lookupToken") ?? "");
   const file = formData.get("proof");

@@ -1,71 +1,67 @@
 # ARCHITECTURE
 
-## Principio rector: puertos y adaptadores
+## Capas
 
-El dominio y la lógica de aplicación no importan APIs de un proveedor concreto (Cloudflare, Mercado Pago, Meta). Dependen de **interfaces** (`application/ports/*`); la infraestructura implementa esas interfaces para cada proveedor. Cloudflare es un destino de despliegue, no el diseño del dominio (sección 28.1 del prompt maestro).
-
-```
-src/
-  app/                    Next.js App Router
-    (store)/              Rutas públicas + layout con header/footer/WhatsApp
-    admin/                 Panel administrativo + layout con sidebar
-    api/                   Route handlers (vacío hasta Fase 2/3)
-    proxy.ts               Modo mantenimiento (convención "proxy" de Next 16, antes "middleware")
-  components/
-    ui/                    Sistema de diseño: Button, Card, Chip, Input, Section, Container...
-    store/                 Header, footer, tarjeta de producto, botón WhatsApp
-    admin/                 Sidebar, topbar, placeholders de módulo
-  domain/
-    entities/              Tipos del dominio (catálogo, pedido)
-    value-objects/         Money (entero COP, sin punto flotante)
-    errors/                 Errores de dominio tipados
-  application/
-    ports/                  Contratos: PaymentProvider, StorageProvider, AnalyticsProvider,
-                             NotificationProvider, ShippingRateResolver
-    use-cases/              (vacío hasta Fase 2: aquí vivirá la lógica de checkout, etc.)
-  infrastructure/
-    db/                     Drizzle: esquema, cliente (better-sqlite3 y D1), migrate/seed
-    cloudflare/             Acceso a bindings de Cloudflare (D1, R2) vía @opennextjs/cloudflare
-    storage/ payments/ analytics/ notifications/  (adaptadores concretos, se implementan
-                             en las fases donde cada integración se activa)
-  modules/                  Lógica de negocio por dominio (auth/password.ts implementado;
-                             el resto son carpetas de extensión para Fase 2/3)
-  lib/                      Utilidades transversales (cn, fuentes, config de marca, datos demo)
-tests/
-  unit/                     Vitest
-  e2e/                      Playwright
+```text
+Next App Router (store/admin/API)
+        │
+Application ports + domain services
+        │
+Adapters: Drizzle, storage, pagos, analítica, notificaciones, try-on
+        │
+SQLite/Node-Docker ───────────── D1/R2/Cloudflare Workers
 ```
 
-## Por qué esta base (sección 28.2)
+El dominio no importa Cloudflare, Mercado Pago ni Meta. `getRuntimeDb()`,
+`StorageProvider`, `PaymentProvider`, `AnalyticsProvider`,
+`NotificationProvider`, `ShippingRateResolver` y `TryOnRepository` contienen
+los límites portables.
 
-- **Next.js 16 (App Router)** — SSR/SSG combinados, Server Components para reducir JS público, Route Handlers tipados para la API.
-- **Tailwind CSS v4** — tokens de diseño vía `@theme` en CSS (ver `src/app/globals.css`), sin duplicar valores en JS.
-- **Drizzle ORM sobre SQLite** — mismo dialecto SQL en desarrollo (better-sqlite3) y en Cloudflare (D1); migraciones legibles y versionadas en `drizzle/`.
-- **@opennextjs/cloudflare** — adaptador oficial vigente para Next.js en Workers (reemplaza a `@cloudflare/next-on-pages`, que no soporta Next 16).
-- **@paralleldrive/cuid2** — IDs de texto colisión-resistentes, sin depender de autoincrementales ligados a un motor concreto.
+## Tienda y administrador
 
-## Portabilidad (sección 40)
+- `(store)` usa Server Components para datos y componentes cliente pequeños
+  para carrito, consentimiento, checkout y UI.
+- `/admin` vuelve a autenticar y autorizar en servidor por operación. No depende
+  de ocultar controles.
+- El modo mantenimiento vive en el layout público. Se retiró `proxy.ts` porque
+  OpenNext no admite el runtime Node de Proxy en Workers; el administrador y
+  APIs no quedan bloqueados.
+- Headers de seguridad se definen en `next.config.ts`; admin y API son
+  `no-store`.
 
-| Necesidad | Adaptador Cloudflare | Adaptador Node/Docker |
+## Simulador
+
+`TryOnLauncher` se carga en productos de lentes, pero
+`TryOnSimulator` y `@mediapipe/tasks-vision` son imports dinámicos. La foto se
+convierte en un object URL local, se analiza en el navegador y se dibuja en
+canvas. No hay endpoint de upload de fotos. Si el modelo no carga o no reconoce
+el rostro, se usa geometría manual ajustable. Las texturas sí son activos
+administrados, revisados y almacenados por el adaptador de medios.
+
+El bundle analysis de Next confirmó que los chunks de MediaPipe no pertenecen a
+la primera carga de `/productos/[slug]`.
+
+## Seguridad y observabilidad
+
+- Better Auth, RBAC, sesiones revocables y login con bloqueo/rate limit.
+- Rate limiting adicional guarda únicamente hash de IP, alcance, contador y
+  expiración.
+- Logs estructurados JSON sin secretos; `/api/health` expone solo salud mínima.
+- `/admin/estado` y `/api/admin/status` requieren permiso y muestran latencia,
+  revisión, runtime y presencia de configuración, nunca valores.
+- Web Vitals se reciben con esquema estricto y se registran como métricas
+  técnicas; no contienen foto ni biometría.
+
+## Portabilidad
+
+| Necesidad | Cloudflare | Node/Docker |
 | --- | --- | --- |
-| Base de datos | D1 (`drizzle-orm/d1`) | better-sqlite3 (`drizzle-orm/better-sqlite3`) — mismo esquema |
-| Medios | R2 (binding `MEDIA_BUCKET`, sección 23.4) | Disco local / cualquier S3-compatible |
-| Runtime | Workers (`wrangler.jsonc`) | `Dockerfile` (Node 22) |
+| SQL | D1 / `drizzle-orm/d1` | SQLite / `better-sqlite3` |
+| Medios | R2 bindings | `public/uploads` persistente |
+| Runtime | OpenNext Worker | Node 22 `next start` |
+| Health | `/api/health` | `/api/health` + Docker healthcheck |
+| Backup | D1 export/time travel | scripts SQLite + SHA-256 |
 
-El código de dominio y aplicación es idéntico en ambos destinos; solo cambia qué adaptador se inyecta en `infrastructure/`.
-
-## Estado de la proxy/middleware
-
-Next.js 16 renombró `middleware.ts` a `proxy.ts` (mismo comportamiento, función exportada `proxy` en vez de `middleware`). Este proyecto ya usa la convención nueva desde el inicio para evitar deuda técnica.
-
-## Decisiones de modelado no cubiertas literalmente por el prompt
-
-Ver [`DECISIONS.md`](./DECISIONS.md).
-# Implementación de Fase 3
-
-El composition root usa adaptadores Drizzle para catálogo, promociones, páginas
-y envíos. `getRuntimeDb()` selecciona SQLite en Node/Docker y D1 en Workers.
-Better Auth persiste usuarios/sesiones/cuentas sobre el mismo esquema y el DAL
-de autorización resuelve roles/permisos por solicitud. Medios, pagos,
-notificaciones y analítica permanecen detrás de puertos; los adaptadores local,
-R2, transferencia manual y Mercado Pago no contaminan el dominio.
+El dialecto actual es SQLite. Una futura migración a PostgreSQL exige un nuevo
+cliente/adaptador y conversión de migraciones, pero no reescribir servicios del
+dominio.

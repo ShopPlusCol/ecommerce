@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { Product } from "@/domain/entities/catalog";
 import { formatMoney } from "@/domain/value-objects/money";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
+import { isVideoUrl } from "@/lib/media-type";
 
 /** Accesorios sugeridos / frecuentemente comprados juntos (sección 11.2). */
 export function CartUpsells({ products, title = "Agrega el cuidado de tus lentes" }: { products: Product[]; title?: string }) {
@@ -18,7 +19,9 @@ export function CartUpsells({ products, title = "Agrega el cuidado de tus lentes
             className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised p-2"
           >
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-surface-sunken">
-              {product.media[0] ? (
+              {product.media[0] && isVideoUrl(product.media[0].url) ? (
+                <video src={product.media[0].url} muted playsInline preload="metadata" aria-label={product.name} className="h-full w-full object-cover" />
+              ) : product.media[0] ? (
                 <Image src={product.media[0].url} alt={product.name} fill sizes="56px" className="object-cover" />
               ) : null}
             </div>

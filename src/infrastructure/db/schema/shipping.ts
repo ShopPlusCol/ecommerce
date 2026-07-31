@@ -1,11 +1,13 @@
-import { integer, sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, index, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { idColumn, timestampColumns } from "./_helpers";
 import { orders } from "./orders";
 
 /**
- * Sección 17: jerarquía país › departamento › ciudad › barrio › excepción.
- * La regla más específica que aplique gana; si ninguna aplica, el checkout
- * no debe inventar tarifa (sección 17.1).
+ * Árbol real de zonas: Departamento (raíz) › Ciudad o municipio › Barrio,
+ * más un nivel "country" sin padre como respaldo nacional (sección 17).
+ * `parentZoneId` es la única fuente de jerarquía; el `name` de cada zona es
+ * su propio nombre (no hay campos de coincidencia de texto contra el
+ * destino en niveles separados).
  */
 export const shippingZones = sqliteTable(
   "shipping_zones",
@@ -13,19 +15,24 @@ export const shippingZones = sqliteTable(
     id: idColumn(),
     name: text("name").notNull(),
     level: text("level", { enum: ["country", "department", "city", "neighborhood"] }).notNull(),
+    parentZoneId: text("parent_zone_id").references((): AnySQLiteColumn => shippingZones.id, { onDelete: "cascade" }),
     country: text("country").notNull().default("CO"),
-    department: text("department"),
-    city: text("city"),
-    neighborhood: text("neighborhood"),
     status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
     ...timestampColumns,
   },
   (table) => [
     index("shipping_zones_level_idx").on(table.level),
-    index("shipping_zones_city_idx").on(table.city),
+    index("shipping_zones_parent_idx").on(table.parentZoneId),
   ],
 );
 
+/**
+ * Configuración propia de una zona (a lo sumo una fila por zona). Cada
+ * campo es opcional: `null` significa "hereda de la zona padre más
+ * cercana que tenga un valor propio"; un valor no nulo es la
+ * personalización de esa zona. Sin fila = hereda todo. Ver
+ * `resolveShippingQuote` para el recorrido del árbol.
+ */
 export const shippingRules = sqliteTable(
   "shipping_rules",
   {
@@ -33,30 +40,58 @@ export const shippingRules = sqliteTable(
     zoneId: text("zone_id")
       .notNull()
       .references(() => shippingZones.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    fee: integer("fee").notNull().default(0),
+    fee: integer("fee"),
     freeShippingThreshold: integer("free_shipping_threshold"),
-    cashOnDeliveryAllowed: integer("cash_on_delivery_allowed", { mode: "boolean" }).notNull().default(false),
-    requiresAdvancePayment: integer("requires_advance_payment", { mode: "boolean" }).notNull().default(false),
+    coverage: text("coverage", { enum: ["available", "unavailable"] }),
+    cashOnDeliveryAllowed: integer("cash_on_delivery_allowed", { mode: "boolean" }),
+    requiresAdvancePayment: integer("requires_advance_payment", { mode: "boolean" }),
     advancePercentage: integer("advance_percentage"),
-    sameDayAvailable: integer("same_day_available", { mode: "boolean" }).notNull().default(false),
+    sameDayAvailable: integer("same_day_available", { mode: "boolean" }),
     sameDayCutoffHour: integer("same_day_cutoff_hour"),
-    estimatedBusinessDaysMin: integer("estimated_business_days_min").notNull().default(1),
-    estimatedBusinessDaysMax: integer("estimated_business_days_max").notNull().default(3),
-    operatingDays: text("operating_days", { mode: "json" }).$type<number[]>(),
-    surcharge: integer("surcharge").notNull().default(0),
-    minOrderAmount: integer("min_order_amount"),
-    maxOrderAmount: integer("max_order_amount"),
-    excludedProductIds: text("excluded_product_ids", { mode: "json" }).$type<string[]>(),
+    estimatedBusinessDaysMin: integer("estimated_business_days_min"),
+    estimatedBusinessDaysMax: integer("estimated_business_days_max"),
+    allowedPaymentMethods: text("allowed_payment_methods", { mode: "json" }).$type<
+      Array<"mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full">
+    >(),
     customerMessage: text("customer_message"),
-    internalInstructions: text("internal_instructions"),
-    priority: integer("priority").notNull().default(0),
-    status: text("status", { enum: ["draft", "active", "inactive"] }).notNull().default("draft"),
-    startsAt: integer("starts_at", { mode: "timestamp_ms" }),
-    endsAt: integer("ends_at", { mode: "timestamp_ms" }),
     ...timestampColumns,
   },
-  (table) => [index("shipping_rules_zone_idx").on(table.zoneId)],
+  (table) => [uniqueIndex("shipping_rules_zone_id_unique").on(table.zoneId)],
+);
+
+/**
+ * Configuración compartida de los dos grupos configurables de barrios
+ * ("Sin cobertura" y "Precio especial"; "Con cobertura" no tiene fila
+ * porque siempre hereda de la ciudad), por ciudad. El panel usa esta tabla
+ * únicamente para (a) precargar el formulario del grupo y (b) al guardar,
+ * escribir en bloque estos mismos valores sobre la fila `shipping_rules`
+ * de cada barrio miembro — `resolveShippingQuote` sigue leyendo solo
+ * `shipping_rules` por zona, sin ningún cambio.
+ */
+export const shippingNeighborhoodGroupSettings = sqliteTable(
+  "shipping_neighborhood_group_settings",
+  {
+    id: idColumn(),
+    cityZoneId: text("city_zone_id")
+      .notNull()
+      .references(() => shippingZones.id, { onDelete: "cascade" }),
+    groupKind: text("group_kind", { enum: ["no_coverage", "special_price"] }).notNull(),
+    fee: integer("fee"),
+    freeShippingThreshold: integer("free_shipping_threshold"),
+    cashOnDeliveryAllowed: integer("cash_on_delivery_allowed", { mode: "boolean" }),
+    requiresAdvancePayment: integer("requires_advance_payment", { mode: "boolean" }),
+    advancePercentage: integer("advance_percentage"),
+    sameDayAvailable: integer("same_day_available", { mode: "boolean" }),
+    sameDayCutoffHour: integer("same_day_cutoff_hour"),
+    estimatedBusinessDaysMin: integer("estimated_business_days_min"),
+    estimatedBusinessDaysMax: integer("estimated_business_days_max"),
+    allowedPaymentMethods: text("allowed_payment_methods", { mode: "json" }).$type<
+      Array<"mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full">
+    >(),
+    customerMessage: text("customer_message"),
+    ...timestampColumns,
+  },
+  (table) => [uniqueIndex("shipping_neighborhood_group_settings_city_kind_idx").on(table.cityZoneId, table.groupKind)],
 );
 
 export const shipments = sqliteTable("shipments", {

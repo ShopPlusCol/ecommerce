@@ -6,6 +6,8 @@ import { FavoritesProvider } from "@/modules/favorites/favorites-context";
 import { AnalyticsProvider } from "@/modules/analytics/analytics-context";
 import { CartDrawer } from "@/components/store/cart/cart-drawer";
 import { PageViewTracker } from "@/components/store/page-view-tracker";
+import { UtmAttribution } from "@/components/store/utm-attribution";
+import { WebVitalsReporter } from "@/components/store/web-vitals-reporter";
 
 /**
  * Raíz de proveedores de la tienda pública. Recibe las reglas de recompensa
@@ -26,6 +28,8 @@ export function StoreProviders({
           {children}
           <CartDrawer />
           <PageViewTracker />
+          <UtmAttribution />
+          <WebVitalsReporter />
         </CartProvider>
       </FavoritesProvider>
     </AnalyticsProvider>

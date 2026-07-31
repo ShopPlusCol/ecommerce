@@ -1,0 +1,1 @@
+ALTER TABLE `reward_rules` ADD `eligible_zone_ids` text;

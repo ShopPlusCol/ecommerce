@@ -2,44 +2,237 @@
 
 ## Acceso
 
-1. Ejecuta `npm run db:migrate` y `npm run db:seed`.
-2. Guarda la contraseña que el seed imprime únicamente al crear la credencial.
-3. Abre `/acceso-admin`. `/admin` redirige al login sin cookie y vuelve a
-   validar sesión/estado del usuario contra la base de datos.
+```bash
+npm run db:migrate
+npm run db:seed
+```
 
-El owner local usa el correo `ADMIN_OWNER_EMAIL` (por defecto
-`owner@shoppluscol.local`). Define `ADMIN_OWNER_PASSWORD` antes del primer seed
-si no quieres una contraseña aleatoria. Nunca la publiques ni la versionas.
-
-## Roles
-
-| Rol | Alcance |
-| --- | --- |
-| Propietario | Acceso total |
-| Administrador | Todo excepto eliminar propietarios |
-| Operaciones | Pedidos, inventario, clientes, envíos y pagos |
-| Editor de contenido | Catálogo, promociones, contenido y medios |
-| Analista de solo lectura | Lectura y exportación |
-
-Todas las mutaciones vuelven a autorizar por recurso/acción en el servidor; no
-se confía en ocultar botones.
+El seed muestra la contraseña solo al crear la credencial. El correo proviene
+de `ADMIN_OWNER_EMAIL`. Guarda ambos en un gestor de contraseñas; no en Git,
+capturas, documentación ni chats compartidos. Abre `/acceso-admin`.
 
 ## Operación
 
-- **Productos:** crear, cambiar estado, importar/exportar CSV y consultar datos
-  reales. El CSV requiere `sku,name,slug,price,status`.
-- **Inventario:** el ajuste exige cantidad y motivo; se rechaza si invade stock
-  reservado. Checkout crea reservas temporales auditables.
-- **Pedidos:** estados de pedido, pago y envío son independientes. Cada cambio
-  de estado crea línea de tiempo y auditoría.
-- **Configuración:** identidad de marca, logos por URL de `media_assets`,
-  favicon, Open Graph, contacto y redes. Nunca uses base64.
-- **Integraciones:** solo muestra presencia/estado de configuración, nunca
-  tokens. No declares pruebas externas exitosas sin credenciales.
-- **Auditoría:** conserva actor, acción, entidad, antes/después y motivo.
+- Productos: alta, estado, CSV, galería con carga directa y metadatos. La
+  edición individual permite subir, seleccionar, ordenar y retirar imágenes;
+  la primera es la portada visible en la tienda.
+- Edición masiva: abre `/admin/productos/edicion-masiva`. La tabla es
+  compacta (encabezado y columna de selección fijos): marca los productos a
+  editar, cambia nombre, SKU, estado, precios, familia de color o alerta de
+  stock directamente en la fila, y usa el botón “Más” junto a cada producto
+  para abrir slug, descripción corta, categorías e imagen. El guardado se
+  envía por bloques técnicos para no imponer un límite funcional.
+- Simulador: sube PNG/WebP cuadrado de hasta 2 MB, ajusta apariencia, guarda y
+  aprueba solo tras revisar el producto real. Rechazar/pendiente no se publica.
+- Inventario: todo ajuste requiere motivo y no puede invadir reservas.
+- Pedidos/pagos: pedido y pago tienen estados separados. Un comprobante queda
+  pendiente hasta revisión explícita; cargarlo nunca aprueba el pago.
+- Configuración: identidad, transferencia, métodos de pago, mensajes de
+  envío, textos del sitio, privacidad, retención y exportación. Los logos,
+  iconos, Open Graph y QR pueden seleccionarse de Multimedia o cargarse
+  directamente desde el equipo.
+  - **Métodos de pago:** nombre y descripción de cada uno de los 4 métodos
+    (Mercado Pago, contraentrega, anticipo del envío, transferencia total),
+    visibles en el checkout y la confirmación de pedido. No cambia cuáles
+    están disponibles ni cómo se cobran, solo cómo se llaman.
+  - **Textos del sitio:** banner del encabezado, plantillas de mensaje de
+    WhatsApp (consulta general y carrito), aviso de pago del checkout, y
+    los tres textos de la página `/envíos`.
+- Estado del sistema: confirma DB/runtime/revisión y si una integración está
+  configurada, sin mostrar secretos.
+- Auditoría: revisa actor, acción, entidad y cambios antes/después.
 
-## Recuperación y bloqueo
+## Privacidad
 
-Tras cinco fallos se bloquea la identidad durante 15 minutos; Better Auth añade
-rate limit persistente. La recuperación siempre responde de forma genérica. Sin
-SMTP configurado no se envía correo y el panel lo comunica honestamente.
+En Configuración completa responsable, datos legales, correo, versión y
+retención. No marques “Revisada” hasta que el negocio/asesor competente la
+valide. La foto del simulador no aparece en medios ni exportaciones porque
+nunca llega al servidor.
+
+## Exportación y recuperación
+
+- Panel: Configuración → Exportar datos de negocio.
+- CLI: `npm run db:export`.
+- Backup: `npm run db:backup`.
+- Restauración: sigue [RECOVERY.md](./RECOVERY.md); nunca restaures con la
+  aplicación escribiendo sobre la misma base.
+
+### Restablecer ventas
+
+Solo el propietario ve las zonas de limpieza en Pedidos y Clientes. Antes de
+usarlas crea un backup. Pedidos elimina sus pagos, envíos e historial y libera
+reservas; Clientes elimina perfiles, direcciones y consentimientos, pero los
+pedidos que se conserven mantienen su instantánea histórica. Ambas acciones
+exigen escribir una frase completa, marcar el reconocimiento y aceptar una
+segunda confirmación. La recuperación posterior solo es posible desde backup.
+
+## Seguridad
+
+Tras cinco intentos fallidos se bloquea la identidad temporalmente. Cerrar
+sesión usa el endpoint de Better Auth y se verifica al volver a `/admin`.
+La recuperación responde de forma genérica y requiere SMTP para enviar correo.
+
+## Integraciones pendientes
+
+Mercado Pago sandbox, Meta Test Events, SMTP y R2 requieren credenciales o
+recursos externos. El panel dice “Pendiente” hasta una validación real. No
+habilites modo producción ni Meta desde el panel por anticipado.
+# Operación añadida en Fase 4.1
+
+- **Inventario:** filtra existencias y movimientos, exporta CSV, ajusta con motivo y libera reservas desde `/admin/inventario`. El servidor impide quedar por debajo de lo reservado.
+- **Envíos:** árbol real Departamento → Ciudad/Municipio → Barrio con herencia de configuración por campo; ver la sección "Envíos y zonas: árbol Departamento → Ciudad → Barrio" más abajo para el detalle completo (reemplaza la descripción anterior de "grupos de barrios").
+- **Editor:** crea la página en `/admin/editor`, agrega bloques, guarda el borrador, abre la vista previa y publica. Restaurar siempre crea otra versión. El contenido de cada bloque se edita con campos guiados (texto, número, casilla, listas de beneficios/testimonios/preguntas); “Editar como JSON avanzado” sigue disponible para casos puntuales.
+- **Analítica:** selecciona fechas en `/admin/analitica`; “Negocio” usa pedidos reales y “Eventos técnicos” diagnostica instrumentación.
+- **Usuarios:** crea una cuenta con contraseña temporal, asigna un rol, revoca sesiones o cambia la contraseña. No puede suspenderse al último propietario activo.
+- **Simulador:** calibra sobre la imagen local, guarda como borrador y selecciona “Aprobar y activar” solo tras revisar el resultado.
+- **Integraciones y estado:** los diagnósticos comprueban presencia local de variables; nunca demuestran conectividad externa ni muestran secretos.
+- **Configuración:** logos, favicon, Apple Touch Icon, Open Graph y QR se seleccionan desde Multimedia, con previsualización y eliminación.
+- **Imágenes:** productos, categorías, promociones, pop-ups y configuración visual admiten carga directa desde el equipo mediante el mismo adaptador local/R2 y conservan la validación de formato.
+- **Lenguaje operativo:** las acciones genéricas fueron reemplazadas por instrucciones concretas como “Añadir una nueva categoría” o “Añadir una nueva regla de envío”.
+- **Pedidos, productos y pagos:** las tres pantallas tienen filtro por texto y estado, miniatura de producto donde aplica, y badges de estado traducidos; ya no dependen de recordar el enum interno.
+
+# Operación añadida en Ronda 2 (2026-07-30)
+
+- **Multimedia (`/admin/medios`):** puedes seleccionar varios archivos a la
+  vez; cada uno se sube apenas lo eliges, conserva un nombre reconocible
+  (basado en el nombre original) y se muestra como miniatura cuadrada.
+  Eliminar un archivo ya no exige escribir un motivo.
+- **Imágenes en productos y pop-ups:** en la ficha de producto (individual y
+  edición masiva) y en pop-ups, seleccionar un archivo lo sube de inmediato;
+  no hace falta un botón "Subir" separado.
+- **Recompensas — envío gratis por zona (`/admin/recompensas`):** el campo
+  "Ciudades/departamentos donde aplica" limita una recompensa de tipo
+  "Envío gratis" a las zonas que elijas (barrios no incluidos, solo ciudad/
+  departamento/país); si lo dejas vacío, aplica en todo el país. El cliente
+  solo ve el envío gratis cuando su dirección coincide con una zona
+  elegida, y el pedido se revalida en el servidor antes de confirmarse.
+- **Límite de compra por categoría (`/admin/productos`):** en el detalle de
+  producto y en edición masiva puedes fijar "Categoría límite" y "Máximo por
+  unidad de categoría"; por ejemplo, si el cliente tiene 1 unidad de esa
+  categoría en el carrito, este producto no pasará de esa cantidad. El
+  carrito ajusta la cantidad automáticamente al llegar al tope.
+- **Inventario (`/admin/inventario`):** además del ajuste individual, hay un
+  bloque de ajuste masivo: escribe el ajuste (+/−) y el motivo en cada fila
+  y solo se guardan las filas con ambos campos completos.
+- **Pop-ups (`/admin/popups`):** ahora sí se muestran en la tienda. Configura
+  imagen, texto, cupón opcional, rutas donde aparece/no aparece, frecuencia
+  (una vez por sesión, una vez por período o siempre) y el disparador
+  (retraso en segundos, porcentaje de scroll o intención de salida).
+- **Grupos de barrios (`/admin/envios`):** retirado en la Ronda 3 — ver la
+  sección "Envíos y zonas: árbol Departamento → Ciudad → Barrio" más abajo.
+- **Editor visual (`/admin/editor/[id]`):** cada bloque tiene un asa de
+  arrastre (⠿) junto al título; arrástralo sobre otro bloque para
+  reordenar. Los botones ↑/↓ siguen disponibles como alternativa sin mouse.
+- **Configuración (`/admin/configuracion`):** guardar marca, transferencia
+  manual o privacidad ahora muestra un mensaje de confirmación visible bajo
+  el botón; antes guardaba en silencio.
+- **Zonas de peligro (`/admin/pedidos`, `/admin/clientes`):** "Limpiar
+  todos los pedidos/clientes" está ahora colapsado por defecto; haz clic en
+  el título para expandirlo antes de usarlo.
+
+# Envíos y zonas: árbol Departamento → Ciudad → Barrio (Ronda 3, 2026-07-30)
+
+`/admin/envios` reemplaza por completo el modelo anterior de "zonas geográficas
++ reglas + grupos de barrios" (texto suelto comparado por igualdad) por un
+árbol real con navegación progresiva:
+
+- **Nivel 1 — Departamentos (`/admin/envios`):** tarjetas compactas con
+  estado, cobertura, tarifa propia o "heredada de X", contraentrega, mismo
+  día y cantidad de ciudades. El formulario "Agregar departamento" crea uno
+  nuevo; el buscador global encuentra cualquier zona por nombre y enlaza
+  directo a su nivel. Al final de la lista, la tarjeta **"Resto de
+  Colombia"** es el respaldo nacional: se usa solo cuando el departamento del
+  pedido no tiene una zona configurada. No se puede eliminar.
+- **Nivel 2 — Ciudades (`/admin/envios/[departamento]`):** breadcrumb,
+  tarjetas de sus ciudades/municipios y alta rápida de una nueva ciudad
+  (individual o pegando varias a la vez). Desde la Ronda 4 esta pantalla ya
+  no repite la configuración propia del departamento arriba — esa se edita
+  desde su tarjeta "Configurar" en `/admin/envios`, un nivel antes.
+- **Nivel 3 — Barrios (`/admin/envios/[departamento]/[ciudad]`):**
+  breadcrumb, alta de un barrio individual o **pegar varios a la vez**
+  (separados por coma o uno por línea). Desde la Ronda 4 tampoco repite la
+  configuración propia de la ciudad arriba (se edita igual, un nivel
+  antes) y los barrios se organizan como pastillas por grupo — ver la
+  sección "Pastillas de barrios" más abajo.
+- **Herencia por campo:** cada zona expone un control **Heredado /
+  Personalizado** por cada campo (tarifa, envío gratis desde, cobertura,
+  contraentrega, anticipo, mismo día + hora límite, días hábiles, métodos de
+  pago, mensaje al cliente). En modo "Heredado" se muestra en gris el valor
+  efectivo y de qué zona ancestro viene ("Heredado de Antioquia: $13.900");
+  en modo "Personalizado" se habilita el campo real. Un barrio sin tarifa
+  propia usa la de su ciudad; una ciudad sin tarifa propia usa la de su
+  departamento; cambiar la tarifa del departamento se refleja de inmediato en
+  cualquier hijo que herede, sin tocarlo uno por uno.
+- **Mismo día con hora límite real:** si "Entrega el mismo día" está activo,
+  el campo de hora límite (hora de Bogotá) decide en vivo, tanto en el
+  checkout como en el simulador admin, si "hoy" sigue disponible o si ya hay
+  que usar los días hábiles configurados como respaldo.
+- **Cobertura:** una zona con cobertura "Sin cobertura" (propia o heredada)
+  nunca cotiza en el checkout, aunque siga apareciendo en los selectores para
+  que el cliente pueda elegir su barrio real y reciba el mensaje claro de que
+  ahí no se hace envío, en vez de que la opción desaparezca sin explicación.
+- **Estado activo/inactivo en cascada:** si un departamento o ciudad queda
+  "Inactiva", ningún hijo suyo es una opción válida en el checkout aunque el
+  hijo mismo diga "Activa" — el formulario de cada zona avisa cuando esto
+  pasa ("Bloqueada: ancestro inactivo").
+- **Eliminar una zona** borra también todas sus zonas hijas (con
+  confirmación del navegador antes de continuar); no hay forma de dejar
+  barrios "huérfanos".
+- **Checkout (`/checkout`):** Departamento muestra los 32 departamentos de
+  Colombia + Bogotá D.C., que desde la Ronda 4 son zonas reales
+  precargadas en `/admin/envios` (ver más abajo) — no una lista aparte del
+  checkout. Ciudad/Municipio y Barrio solo aparecen si el nivel superior
+  elegido tiene hijos configurados y activos; si no, el checkout no los
+  pide y usa directamente la configuración del nivel superior. Los tres
+  selectores tienen buscador. La tarifa, cobertura, contraentrega, mismo
+  día y tiempo de entrega que ve el cliente son exactamente los que
+  calcula `resolveShippingQuote` — el mismo motor que usa el simulador
+  admin.
+- **Simulador admin (`/admin/envios`, arriba de todo):** muestra si la
+  tarifa aplicada es propia de la zona resuelta o heredada de un ancestro, y
+  si el mismo día aplica a la hora actual.
+
+# Envíos y zonas: pastillas por grupo y ajustes (Ronda 4, 2026-07-31)
+
+- **33 departamentos precargados:** una migración crea los 32 departamentos
+  de Colombia + Bogotá D.C. como zonas reales en `/admin/envios` desde el
+  primer arranque (si "Antioquia" ya existía, no la duplica). Cada uno se
+  configura individualmente igual que cualquier otra zona; el checkout ya
+  no depende de una lista estática aparte.
+- **Pastillas de barrios (`/admin/envios/[departamento]/[ciudad]`):**
+  reemplaza la lista de tarjetas de barrios de la Ronda 3 por un tablero de
+  3 columnas fijas — **Con cobertura**, **Sin cobertura** y **Precio
+  especial**. "Con cobertura" siempre hereda de la ciudad y no tiene
+  configuración propia; los otros dos grupos tienen **una sola
+  configuración compartida** (tarifa, envío gratis desde, contraentrega,
+  anticipo, mismo día, días hábiles, métodos de pago, mensaje al cliente)
+  que se aplica de inmediato a **todos** los barrios que estén en ese grupo
+  al momento de guardar, no solo a los que se muevan después.
+  - Mueve una pastilla arrastrándola a otra columna, o con el selector
+    accesible de cada una (alternativa sin arrastrar).
+  - Marca la casilla de varias pastillas (o usa "Todos" por columna /
+    "Seleccionar todo" arriba) para moverlas o eliminarlas juntas de una
+    vez, incluso combinando pastillas de columnas distintas.
+  - Un barrio nuevo siempre nace en "Con cobertura". Mover uno a "Precio
+    especial" exige haber configurado antes la tarifa de ese grupo; "Sin
+    cobertura" no lo exige.
+- **Sin repetir configuración del nivel padre:** entrar a las ciudades de
+  un departamento, o a los barrios de una ciudad, ya no muestra arriba la
+  configuración propia del nivel anterior — esa se sigue editando igual,
+  desde la tarjeta "Configurar" de la pantalla anterior.
+- **Alta masiva por coma en todos los niveles:** pegar varios nombres
+  separados por coma (o uno por línea) ya no es solo para barrios —
+  también está disponible al agregar departamentos (`/admin/envios`) y
+  ciudades/municipios (`/admin/envios/[departamento]`).
+- **Edición rápida masiva:** en los listados de departamentos y de
+  ciudades/municipios, una tabla plegable "Edición rápida masiva" permite
+  fijar tarifa, cobertura y días hábiles mín/máx de varias filas con un
+  solo guardado. Una celda vacía no toca ese campo en esa fila — para
+  volver un campo a "heredado" se sigue usando el formulario individual
+  "Configurar".
+- **Mensaje de "sin cobertura" personalizable:** cuando un destino no
+  tiene tarifa, el checkout muestra el mensaje propio de la zona más
+  específica si tiene uno (heredable, igual que el resto de la
+  configuración), o si no, el mensaje global editable en
+  **Configuración → Envíos**, con `{lugar}` sustituido por el nombre real
+  del destino.

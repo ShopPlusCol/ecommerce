@@ -8,7 +8,7 @@ import { money } from "@/domain/value-objects/money";
 import type { Cart, CartLine } from "@/domain/entities/cart";
 import { validateCoupon } from "@/domain/services/coupons";
 import { evaluateRewards } from "@/domain/services/rewards";
-import { computeSubtotal, computeOrderSummary, totalUnits } from "@/domain/services/cart-pricing";
+import { computeSubtotal, computeOrderSummary, maxAllowedByPurchaseLimit, totalUnits } from "@/domain/services/cart-pricing";
 import { availablePaymentMethods } from "@/domain/services/payments";
 import { productToCartLine } from "@/modules/cart/cart-line";
 import { catalogRepository, promotionsRepository, shippingResolver } from "@/lib/container";
@@ -34,11 +34,20 @@ import {
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { releaseExpiredReservations } from "@/modules/inventory/reservations";
 import { getManualTransferSettings } from "@/modules/settings/manual-transfer";
+import { getShippingMessagesSettings } from "@/modules/settings/shipping-messages";
+import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit";
+import { resolveDestinationLabel, resolveRejectionMessage } from "@/domain/services/shipping";
+import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
+import { getBrandSettings } from "@/modules/settings/brand";
+import { ConfiguredNotificationProvider } from "@/infrastructure/notifications/configured-notification-provider";
+import { buildOrderConfirmationEmail } from "@/modules/notifications/order-confirmation-email";
 
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
   department: z.string().min(1),
-  city: z.string().min(1),
+  // Vacío cuando el departamento no tiene ciudades configuradas (sección
+  // 17.3): el checkout no fuerza a elegir una ciudad que no existe.
+  city: z.string(),
   neighborhood: z.string().nullable(),
 });
 
@@ -92,6 +101,15 @@ export async function validateCouponAction(input: unknown): Promise<ValidateCoup
   return { ok: true, coupon: result.coupon };
 }
 
+/** Mensaje a mostrar cuando no hay tarifa/cobertura para un destino: el mensaje propio de su zona más específica si tiene uno, o el mensaje global personalizable con el nombre del destino. */
+async function resolveNoCoverageMessage(destination: z.infer<typeof destinationSchema>): Promise<string> {
+  const { zones, rules } = await loadShippingTree();
+  const ownMessage = resolveRejectionMessage(zones, rules, destination);
+  if (ownMessage) return ownMessage;
+  const template = (await getShippingMessagesSettings()).noCoverageTemplate;
+  return template.replace("{lugar}", resolveDestinationLabel(zones, destination));
+}
+
 /** Cotiza el envío para un destino (jerarquía de zonas, sección 17). */
 export async function quoteShippingAction(input: unknown): Promise<QuoteShippingResult> {
   const parsed = quoteSchema.safeParse(input);
@@ -99,7 +117,7 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
 
   const quote = await shippingResolver.resolve(parsed.data.destination, money(parsed.data.productsTotal));
   if (!quote) {
-    return { ok: false, reason: "Cotización requerida para esta dirección. Escríbenos por WhatsApp." };
+    return { ok: false, reason: await resolveNoCoverageMessage(parsed.data.destination) };
   }
   const transferConfigured = Boolean((await getManualTransferSettings()).accountNumber);
   const methods = availablePaymentMethods(quote)
@@ -116,6 +134,12 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
  * la Fase 3.
  */
 export async function createDemoOrderAction(input: CreateDemoOrderInput): Promise<CreateDemoOrderResult> {
+  try {
+    await enforceRateLimit("checkout", 8, 10 * 60);
+  } catch (error) {
+    if (error instanceof RateLimitError) return { ok: false, error: error.message };
+    throw error;
+  }
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Revisa los datos del formulario." };
   const data = parsed.data;
@@ -140,7 +164,20 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     return { ok: false, error: "Los productos del carrito ya no están disponibles." };
   }
 
-  const cart: Cart = { lines, couponCode: data.couponCode };
+  // Límite de venta cruzada (sección 11.2): revalida contra el carrito
+  // reconstruido, nunca contra lo que envió el navegador.
+  for (const targetLine of lines) {
+    const maxAllowed = maxAllowedByPurchaseLimit(targetLine, lines);
+    if (maxAllowed !== null && targetLine.quantity > maxAllowed) {
+      targetLine.quantity = maxAllowed;
+    }
+  }
+  const nonZeroLines = lines.filter((line) => line.quantity > 0);
+  if (nonZeroLines.length === 0) {
+    return { ok: false, error: "Los productos del carrito superan el límite permitido para tu combinación actual." };
+  }
+
+  const cart: Cart = { lines: nonZeroLines, couponCode: data.couponCode };
   const subtotal = computeSubtotal(cart);
 
   // Cupón (autoritativo).
@@ -151,15 +188,20 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     if (validation.valid) coupon = validation.coupon;
   }
 
-  // Recompensas (autoritativas).
-  const rewardRules = await promotionsRepository.listActiveRewardRules();
-  const rewards = evaluateRewards(rewardRules, { subtotal, totalUnits: totalUnits(cart) });
-
-  // Envío.
+  // Envío (se resuelve antes que las recompensas: el envío gratis puede
+  // estar restringido a zonas específicas, sección 12).
   const quote = await shippingResolver.resolve(data.destination, subtotal);
   if (!quote) {
-    return { ok: false, error: "No hay tarifa de envío para esta dirección. Escríbenos por WhatsApp." };
+    return { ok: false, error: await resolveNoCoverageMessage(data.destination) };
   }
+
+  // Recompensas (autoritativas).
+  const rewardRules = await promotionsRepository.listActiveRewardRules();
+  const rewards = evaluateRewards(rewardRules, {
+    subtotal,
+    totalUnits: totalUnits(cart),
+    zoneIds: quote.matchingZoneIds,
+  });
 
   // Método de pago válido para la zona.
   const transferConfigured = Boolean((await getManualTransferSettings()).accountNumber);
@@ -180,8 +222,8 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   let attribution: Record<string, string> = {};
   let firstAttribution: Record<string, string> = {};
   try {
-    attribution = JSON.parse(cookieStore.get("shoppluscol_utm_last")?.value ?? "{}") as Record<string, string>;
-    firstAttribution = JSON.parse(cookieStore.get("shoppluscol_utm_first")?.value ?? "{}") as Record<string, string>;
+    attribution = JSON.parse(decodeURIComponent(cookieStore.get("shoppluscol_utm_last")?.value ?? "%7B%7D")) as Record<string, string>;
+    firstAttribution = JSON.parse(decodeURIComponent(cookieStore.get("shoppluscol_utm_first")?.value ?? "%7B%7D")) as Record<string, string>;
   } catch {
     attribution = {};
     firstAttribution = {};
@@ -207,6 +249,13 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   const lookupToken = randomBytes(24).toString("base64url");
   const lookupTokenHash = createHash("sha256").update(lookupToken).digest("hex");
   const reserved: Array<{ id: string; quantity: number }> = [];
+  // Sin transacción real (D1 no soporta transacciones interactivas): si algo
+  // falla después de crear el pedido (p. ej. Mercado Pago rechaza la
+  // preferencia), hay que borrar a mano lo que ya se insertó. `orders` borra
+  // en cascada order_items/order_status_history/order_adjustments/payments,
+  // así que basta con guardar estos dos ids.
+  let createdOrderId: string | null = null;
+  let createdConsentRecordId: string | null = null;
 
   try {
     for (const line of lines) {
@@ -289,6 +338,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       utmFirstAttribution: firstAttribution,
       utmLastAttribution: attribution,
     }).returning();
+    createdOrderId = order.id;
 
     await db.insert(orderItems).values(lines.map((line) => ({
       orderId: order.id,
@@ -335,12 +385,13 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       externalReference: order.orderNumber,
       idempotencyKey: `payment:${data.idempotencyKey}`,
     }).returning();
-    await db.insert(consentRecords).values({
+    const [consentRecord] = await db.insert(consentRecords).values({
       subjectId: customer.id,
       analytics: data.consent.analytics,
       marketing: data.consent.marketing,
       policyVersion: "2026-07-29",
-    });
+    }).returning();
+    createdConsentRecordId = consentRecord.id;
 
     let checkoutUrl: string | null = null;
     if (data.paymentMethod === "mercado_pago") {
@@ -390,6 +441,25 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       },
     };
     await db.update(idempotencyKeys).set({ responseSnapshot: result }).where(eq(idempotencyKeys.key, data.idempotencyKey));
+
+    // Correo de confirmación (sección 38, evento "order_created"): solo si
+    // el cliente dejó su correo, y nunca a costa del pedido — si falla o
+    // SMTP no está configurado, el pedido ya se confirmó igual.
+    if (data.contact.email) {
+      try {
+        const brand = await getBrandSettings();
+        const email = buildOrderConfirmationEmail(result.order, brand.name, process.env.NEXT_PUBLIC_SITE_URL ?? "");
+        await new ConfiguredNotificationProvider().send({
+          event: "order_created",
+          to: data.contact.email,
+          subject: email.subject,
+          data: { html: email.html, text: email.text },
+        });
+      } catch {
+        // Nunca rompe el pedido ya confirmado.
+      }
+    }
+
     return result;
   } catch (error) {
     for (const reservation of reserved) {
@@ -398,6 +468,12 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
         updatedAt: new Date(),
       }).where(eq(inventoryItems.id, reservation.id));
     }
+    // Deshace lo que ya se insertó antes del fallo (p. ej. Mercado Pago
+    // rechazó la preferencia después de crear el pedido): si no se borra el
+    // pedido aquí, un reintento con la misma idempotencyKey del cliente
+    // choca con la fila `payments` ya creada (UNIQUE en idempotency_key).
+    if (createdOrderId) await db.delete(orders).where(eq(orders.id, createdOrderId));
+    if (createdConsentRecordId) await db.delete(consentRecords).where(eq(consentRecords.id, createdConsentRecordId));
     await db.delete(idempotencyKeys).where(eq(idempotencyKeys.key, data.idempotencyKey));
     return { ok: false, error: error instanceof Error ? error.message : "No fue posible crear el pedido." };
   }

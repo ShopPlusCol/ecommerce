@@ -21,5 +21,7 @@ export function productToCartLine(product: Product, quantity: number): CartLine 
     maxStock: product.stock,
     allowBackorder: product.allowBackorder,
     isGift: false,
+    categoryIds: product.categoryIds,
+    purchaseLimit: product.purchaseLimit,
   };
 }

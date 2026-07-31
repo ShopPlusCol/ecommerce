@@ -43,6 +43,7 @@ export function CartDrawer() {
         drawerOpen ? "opacity-100" : "pointer-events-none opacity-0",
       )}
       aria-hidden={!drawerOpen}
+      inert={!drawerOpen}
     >
       <div
         className="absolute inset-0 bg-[rgba(19,17,16,0.45)]"

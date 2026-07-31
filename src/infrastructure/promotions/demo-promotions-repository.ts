@@ -1,4 +1,4 @@
-import type { Coupon, RewardRule } from "@/domain/entities/promotions";
+import type { Coupon, Popup, RewardRule } from "@/domain/entities/promotions";
 import type { PromotionsRepository } from "@/application/ports/promotions-repository";
 import { normalizeCouponCode } from "@/domain/services/coupons";
 import { coupons, rewardRules } from "@/infrastructure/demo/demo-dataset";
@@ -11,5 +11,9 @@ export class DemoPromotionsRepository implements PromotionsRepository {
 
   async listActiveRewardRules(): Promise<RewardRule[]> {
     return rewardRules.filter((r) => r.status === "active");
+  }
+
+  async listActivePopups(): Promise<Popup[]> {
+    return [];
   }
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { money } from "@/domain/value-objects/money";
 import type { Cart, CartLine } from "@/domain/entities/cart";
 import type { Coupon } from "@/domain/entities/promotions";
-import { computeCartTotals, computeOrderSummary, computeSubtotal, clampQuantity } from "@/domain/services/cart-pricing";
+import { computeCartTotals, computeOrderSummary, computeSubtotal, clampQuantity, maxAllowedByPurchaseLimit } from "@/domain/services/cart-pricing";
 import { evaluateRewards } from "@/domain/services/rewards";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 
@@ -21,6 +21,8 @@ function line(overrides: Partial<CartLine> = {}): CartLine {
     maxStock: 10,
     allowBackorder: false,
     isGift: false,
+    categoryIds: [],
+    purchaseLimit: null,
     ...overrides,
   };
 }
@@ -31,20 +33,24 @@ const medellinQuote: ShippingQuote = {
   ruleId: "r-med",
   ruleLevel: "city",
   fee: money(8_000),
+  feeSource: null,
   freeShippingThreshold: null,
   cashOnDeliveryAllowed: true,
   requiresAdvancePayment: false,
   advancePercentage: null,
   estimatedBusinessDaysMin: 0,
   estimatedBusinessDaysMax: 1,
+  sameDayEligible: true,
   sameDayCutoffHour: 14,
   customerMessage: "Entrega el mismo día",
+  matchingZoneIds: ["zone-medellin"],
 };
 
 const nationalQuote: ShippingQuote = {
   ruleId: "r-nac",
   ruleLevel: "country",
   fee: money(13_000),
+  feeSource: null,
   freeShippingThreshold: null,
   cashOnDeliveryAllowed: false,
   requiresAdvancePayment: true,
@@ -52,7 +58,9 @@ const nationalQuote: ShippingQuote = {
   estimatedBusinessDaysMin: 2,
   estimatedBusinessDaysMax: 5,
   customerMessage: "Envío anticipado",
+  sameDayEligible: false,
   sameDayCutoffHour: null,
+  matchingZoneIds: ["zone-co"],
 };
 
 describe("computeSubtotal", () => {
@@ -163,6 +171,7 @@ describe("recompensa de envío gratis integrada al resumen", () => {
           rewardType: "free_shipping",
           rewardValue: null,
           rewardProductId: null,
+          eligibleZoneIds: null,
           priority: 1,
           status: "active",
         },
@@ -189,5 +198,30 @@ describe("clampQuantity — guardas de inventario", () => {
   });
   it("nunca es negativo", () => {
     expect(clampQuantity(-3, 10, false)).toBe(0);
+  });
+});
+
+describe("maxAllowedByPurchaseLimit — límite de venta cruzada (sección 11.2)", () => {
+  it("retorna null cuando el producto no tiene límite configurado", () => {
+    const accessory = line({ productId: "acc", purchaseLimit: null });
+    expect(maxAllowedByPurchaseLimit(accessory, [accessory])).toBeNull();
+  });
+
+  it("permite hasta N unidades por cada unidad de la categoría habilitante", () => {
+    const lens = line({ productId: "lens", quantity: 2, categoryIds: ["cat-lentes"] });
+    const accessory = line({
+      productId: "acc",
+      quantity: 5,
+      purchaseLimit: { categoryId: "cat-lentes", maxUnitsPerCategoryUnit: 1 },
+    });
+    expect(maxAllowedByPurchaseLimit(accessory, [lens, accessory])).toBe(2);
+  });
+
+  it("no permite ninguna unidad si la categoría habilitante no está en el carrito", () => {
+    const accessory = line({
+      productId: "acc",
+      purchaseLimit: { categoryId: "cat-lentes", maxUnitsPerCategoryUnit: 1 },
+    });
+    expect(maxAllowedByPurchaseLimit(accessory, [accessory])).toBe(0);
   });
 });

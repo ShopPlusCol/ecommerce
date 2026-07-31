@@ -9,6 +9,7 @@ import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { useFavorites } from "@/modules/favorites/favorites-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
 import { buildWhatsAppUrl } from "@/modules/whatsapp/cart-message";
+import { getStoreContentAction } from "@/app/(store)/site-content-actions";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/domain/value-objects/money";
 
@@ -19,6 +20,7 @@ import { formatMoney } from "@/domain/value-objects/money";
  */
 export function ProductPurchasePanel({ product }: { product: Product }) {
   const [quantity, setQuantity] = React.useState(1);
+  const [whatsappNumber, setWhatsappNumber] = React.useState<string | undefined>(undefined);
   const { isFavorite, toggleFavorite, isHydrated } = useFavorites();
   const { track } = useAnalytics();
   const outOfStock = product.stock <= 0 && !product.allowBackorder;
@@ -34,8 +36,19 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id]);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    getStoreContentAction().then(({ brand }) => {
+      if (!cancelled) setWhatsappNumber(brand.whatsapp);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const whatsappUrl = buildWhatsAppUrl(
     `Hola, quiero preguntar por el lente ${product.name} (${formatMoney(product.price)}).`,
+    whatsappNumber,
   );
 
   return (
@@ -77,7 +90,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex h-control-md items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#128C4B] transition-colors duration-fast hover:bg-[#25D366]/10"
+        className="inline-flex h-control-md items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#0F7F43] transition-colors duration-fast hover:bg-[#25D366]/10"
       >
         <MessageCircle className="h-4 w-4" aria-hidden="true" />
         Preguntar por WhatsApp

@@ -123,6 +123,7 @@ function buildLens(spec: LensSpec): Product {
     allowBackorder: false,
     featured: Boolean(spec.featured),
     publishedAt: daysAgoIso(spec.publishedDaysAgo),
+    purchaseLimit: null,
   };
 }
 
@@ -145,6 +146,7 @@ const accessories: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: daysAgoIso(200),
+    purchaseLimit: null,
   },
   {
     id: "prod-pinza",
@@ -164,6 +166,7 @@ const accessories: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: daysAgoIso(200),
+    purchaseLimit: null,
   },
   {
     id: "prod-estuche",
@@ -183,6 +186,7 @@ const accessories: Product[] = [
     allowBackorder: false,
     featured: false,
     publishedAt: daysAgoIso(200),
+    purchaseLimit: null,
   },
 ];
 
@@ -238,6 +242,7 @@ export const rewardRules: RewardRule[] = [
     rewardType: "free_shipping",
     rewardValue: null,
     rewardProductId: null,
+    eligibleZoneIds: null,
     priority: 10,
     status: "active",
   },

@@ -10,13 +10,24 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { OrderFinancialSummary } from "@/components/store/checkout/order-financial-summary";
 import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
-import { computeOrderSummary, computeSubtotal } from "@/domain/services/cart-pricing";
-import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
+import { computeOrderSummary, computeSubtotal, totalUnits as sumUnits } from "@/domain/services/cart-pricing";
+import { evaluateRewards } from "@/domain/services/rewards";
+import { DEFAULT_PAYMENT_METHOD_COPY, type PaymentMethodId, type PaymentMethodCopy } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
-import { DEPARTMENTS, MEDELLIN_NEIGHBORHOODS, citiesForDepartment, isMedellin } from "@/lib/colombia-locations";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
+import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
+import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
+import { getStoreContentAction, getCheckoutFieldsAction } from "@/app/(store)/site-content-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
+import {
+  DEFAULT_CHECKOUT_FIELDS,
+  LOCKED_CHECKOUT_FIELDS,
+  NO_REQUIRED_TOGGLE_FIELDS,
+  type CheckoutFieldConfig,
+  type CheckoutFieldId,
+} from "@/modules/checkout/checkout-fields";
 
 type Contact = { fullName: string; phone: string; email: string };
 type LocationForm = {
@@ -28,6 +39,32 @@ type LocationForm = {
   deliveryInstructions: string;
 };
 
+// Orden visual de arriba a abajo, para saltar al primer campo con error —
+// "location" se expande a sus tres sub-campos, que sí tienen error propio.
+function buildFieldOrder(fieldConfig: CheckoutFieldConfig[]): string[] {
+  const order: string[] = [];
+  for (const field of fieldConfig) {
+    if (field.id === "marketingConsent") continue;
+    if (field.id === "location") {
+      order.push("department", "city", "neighborhood");
+      continue;
+    }
+    order.push(field.id);
+  }
+  order.push("quote", "paymentMethod", "terms");
+  return order;
+}
+
+function scrollToFirstError(errorsMap: Record<string, string>, fieldOrder: string[]) {
+  const firstKey = fieldOrder.find((key) => errorsMap[key]);
+  if (!firstKey) return;
+  const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const focusable = el.matches("input, select, textarea") ? el : el.querySelector<HTMLElement>("input, select, textarea");
+  focusable?.focus({ preventScroll: true });
+}
+
 const EMPTY_LOCATION: LocationForm = {
   department: "",
   city: "",
@@ -38,7 +75,7 @@ const EMPTY_LOCATION: LocationForm = {
 };
 
 export function CheckoutClient() {
-  const { cart, lines, coupon, rewards, totals, clearCart, isHydrated } = useCart();
+  const { cart, lines, coupon, rewards, rewardRules, totals, clearCart, isHydrated } = useCart();
   const { track, consent: analyticsConsent } = useAnalytics();
   const idempotencyKey = React.useRef(crypto.randomUUID());
 
@@ -49,6 +86,12 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
+  const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
+  const [paymentDisclaimer, setPaymentDisclaimer] = React.useState("");
+  const [fieldConfig, setFieldConfig] = React.useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
+  const [departments, setDepartments] = React.useState<string[]>([]);
+  const [cities, setCities] = React.useState<string[]>([]);
+  const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
@@ -67,13 +110,81 @@ export function CheckoutClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length]);
 
-  // Cotización de envío cuando hay departamento + ciudad (sección 17).
+  // Departamentos configurados y activos (los 32 + Bogotá D.C. vienen
+  // precargados de fábrica, así que normalmente están todos desde el
+  // primer arranque).
+  React.useEffect(() => {
+    let cancelled = false;
+    listShippingDepartmentsAction().then((names) => {
+      if (!cancelled) setDepartments(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Nombre/descripción de cada método de pago, editables desde Configuración.
+  React.useEffect(() => {
+    let cancelled = false;
+    getPaymentMethodsCopyAction().then((copy) => {
+      if (!cancelled) setPaymentMethodsCopy(copy);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Aviso de pago, editable desde Configuración → Textos del sitio.
+  React.useEffect(() => {
+    let cancelled = false;
+    getStoreContentAction().then(({ texts }) => {
+      if (!cancelled) setPaymentDisclaimer(texts.checkoutPaymentDisclaimer);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Qué campos del formulario están activos/obligatorios y en qué orden,
+  // editable desde Configuración → Formulario de checkout.
+  React.useEffect(() => {
+    let cancelled = false;
+    getCheckoutFieldsAction().then((config) => {
+      if (!cancelled) setFieldConfig(config);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Ciudades/municipios configurados y activos para el departamento elegido
+  // (sección 17.3): si el departamento no tiene ninguna, el checkout no pide
+  // ciudad y usa directamente la configuración del departamento.
+  React.useEffect(() => {
+    if (!location.department) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia la lista al cambiar de departamento
+      setCities([]);
+      return;
+    }
+    let cancelled = false;
+    listShippingCitiesAction(location.department).then((names) => {
+      if (!cancelled) setCities(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.department]);
+
+  const cityRequired = cities.length > 0;
+
+  // Cotización de envío cuando hay departamento (y ciudad, si el
+  // departamento tiene ciudades configuradas) — sección 17.
   const subtotalAmount = computeSubtotal(cart).amount;
   React.useEffect(() => {
     // Efecto de obtención de datos: cotiza el envío en el servidor (sistema
     // externo) y refleja los estados de carga/resultado. El "setState" en el
     // cuerpo es intencional para el estado de carga inmediato.
-    if (!location.department || !location.city) {
+    if (!location.department || (cityRequired && !location.city)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset del estado de cotización externa
       setQuote(null);
       setQuoteStatus("idle");
@@ -108,12 +219,40 @@ export function CheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [location.department, location.city, location.neighborhood, subtotalAmount]);
+  }, [location.department, location.city, location.neighborhood, cityRequired, subtotalAmount]);
+
+  // Barrios configurados y activos para la ciudad elegida (sección 17.3).
+  React.useEffect(() => {
+    if (!location.city) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia la lista al cambiar de ciudad
+      setConfiguredNeighborhoods([]);
+      return;
+    }
+    let cancelled = false;
+    listShippingNeighborhoodsAction(location.department, location.city).then((names) => {
+      if (!cancelled) setConfiguredNeighborhoods(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.department, location.city]);
+
+  // Con destino conocido, las recompensas se recalculan con las zonas que
+  // cubren la dirección (sección 12): un envío gratis restringido a zonas
+  // solo se confirma aquí, nunca antes de tener una cotización real.
+  const zoneAwareRewards = React.useMemo(() => {
+    if (!quote) return rewards;
+    return evaluateRewards(rewardRules, {
+      subtotal: computeSubtotal(cart),
+      totalUnits: sumUnits(cart),
+      zoneIds: quote.matchingZoneIds,
+    });
+  }, [cart, rewardRules, rewards, quote]);
 
   const summary = React.useMemo(() => {
     if (!quote || !paymentMethod) return null;
-    return computeOrderSummary(cart, { coupon, rewards, shippingQuote: quote, paymentMethod });
-  }, [cart, coupon, rewards, quote, paymentMethod]);
+    return computeOrderSummary(cart, { coupon, rewards: zoneAwareRewards, shippingQuote: quote, paymentMethod });
+  }, [cart, coupon, zoneAwareRewards, quote, paymentMethod]);
 
   if (!isHydrated) {
     return <p className="text-sm text-text-muted">Cargando…</p>;
@@ -134,21 +273,43 @@ export function CheckoutClient() {
     );
   }
 
-  const cities = citiesForDepartment(location.department);
-  const showMedellinNeighborhoods = isMedellin(location.city);
+  const neighborhoodOptions = configuredNeighborhoods;
+  const showNeighborhoodSelect = neighborhoodOptions.length > 0;
+
+  const fieldConfigById = new Map(fieldConfig.map((field) => [field.id, field]));
+  function isFieldEnabled(id: CheckoutFieldId) {
+    if ((LOCKED_CHECKOUT_FIELDS as readonly CheckoutFieldId[]).includes(id)) return true;
+    return fieldConfigById.get(id)?.enabled ?? true;
+  }
+  function isFieldRequired(id: CheckoutFieldId) {
+    if ((LOCKED_CHECKOUT_FIELDS as readonly CheckoutFieldId[]).includes(id)) return true;
+    if ((NO_REQUIRED_TOGGLE_FIELDS as readonly CheckoutFieldId[]).includes(id)) return false;
+    return fieldConfigById.get(id)?.required ?? false;
+  }
 
   const validate = (): boolean => {
     const next: Record<string, string> = {};
     if (contact.fullName.trim().length < 2) next.fullName = "Ingresa tu nombre completo.";
     if (contact.phone.replace(/\D/g, "").length < 7) next.phone = "Ingresa un teléfono válido.";
-    if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
+    if (isFieldEnabled("email")) {
+      if (isFieldRequired("email") && !contact.email.trim()) next.email = "Ingresa tu correo.";
+      else if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
+    }
     if (!location.department) next.department = "Selecciona el departamento.";
-    if (!location.city) next.city = "Selecciona la ciudad o municipio.";
+    if (cityRequired && !location.city) next.city = "Selecciona la ciudad o municipio.";
+    if (!showNeighborhoodSelect && location.neighborhood.trim().length < 2) next.neighborhood = "Escribe tu barrio o sector.";
     if (location.addressLine.trim().length < 3) next.addressLine = "Ingresa la dirección.";
+    if (isFieldEnabled("addressComplement") && isFieldRequired("addressComplement") && !location.addressComplement.trim()) {
+      next.addressComplement = "Completa este campo.";
+    }
+    if (isFieldEnabled("deliveryInstructions") && isFieldRequired("deliveryInstructions") && !location.deliveryInstructions.trim()) {
+      next.deliveryInstructions = "Completa este campo.";
+    }
     if (!quote) next.quote = "Necesitamos una dirección con cobertura para calcular el envío.";
     if (!paymentMethod) next.paymentMethod = "Selecciona un método de pago.";
     if (!consent.terms) next.terms = "Debes aceptar los términos y la política de privacidad.";
     setErrors(next);
+    if (Object.keys(next).length > 0) scrollToFirstError(next, buildFieldOrder(fieldConfig));
     return Object.keys(next).length === 0;
   };
 
@@ -195,147 +356,194 @@ export function CheckoutClient() {
     window.location.assign(resolveCheckoutDestination(result.order.checkoutUrl));
   };
 
-  return (
-    <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="flex flex-col gap-6">
-        {/* Contacto */}
-        <Card>
-          <CardContent className="flex flex-col gap-4">
-            <StepHeading step={1} title="Contacto" />
-            <Input
-              label="Nombre completo"
+  const fieldRenderers: Record<CheckoutFieldId, () => React.ReactNode> = {
+    fullName: () => (
+      <Input
+        key="fullName"
+        label="Nombre completo"
+        required
+        value={contact.fullName}
+        onChange={(e) => setContact((c) => ({ ...c, fullName: e.target.value }))}
+        error={errors.fullName}
+        autoComplete="name"
+        data-field="fullName"
+      />
+    ),
+    phone: () => (
+      <Input
+        key="phone"
+        label="Teléfono"
+        required
+        type="tel"
+        inputMode="tel"
+        value={contact.phone}
+        onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+        error={errors.phone}
+        autoComplete="tel"
+        data-field="phone"
+      />
+    ),
+    email: () => (
+      <Input
+        key="email"
+        label={isFieldRequired("email") ? "Correo" : "Correo (opcional)"}
+        required={isFieldRequired("email")}
+        type="email"
+        inputMode="email"
+        value={contact.email}
+        onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+        error={errors.email}
+        helperText="Para enviarte la confirmación."
+        autoComplete="email"
+        data-field="email"
+      />
+    ),
+    location: () => (
+      <div key="location" className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div data-field="department">
+            <SearchableSelect
+              label="Departamento"
               required
-              value={contact.fullName}
-              onChange={(e) => setContact((c) => ({ ...c, fullName: e.target.value }))}
-              error={errors.fullName}
-              autoComplete="name"
+              value={location.department}
+              error={errors.department}
+              onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
+              options={departments}
+              placeholder="Escribe para buscar…"
             />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Teléfono"
-                required
-                type="tel"
-                inputMode="tel"
-                value={contact.phone}
-                onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                error={errors.phone}
-                autoComplete="tel"
-              />
-              <Input
-                label="Correo (opcional)"
-                type="email"
-                inputMode="email"
-                value={contact.email}
-                onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-                error={errors.email}
-                helperText="Para enviarte la confirmación."
-                autoComplete="email"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Ubicación y entrega */}
-        <Card>
-          <CardContent className="flex flex-col gap-4">
-            <StepHeading step={2} title="Ubicación y entrega" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SelectField
-                label="Departamento"
-                required
-                value={location.department}
-                error={errors.department}
-                onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
-                options={DEPARTMENTS.map((d) => d.name)}
-                placeholder="Selecciona…"
-              />
-              <SelectField
+          </div>
+          {cityRequired ? (
+            <div data-field="city">
+              <SearchableSelect
                 label="Ciudad o municipio"
                 required
                 value={location.city}
                 error={errors.city}
-                disabled={!location.department}
                 onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
                 options={cities}
-                placeholder="Selecciona…"
+                placeholder="Escribe para buscar…"
               />
             </div>
+          ) : null}
+        </div>
 
-            {showMedellinNeighborhoods ? (
-              <SelectField
-                label="Barrio o sector"
-                value={location.neighborhood}
-                onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
-                options={MEDELLIN_NEIGHBORHOODS}
-                placeholder="Selecciona…"
-              />
-            ) : (
-              <Input
-                label="Barrio o sector (opcional)"
-                value={location.neighborhood}
-                onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
-              />
-            )}
+        {showNeighborhoodSelect ? (
+          <div data-field="neighborhood">
+            <SearchableSelect
+              label="Barrio o sector"
+              value={location.neighborhood}
+              onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
+              options={neighborhoodOptions}
+              placeholder="Escribe para buscar…"
+            />
+          </div>
+        ) : (
+          <Input
+            label="Barrio o sector"
+            required
+            value={location.neighborhood}
+            onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
+            error={errors.neighborhood}
+            data-field="neighborhood"
+          />
+        )}
 
-            <Input
-              label="Dirección"
-              required
-              placeholder="Calle 10 # 20-30"
-              value={location.addressLine}
-              onChange={(e) => setLocation((l) => ({ ...l, addressLine: e.target.value }))}
-              error={errors.addressLine}
-              autoComplete="street-address"
-            />
-            <Input
-              label="Apartamento, torre, bloque (opcional)"
-              value={location.addressComplement}
-              onChange={(e) => setLocation((l) => ({ ...l, addressComplement: e.target.value }))}
-            />
-            <Input
-              label="Indicaciones de entrega (opcional)"
-              value={location.deliveryInstructions}
-              onChange={(e) => setLocation((l) => ({ ...l, deliveryInstructions: e.target.value }))}
-            />
+        {quoteStatus === "loading" ? (
+          <p className="flex items-center gap-2 text-sm text-text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Calculando envío…
+          </p>
+        ) : null}
+        {quoteStatus === "error" ? (
+          <p className="rounded-md bg-warning-soft p-3 text-sm text-warning" role="alert">
+            {quoteError}
+          </p>
+        ) : null}
+        {errors.quote ? (
+          <p data-field="quote" className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
+            {errors.quote}
+          </p>
+        ) : null}
+        {quote ? (
+          <div className="rounded-md bg-surface-sunken p-3 text-sm text-text-muted">
+            <p className="font-medium text-text">
+              Envío: {quote.fee.amount === 0 ? "Gratis" : formatMoney(quote.fee)}
+            </p>
+            <p>{quote.customerMessage}</p>
+            <p className="text-xs text-text-subtle">
+              Entrega estimada: {quote.estimatedBusinessDaysMin === 0 ? "hoy" : `${quote.estimatedBusinessDaysMin}`}
+              {quote.estimatedBusinessDaysMax > quote.estimatedBusinessDaysMin
+                ? ` a ${quote.estimatedBusinessDaysMax} días hábiles`
+                : quote.estimatedBusinessDaysMin === 0
+                  ? ""
+                  : " día(s) hábil(es)"}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    ),
+    addressLine: () => (
+      <Input
+        key="addressLine"
+        label="Dirección"
+        required
+        placeholder="Calle 10 # 20-30"
+        value={location.addressLine}
+        onChange={(e) => setLocation((l) => ({ ...l, addressLine: e.target.value }))}
+        error={errors.addressLine}
+        autoComplete="street-address"
+        data-field="addressLine"
+      />
+    ),
+    addressComplement: () => (
+      <Input
+        key="addressComplement"
+        label={isFieldRequired("addressComplement") ? "Apartamento, torre, bloque" : "Apartamento, torre, bloque (opcional)"}
+        required={isFieldRequired("addressComplement")}
+        value={location.addressComplement}
+        onChange={(e) => setLocation((l) => ({ ...l, addressComplement: e.target.value }))}
+        error={errors.addressComplement}
+        data-field="addressComplement"
+      />
+    ),
+    deliveryInstructions: () => (
+      <Input
+        key="deliveryInstructions"
+        label={isFieldRequired("deliveryInstructions") ? "Indicaciones de entrega" : "Indicaciones de entrega (opcional)"}
+        required={isFieldRequired("deliveryInstructions")}
+        value={location.deliveryInstructions}
+        onChange={(e) => setLocation((l) => ({ ...l, deliveryInstructions: e.target.value }))}
+        error={errors.deliveryInstructions}
+        data-field="deliveryInstructions"
+      />
+    ),
+    // Se renderiza aparte, en la tarjeta de Consentimiento junto a los
+    // términos — nunca a través de este mapa (se filtra antes de mapear).
+    marketingConsent: () => null,
+  };
 
-            {quoteStatus === "loading" ? (
-              <p className="flex items-center gap-2 text-sm text-text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Calculando envío…
-              </p>
-            ) : null}
-            {quoteStatus === "error" ? (
-              <p className="rounded-md bg-warning-soft p-3 text-sm text-warning" role="alert">
-                {quoteError}
-              </p>
-            ) : null}
-            {quote ? (
-              <div className="rounded-md bg-surface-sunken p-3 text-sm text-text-muted">
-                <p className="font-medium text-text">
-                  Envío: {quote.fee.amount === 0 ? "Gratis" : formatMoney(quote.fee)}
-                </p>
-                <p>{quote.customerMessage}</p>
-                <p className="text-xs text-text-subtle">
-                  Entrega estimada: {quote.estimatedBusinessDaysMin === 0 ? "hoy" : `${quote.estimatedBusinessDaysMin}`}
-                  {quote.estimatedBusinessDaysMax > quote.estimatedBusinessDaysMin
-                    ? ` a ${quote.estimatedBusinessDaysMax} días hábiles`
-                    : quote.estimatedBusinessDaysMin === 0
-                      ? ""
-                      : " día(s) hábil(es)"}
-                </p>
-              </div>
-            ) : null}
+  return (
+    <form onSubmit={onSubmit} noValidate className="grid gap-8 lg:grid-cols-[1fr_360px]">
+      <div className="flex flex-col gap-6">
+        {/* Tus datos y entrega */}
+        <Card>
+          <CardContent className="flex flex-col gap-4">
+            <StepHeading step={1} title="Tus datos y entrega" />
+            {fieldConfig
+              .filter((field) => field.id !== "marketingConsent" && isFieldEnabled(field.id))
+              .map((field) => fieldRenderers[field.id]())}
           </CardContent>
         </Card>
 
         {/* Pago */}
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <StepHeading step={3} title="Método de pago" />
+            <StepHeading step={2} title="Método de pago" />
             {methods.length === 0 ? (
               <p className="text-sm text-text-muted">
                 Completa tu dirección para ver los métodos de pago disponibles en tu zona.
               </p>
             ) : (
-              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Método de pago">
+              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Método de pago" data-field="paymentMethod">
                 {methods.map((method) => (
                   <label
                     key={method}
@@ -354,7 +562,12 @@ export function CheckoutClient() {
                       }}
                       className="mt-0.5 accent-[var(--tk-cherry-500)]"
                     />
-                    <span className="text-text">{PAYMENT_METHOD_LABELS[method]}</span>
+                    <span className="flex flex-col">
+                      <span className="text-text">{paymentMethodsCopy[method].name}</span>
+                      {paymentMethodsCopy[method].description ? (
+                        <span className="text-xs text-text-muted">{paymentMethodsCopy[method].description}</span>
+                      ) : null}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -364,17 +577,14 @@ export function CheckoutClient() {
                 {errors.paymentMethod}
               </p>
             ) : null}
-            <p className="rounded-md bg-info-soft p-3 text-xs text-info">
-              El pedido se registra al confirmar. Mercado Pago solo aparece cuando está configurado;
-              las transferencias quedan pendientes de revisión y un comprobante no equivale a pago aprobado.
-            </p>
+            {paymentDisclaimer ? <p className="rounded-md bg-info-soft p-3 text-xs text-info">{paymentDisclaimer}</p> : null}
           </CardContent>
         </Card>
 
         {/* Consentimiento */}
         <Card>
           <CardContent className="flex flex-col gap-3">
-            <label className="flex items-start gap-3 text-sm text-text">
+            <label className="flex items-start gap-3 text-sm text-text" data-field="terms">
               <input
                 type="checkbox"
                 checked={consent.terms}
@@ -398,15 +608,17 @@ export function CheckoutClient() {
                 {errors.terms}
               </p>
             ) : null}
-            <label className="flex items-start gap-3 text-sm text-text-muted">
-              <input
-                type="checkbox"
-                checked={consent.marketing}
-                onChange={(e) => setConsent((c) => ({ ...c, marketing: e.target.checked }))}
-                className="mt-0.5 accent-[var(--tk-cherry-500)]"
-              />
-              <span>Quiero recibir novedades y promociones (opcional).</span>
-            </label>
+            {isFieldEnabled("marketingConsent") ? (
+              <label className="flex items-start gap-3 text-sm text-text-muted" data-field="marketingConsent">
+                <input
+                  type="checkbox"
+                  checked={consent.marketing}
+                  onChange={(e) => setConsent((c) => ({ ...c, marketing: e.target.checked }))}
+                  className="mt-0.5 accent-[var(--tk-cherry-500)]"
+                />
+                <span>Quiero recibir novedades y promociones (opcional).</span>
+              </label>
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -428,7 +640,7 @@ export function CheckoutClient() {
             </ul>
             <div className="border-t border-border pt-3">
               {summary ? (
-                <OrderFinancialSummary summary={summary} />
+                <OrderFinancialSummary summary={summary} paymentMethods={paymentMethodsCopy} />
               ) : (
                 <p className="text-sm text-text-muted">
                   Completa tu dirección y método de pago para ver qué pagas ahora y qué pagas al recibir.
@@ -464,52 +676,3 @@ function StepHeading({ step, title }: { step: number; title: string }) {
   );
 }
 
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  required,
-  disabled,
-  error,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  placeholder?: string;
-  required?: boolean;
-  disabled?: boolean;
-  error?: string;
-}) {
-  const id = React.useId();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-text">
-        {label}
-        {required ? <span className="text-brand"> *</span> : null}
-      </label>
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        aria-invalid={Boolean(error) || undefined}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-control-md rounded-md border border-border-strong bg-surface-raised px-3 text-base text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-50"
-      >
-        <option value="">{placeholder ?? "Selecciona…"}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-      {error ? (
-        <p className="text-sm text-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}

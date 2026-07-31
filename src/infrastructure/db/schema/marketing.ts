@@ -91,6 +91,8 @@ export const rewardRules = sqliteTable("reward_rules", {
   targetValue: integer("target_value").notNull(),
   eligibleProductIds: text("eligible_product_ids", { mode: "json" }).$type<string[]>(),
   eligibleCategoryIds: text("eligible_category_ids", { mode: "json" }).$type<string[]>(),
+  /** Restringe el beneficio (típicamente envío gratis) a zonas de envío específicas; vacío/null = sin restricción. */
+  eligibleZoneIds: text("eligible_zone_ids", { mode: "json" }).$type<string[]>(),
   rewardType: text("reward_type", {
     enum: ["free_shipping", "free_product", "fixed_discount", "percentage_discount"],
   }).notNull(),

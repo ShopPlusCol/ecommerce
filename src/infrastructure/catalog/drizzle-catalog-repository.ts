@@ -66,6 +66,10 @@ export class DrizzleCatalogRepository implements CatalogRepository {
         allowBackorder: row.allowBackorder,
         featured: row.featured,
         publishedAt: row.publishedAt?.toISOString() ?? null,
+        purchaseLimit:
+          row.limitCategoryId && row.maxUnitsPerCategoryUnit
+            ? { categoryId: row.limitCategoryId, maxUnitsPerCategoryUnit: row.maxUnitsPerCategoryUnit }
+            : null,
       };
     });
   }

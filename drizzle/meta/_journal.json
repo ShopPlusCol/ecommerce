@@ -36,6 +36,97 @@
       "when": 1785351087830,
       "tag": "0004_robust_silverclaw",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785355357569,
+      "tag": "0005_smiling_kid_colt",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785356378476,
+      "tag": "0006_sparkling_vapor",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785363718444,
+      "tag": "0007_normal_micromax",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1785365752296,
+      "tag": "0008_bent_stick",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1785378640426,
+      "tag": "0009_perpetual_anthem",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785380575583,
+      "tag": "0010_chilly_phantom_reporter",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1785430673245,
+      "tag": "0011_jittery_mephisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1785442323883,
+      "tag": "0012_oval_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1785442372311,
+      "tag": "0013_shipping_tree_data_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785443180625,
+      "tag": "0014_tricky_wendell_rand",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1785447688320,
+      "tag": "0015_shipping_zones_parent_cascade",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1785515669406,
+      "tag": "0016_seed_colombia_departments",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1785516205134,
+      "tag": "0017_shipping_neighborhood_group_settings",
+      "breakpoints": true
     }
   ]
 }

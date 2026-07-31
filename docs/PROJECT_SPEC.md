@@ -1,30 +1,36 @@
 # PROJECT_SPEC
 
-Resumen ejecutivo. La especificación completa y vinculante es [`PROMPT_MAESTRO.md`](../PROMPT_MAESTRO.md); este documento es un mapa de navegación, no un reemplazo.
+La especificación vinculante es
+[`PROMPT_MAESTRO.md`](../PROMPT_MAESTRO.md). ShopPlusCol es una tienda
+es-CO/COP de lentes cosméticos sin fórmula, inicialmente orientada a Medellín y
+envíos nacionales.
 
-## Producto
+## Capacidades
 
-ShopPlusCol: tienda premium de lentes de contacto cosméticos sin fórmula ni aumento. Mercado inicial: Medellín y Área Metropolitana, con envíos a toda Colombia. ~50 referencias de color + ~5 de Halloween + accesorios (solución, pinza/aplicador, kits). Precio de referencia: $49.000 COP por par. Moneda COP, idioma es-CO, zona horaria `America/Bogota`.
+- Catálogo, categorías, colecciones, búsqueda, favoritos y contenido.
+- Carrito, cupones, recompensas, envío jerárquico, pago total/parcial,
+  checkout, confirmación, comprobante y consulta privada.
+- Administración persistente con RBAC, auditoría, catálogo, inventario,
+  pedidos, pagos, clientes, contenido, configuración e integraciones.
+- Simulador fotográfico local con fallback y texturas administrables.
+- Cloudflare Workers/D1/R2 y alternativa Node/Docker.
 
-## Objetivos de negocio (sección 3 del prompt maestro)
+## Reglas
 
-Aumentar conversión desde Meta Ads, reducir pasos de compra, aumentar ticket promedio, reducir preguntas repetidas por WhatsApp, calcular correctamente envíos y pagos parciales, permitir administración sin tocar código, medir el embudo completo, mantener portabilidad de infraestructura.
+- Precio, stock, envío y pago se revalidan en servidor.
+- No se finge una integración activa ni una prueba externa.
+- La foto del simulador no se sube.
+- No hay secretos ni credenciales versionados.
+- Producción requiere staging, backups, contenido definitivo, revisión legal y
+  aprobación humana.
 
-## Fases (sección 44)
+## Estado de fases
 
-1. **Fundamentos, arquitectura y UX** — base técnica, sistema de diseño, layouts público/admin, modelo de datos, seed. *(en curso/cerrada en este documento — ver PHASE_STATUS)*
-2. **Tienda pública y experiencia de compra** — catálogo, carrito, checkout, favoritos, upsells, recompensas, WhatsApp, analítica de interfaz, todo con datos reales de desarrollo.
-3. **Backend, administrador e integraciones** — auth, panel conectado a base de datos, Mercado Pago, Meta Conversions API, cupones/promociones/pop-ups reales, auditoría.
-4. **Simulador, hardening y salida a producción** — try-on por foto, rendimiento, seguridad, despliegue final.
+Fases 1–3 aprobadas. Fase 4 y su ampliación administrativa 4.1 están
+implementadas localmente y pendientes de tres validaciones manuales finales.
+No existe aprobación de producción.
 
-## Reglas no negociables (resumen)
-
-- Nunca fingir una integración activa; todo pendiente debe ser seguro, documentado y no romper el sistema.
-- Cálculos de dinero, inventario y envío siempre verificados en servidor.
-- Sin secretos en el repositorio; `.env.example` documenta cada variable.
-- Arquitectura portable: el dominio no importa APIs de Cloudflare directamente (sección 28.1).
-- Precios, categorías, zonas y promociones son datos administrables, nunca constantes de código.
-
-## Alcance de esta fase
-
-Ver [`docs/PHASE_STATUS.md`](./PHASE_STATUS.md) para el detalle exacto de qué existe hoy y qué queda para la Fase 2.
+Ver [PHASE_STATUS.md](./PHASE_STATUS.md),
+[PHASE_4_1_MATRIX.md](./PHASE_4_1_MATRIX.md),
+[PHASE_4_CHECKLIST.md](./PHASE_4_CHECKLIST.md) y
+[DEPLOYMENT.md](./DEPLOYMENT.md).

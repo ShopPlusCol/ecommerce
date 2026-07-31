@@ -1,100 +1,84 @@
 import { money } from "@/domain/value-objects/money";
-import type {
-  ShippingDestination,
-  ShippingQuote,
-  ShippingRateResolver,
-} from "@/application/ports/shipping-rate-resolver";
-import { resolveShippingQuote, type ShippingRuleWithZone } from "@/domain/services/shipping";
+import type { ShippingDestination, ShippingQuote, ShippingRateResolver } from "@/application/ports/shipping-rate-resolver";
+import { resolveShippingQuote, type ShippingRuleConfig, type ShippingZoneNode } from "@/domain/services/shipping";
 
 /**
- * Reglas de envío de desarrollo (Fase 2). Cubren Medellín y Área
- * Metropolitana (contra entrega, mismo día), Antioquia y el resto de
- * Colombia (envío anticipado + saldo contra entrega). Editables desde el
- * panel en la Fase 3. La lista y las tarifas son de ejemplo.
+ * Árbol de zonas de desarrollo (Fase 2): Antioquia (Medellín con
+ * contraentrega y mismo día, Bello heredando de Antioquia) más un nivel
+ * país de respaldo para el resto de Colombia, y El Poblado con tarifa
+ * propia dentro de Medellín. Editable desde el panel en producción; esta
+ * lista y las tarifas son solo de ejemplo.
  */
-function cityRule(
-  id: string,
-  city: string,
-  fee: number,
-  extras: Partial<ShippingRuleWithZone> = {},
-): ShippingRuleWithZone {
+export const DEMO_SHIPPING_ZONES: ShippingZoneNode[] = [
+  { id: "zone-nacional", name: "Resto de Colombia", level: "country", parentZoneId: null, status: "active" },
+  { id: "zone-antioquia", name: "Antioquia", level: "department", parentZoneId: null, status: "active" },
+  { id: "zone-medellin", name: "Medellín", level: "city", parentZoneId: "zone-antioquia", status: "active" },
+  { id: "zone-bello", name: "Bello", level: "city", parentZoneId: "zone-antioquia", status: "active" },
+  { id: "zone-poblado", name: "El Poblado", level: "neighborhood", parentZoneId: "zone-medellin", status: "active" },
+];
+
+function rule(overrides: Partial<ShippingRuleConfig> & { ruleId: string; zoneId: string }): ShippingRuleConfig {
   return {
-    ruleId: id,
-    zone: { level: "city", country: "CO", department: "Antioquia", city, neighborhood: null },
-    fee: money(fee),
-    freeShippingThreshold: money(150_000),
-    cashOnDeliveryAllowed: true,
-    requiresAdvancePayment: false,
+    fee: null,
+    freeShippingThreshold: null,
+    coverage: null,
+    cashOnDeliveryAllowed: null,
+    requiresAdvancePayment: null,
     advancePercentage: null,
-    estimatedBusinessDaysMin: 0,
-    estimatedBusinessDaysMax: 1,
-    sameDayCutoffHour: 14,
-    customerMessage: "Entrega el mismo día pidiendo antes de las 2:00 p.m.",
-    priority: 0,
-    status: "active",
-    ...extras,
+    sameDayAvailable: null,
+    sameDayCutoffHour: null,
+    estimatedBusinessDaysMin: null,
+    estimatedBusinessDaysMax: null,
+    allowedPaymentMethods: null,
+    customerMessage: null,
+    ...overrides,
   };
 }
 
-export const DEMO_SHIPPING_RULES: ShippingRuleWithZone[] = [
-  cityRule("med", "Medellín", 8_000),
-  cityRule("bello", "Bello", 9_000),
-  cityRule("envigado", "Envigado", 9_000),
-  cityRule("itagui", "Itagüí", 9_000),
-  cityRule("sabaneta", "Sabaneta", 9_000),
-  cityRule("la-estrella", "La Estrella", 10_000),
-  // Excepción de barrio: El Poblado tiene tarifa reducida.
-  {
-    ruleId: "poblado",
-    zone: { level: "neighborhood", country: "CO", department: "Antioquia", city: "Medellín", neighborhood: "El Poblado" },
-    fee: money(6_000),
-    freeShippingThreshold: money(120_000),
-    cashOnDeliveryAllowed: true,
-    requiresAdvancePayment: false,
-    advancePercentage: null,
-    estimatedBusinessDaysMin: 0,
-    estimatedBusinessDaysMax: 1,
-    sameDayCutoffHour: 15,
-    customerMessage: "Entrega el mismo día en El Poblado pidiendo antes de las 3:00 p.m.",
-    priority: 0,
-    status: "active",
-  },
-  // Resto de Antioquia.
-  {
-    ruleId: "antioquia",
-    zone: { level: "department", country: "CO", department: "Antioquia", city: null, neighborhood: null },
-    fee: money(13_000),
-    freeShippingThreshold: null,
-    cashOnDeliveryAllowed: true,
-    requiresAdvancePayment: false,
-    advancePercentage: null,
-    estimatedBusinessDaysMin: 1,
-    estimatedBusinessDaysMax: 3,
-    sameDayCutoffHour: null,
-    customerMessage: "Entrega en 1 a 3 días hábiles.",
-    priority: 0,
-    status: "active",
-  },
-  // Resto de Colombia: envío anticipado, productos como saldo contra entrega.
-  {
-    ruleId: "nacional",
-    zone: { level: "country", country: "CO", department: null, city: null, neighborhood: null },
+export const DEMO_SHIPPING_RULES: ShippingRuleConfig[] = [
+  rule({
+    ruleId: "rule-nacional",
+    zoneId: "zone-nacional",
     fee: money(16_000),
-    freeShippingThreshold: null,
-    cashOnDeliveryAllowed: false,
     requiresAdvancePayment: true,
-    advancePercentage: null,
     estimatedBusinessDaysMin: 2,
     estimatedBusinessDaysMax: 6,
-    sameDayCutoffHour: null,
     customerMessage: "El envío se paga por anticipado; el valor de los productos queda como saldo contra entrega.",
-    priority: 0,
-    status: "active",
-  },
+  }),
+  rule({
+    ruleId: "rule-antioquia",
+    zoneId: "zone-antioquia",
+    fee: money(13_000),
+    cashOnDeliveryAllowed: true,
+    estimatedBusinessDaysMin: 1,
+    estimatedBusinessDaysMax: 3,
+    customerMessage: "Entrega en 1 a 3 días hábiles.",
+  }),
+  rule({
+    ruleId: "rule-medellin",
+    zoneId: "zone-medellin",
+    fee: money(8_000),
+    freeShippingThreshold: money(150_000),
+    cashOnDeliveryAllowed: true,
+    sameDayAvailable: true,
+    sameDayCutoffHour: 14,
+    estimatedBusinessDaysMin: 0,
+    estimatedBusinessDaysMax: 1,
+    customerMessage: "Entrega el mismo día pidiendo antes de las 2:00 p.m.",
+  }),
+  // Bello no tiene fila propia: hereda todo de Antioquia (sección 17.2).
+  rule({
+    ruleId: "rule-poblado",
+    zoneId: "zone-poblado",
+    fee: money(6_000),
+    freeShippingThreshold: money(120_000),
+    sameDayCutoffHour: 15,
+    customerMessage: "Entrega el mismo día en El Poblado pidiendo antes de las 3:00 p.m.",
+  }),
 ];
 
 export class DemoShippingResolver implements ShippingRateResolver {
   async resolve(destination: ShippingDestination, cartTotal: { amount: number; currency: "COP" }): Promise<ShippingQuote | null> {
-    return resolveShippingQuote(DEMO_SHIPPING_RULES, destination, cartTotal);
+    return resolveShippingQuote(DEMO_SHIPPING_ZONES, DEMO_SHIPPING_RULES, destination, money(cartTotal.amount));
   }
 }

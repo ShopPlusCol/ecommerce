@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ShieldCheck, Truck } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Section } from "@/components/ui/section";
 import { PageHeader } from "@/components/store/page-header";
 import { ProductCard } from "@/components/store/product-card";
+import { ProductGallery } from "@/components/store/product/product-gallery";
 import { ProductPurchasePanel } from "@/components/store/product/product-purchase-panel";
 import { ProductStickyBar } from "@/components/store/product/product-sticky-bar";
 import { CartUpsells } from "@/components/store/cart/cart-upsells";
+import { TryOnLauncher } from "@/components/store/try-on/try-on-launcher";
 import { formatMoney } from "@/domain/value-objects/money";
-import { catalogRepository } from "@/lib/container";
+import { catalogRepository, tryOnRepository } from "@/lib/container";
 import { siteConfig } from "@/lib/site-config";
 import { productJsonLd } from "@/lib/seo";
 
@@ -46,8 +47,9 @@ export default async function ProductPage({ params }: Params) {
     catalogRepository.getRelatedProducts(product.id, 4),
     catalogRepository.getUpsellProducts(product.id, 3),
   ]);
+  const tryOnProducts = [product, ...related].filter((item) => item.sku.startsWith("SPC-LEN"));
+  const tryOnTextures = await tryOnRepository.listApprovedByProductIds(tryOnProducts.map((item) => item.id));
 
-  const cover = product.media[0];
   const jsonLd = productJsonLd(product);
   const discount =
     product.compareAtPrice && product.compareAtPrice.amount > product.price.amount
@@ -58,7 +60,6 @@ export default async function ProductPage({ params }: Params) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <PageHeader
-        title={product.name}
         breadcrumbs={[
           { href: "/catalogo", label: "Catálogo" },
           { href: `/productos/${product.slug}`, label: product.name },
@@ -68,16 +69,17 @@ export default async function ProductPage({ params }: Params) {
       <Section spacing="sm">
         <Container className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
           <div className="lg:sticky lg:top-28 lg:self-start">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[24px] bg-surface-sunken shadow-sm">
-              {cover ? (
-                <Image src={cover.url} alt={cover.altText} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
-              ) : null}
-              {discount ? (
-                <span className="absolute left-4 top-4 rounded-full bg-brand px-2.5 py-1 text-xs font-semibold text-brand-contrast shadow-brand">
-                  −{discount}%
-                </span>
-              ) : null}
-            </div>
+            <ProductGallery
+              media={product.media}
+              productName={product.name}
+              badge={
+                discount ? (
+                  <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-brand px-2.5 py-1 text-xs font-semibold text-brand-contrast shadow-brand">
+                    −{discount}%
+                  </span>
+                ) : undefined
+              }
+            />
           </div>
 
           <div className="flex flex-col gap-5 pb-24 md:pb-0">
@@ -87,17 +89,24 @@ export default async function ProductPage({ params }: Params) {
               </span>
             ) : null}
 
-            <div className="flex flex-wrap items-baseline gap-3">
-              <span className="font-display text-3xl font-semibold text-text">{formatMoney(product.price)}</span>
-              {product.compareAtPrice ? (
-                <>
-                  <span className="text-md text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
-                  {discount ? <span className="text-sm font-medium text-brand">Ahorras {discount}%</span> : null}
-                </>
-              ) : null}
+            <div className="flex flex-col gap-1.5">
+              <h1 className="font-display text-2xl font-semibold text-text">{product.name}</h1>
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className="font-display text-xl font-semibold text-text">{formatMoney(product.price)}</span>
+                {product.compareAtPrice ? (
+                  <>
+                    <span className="text-sm text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
+                    {discount ? <span className="text-sm font-medium text-brand">Ahorras {discount}%</span> : null}
+                  </>
+                ) : null}
+              </div>
             </div>
 
             <ProductPurchasePanel product={product} />
+
+            {product.sku.startsWith("SPC-LEN") ? (
+              <TryOnLauncher products={tryOnProducts} textures={tryOnTextures} />
+            ) : null}
 
             {/* Envío y pagos, fácil de comprender (sección 9) */}
             <div className="grid gap-3 rounded-xl border border-border p-4 text-sm sm:grid-cols-2">

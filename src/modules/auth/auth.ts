@@ -48,7 +48,11 @@ export async function getAuth() {
           event: "password_reset",
           to: user.email,
           subject: "Recupera tu acceso administrativo",
-          data: { resetUrl: url },
+          data: {
+            resetUrl: url,
+            text: `Solicitaste restablecer tu contraseña administrativa. Entra a este enlace para elegir una nueva (vence pronto, si no fuiste tú ignora este correo):\n\n${url}`,
+            html: `<p>Solicitaste restablecer tu contraseña administrativa.</p><p><a href="${url}">Elegir una nueva contraseña</a></p><p style="font-size:12px;color:#666;">Vence pronto. Si no fuiste tú, ignora este correo.</p>`,
+          },
         });
       },
     },

@@ -36,6 +36,8 @@ describe("comprobantes de transferencia", () => {
   });
 
   it("configura margen multipart sobre el límite funcional", () => {
-    expect(nextConfig.experimental?.serverActions?.bodySizeLimit).toBe("9mb");
+    // El techo global de Server Actions cubre el mayor límite funcional real:
+    // los videos de producto (60 MB, ver validateMedia) más margen multipart.
+    expect(nextConfig.experimental?.serverActions?.bodySizeLimit).toBe("65mb");
   });
 });
