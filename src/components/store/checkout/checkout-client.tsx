@@ -32,6 +32,22 @@ type LocationForm = {
   deliveryInstructions: string;
 };
 
+// Orden visual de arriba a abajo, para saltar al primer campo con error.
+const FIELD_ORDER = [
+  "fullName", "phone", "email", "department", "city", "neighborhood",
+  "addressLine", "quote", "paymentMethod", "terms",
+] as const;
+
+function scrollToFirstError(errorsMap: Record<string, string>) {
+  const firstKey = FIELD_ORDER.find((key) => errorsMap[key]);
+  if (!firstKey) return;
+  const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const focusable = el.matches("input, select, textarea") ? el : el.querySelector<HTMLElement>("input, select, textarea");
+  focusable?.focus({ preventScroll: true });
+}
+
 const EMPTY_LOCATION: LocationForm = {
   department: "",
   city: "",
@@ -243,6 +259,7 @@ export function CheckoutClient() {
     if (!paymentMethod) next.paymentMethod = "Selecciona un método de pago.";
     if (!consent.terms) next.terms = "Debes aceptar los términos y la política de privacidad.";
     setErrors(next);
+    if (Object.keys(next).length > 0) scrollToFirstError(next);
     return Object.keys(next).length === 0;
   };
 
@@ -303,6 +320,7 @@ export function CheckoutClient() {
               onChange={(e) => setContact((c) => ({ ...c, fullName: e.target.value }))}
               error={errors.fullName}
               autoComplete="name"
+              data-field="fullName"
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
@@ -314,6 +332,7 @@ export function CheckoutClient() {
                 onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
                 error={errors.phone}
                 autoComplete="tel"
+                data-field="phone"
               />
               <Input
                 label="Correo (opcional)"
@@ -324,6 +343,7 @@ export function CheckoutClient() {
                 error={errors.email}
                 helperText="Para enviarte la confirmación."
                 autoComplete="email"
+                data-field="email"
               />
             </div>
           </CardContent>
@@ -334,36 +354,42 @@ export function CheckoutClient() {
           <CardContent className="flex flex-col gap-4">
             <StepHeading step={2} title="Ubicación y entrega" />
             <div className="grid gap-4 sm:grid-cols-2">
-              <SearchableSelect
-                label="Departamento"
-                required
-                value={location.department}
-                error={errors.department}
-                onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
-                options={departments}
-                placeholder="Escribe para buscar…"
-              />
-              {cityRequired ? (
+              <div data-field="department">
                 <SearchableSelect
-                  label="Ciudad o municipio"
+                  label="Departamento"
                   required
-                  value={location.city}
-                  error={errors.city}
-                  onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
-                  options={cities}
+                  value={location.department}
+                  error={errors.department}
+                  onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
+                  options={departments}
                   placeholder="Escribe para buscar…"
                 />
+              </div>
+              {cityRequired ? (
+                <div data-field="city">
+                  <SearchableSelect
+                    label="Ciudad o municipio"
+                    required
+                    value={location.city}
+                    error={errors.city}
+                    onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
+                    options={cities}
+                    placeholder="Escribe para buscar…"
+                  />
+                </div>
               ) : null}
             </div>
 
             {showNeighborhoodSelect ? (
-              <SearchableSelect
-                label="Barrio o sector"
-                value={location.neighborhood}
-                onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
-                options={neighborhoodOptions}
-                placeholder="Escribe para buscar…"
-              />
+              <div data-field="neighborhood">
+                <SearchableSelect
+                  label="Barrio o sector"
+                  value={location.neighborhood}
+                  onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
+                  options={neighborhoodOptions}
+                  placeholder="Escribe para buscar…"
+                />
+              </div>
             ) : (
               <Input
                 label="Barrio o sector"
@@ -371,6 +397,7 @@ export function CheckoutClient() {
                 value={location.neighborhood}
                 onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
                 error={errors.neighborhood}
+                data-field="neighborhood"
               />
             )}
 
@@ -382,6 +409,7 @@ export function CheckoutClient() {
               onChange={(e) => setLocation((l) => ({ ...l, addressLine: e.target.value }))}
               error={errors.addressLine}
               autoComplete="street-address"
+              data-field="addressLine"
             />
             <Input
               label="Apartamento, torre, bloque (opcional)"
@@ -402,6 +430,11 @@ export function CheckoutClient() {
             {quoteStatus === "error" ? (
               <p className="rounded-md bg-warning-soft p-3 text-sm text-warning" role="alert">
                 {quoteError}
+              </p>
+            ) : null}
+            {errors.quote ? (
+              <p data-field="quote" className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
+                {errors.quote}
               </p>
             ) : null}
             {quote ? (
@@ -432,7 +465,7 @@ export function CheckoutClient() {
                 Completa tu dirección para ver los métodos de pago disponibles en tu zona.
               </p>
             ) : (
-              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Método de pago">
+              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Método de pago" data-field="paymentMethod">
                 {methods.map((method) => (
                   <label
                     key={method}
@@ -473,7 +506,7 @@ export function CheckoutClient() {
         {/* Consentimiento */}
         <Card>
           <CardContent className="flex flex-col gap-3">
-            <label className="flex items-start gap-3 text-sm text-text">
+            <label className="flex items-start gap-3 text-sm text-text" data-field="terms">
               <input
                 type="checkbox"
                 checked={consent.terms}
