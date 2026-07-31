@@ -67,23 +67,24 @@ test.describe.serial("árbol de zonas de envío (Departamento → Ciudad → Bar
     await page.getByRole("button", { name: "Agregar" }).click();
     await expect(page.getByText(`Barrio "${blockedNeighborhoodName}" creada.`)).toBeVisible();
 
-    // Tarifa propia en el barrio principal.
-    const barrioCard = page.locator(`[data-zone-name="${neighborhoodName}"]`);
-    await barrioCard.getByText("Configurar").click();
-    const feeForm = barrioCard.locator('form:has(input[name="fee_mode"])');
-    await feeForm.locator('input[name="fee_mode"][value="custom"]').check();
-    await feeForm.locator('input[name="fee"]').fill("7000");
-    await feeForm.getByRole("button", { name: "Guardar cambios" }).click();
-    await expect(feeForm.getByText(`"${neighborhoodName}" guardada.`)).toBeVisible();
+    // Ambos barrios nacen en el grupo "Con cobertura" del tablero de
+    // pastillas (sección 2 de la Ronda 4). Configura primero la tarifa
+    // compartida del grupo "Precio especial"...
+    // El panel de "Precio especial" empieza abierto (a diferencia de "Sin
+    // cobertura"), así que no hace falta hacer clic en "Configurar grupo".
+    const specialPriceColumn = page.locator('[data-group="special_price"]');
+    await specialPriceColumn.locator('input[name="fee"]').fill("7000");
+    await specialPriceColumn.getByLabel("Mercado Pago").check();
+    await specialPriceColumn.getByRole("button", { name: /Guardar y aplicar/ }).click();
+    await expect(specialPriceColumn.getByText(/Configuración de "Precio especial" guardada/)).toBeVisible();
 
-    // Sin cobertura en el barrio bloqueado.
-    const blockedCard = page.locator(`[data-zone-name="${blockedNeighborhoodName}"]`);
-    await blockedCard.getByText("Configurar").click();
-    const coverageForm = blockedCard.locator('form:has(input[name="fee_mode"])');
-    await coverageForm.locator('input[name="coverage_mode"][value="custom"]').check();
-    await coverageForm.locator('select[name="coverage"]').selectOption("unavailable");
-    await coverageForm.getByRole("button", { name: "Guardar cambios" }).click();
-    await expect(coverageForm.getByText(`"${blockedNeighborhoodName}" guardada.`)).toBeVisible();
+    // ...y mueve el barrio principal a ese grupo con su selector accesible.
+    await page.getByRole("combobox", { name: `Mover "${neighborhoodName}" a otro grupo` }).selectOption("special_price");
+    await expect(page.getByText(`"${neighborhoodName}" movido a "Precio especial".`)).toBeVisible();
+
+    // El grupo "Sin cobertura" no requiere configuración previa para recibir barrios.
+    await page.getByRole("combobox", { name: `Mover "${blockedNeighborhoodName}" a otro grupo` }).selectOption("no_coverage");
+    await expect(page.getByText(`"${blockedNeighborhoodName}" movido a "Sin cobertura".`)).toBeVisible();
   });
 
   test("el checkout cotiza exactamente la tarifa propia configurada para el barrio", async ({ page }) => {

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import { getLocalDb } from "./client";
 import {
@@ -345,22 +345,31 @@ async function seed() {
     .onConflictDoNothing();
 
   console.log("Sembrando zonas de envío de ejemplo...");
-  const [antioquiaZone, nationalZone] = await db
-    .insert(shippingZones)
-    .values([
-      { name: "Antioquia", level: "department", country: "CO", status: "active" },
-      { name: "Resto de Colombia", level: "country", country: "CO", status: "active" },
-    ])
-    .onConflictDoNothing()
-    .returning();
+  // `onConflictDoNothing()` no evita duplicados aquí: el id es aleatorio y
+  // nunca choca, así que busca primero por nombre/nivel (p. ej. el
+  // departamento "Antioquia" que ya precarga la migración 0016) antes de
+  // insertar, para que sembrar dos veces (o sembrar sobre una base ya
+  // migrada) no cree zonas repetidas.
+  async function findOrCreateZone(values: { name: string; level: "department" | "city" | "country"; parentZoneId?: string; country: string; status: "active" }) {
+    const [existing] = await db
+      .select()
+      .from(shippingZones)
+      .where(
+        and(
+          eq(shippingZones.name, values.name),
+          eq(shippingZones.level, values.level),
+          values.parentZoneId ? eq(shippingZones.parentZoneId, values.parentZoneId) : isNull(shippingZones.parentZoneId),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing;
+    const [created] = await db.insert(shippingZones).values(values).returning();
+    return created;
+  }
 
-  const [medellinZone] = antioquiaZone
-    ? await db
-        .insert(shippingZones)
-        .values([{ name: "Medellín", level: "city", parentZoneId: antioquiaZone.id, country: "CO", status: "active" }])
-        .onConflictDoNothing()
-        .returning()
-    : [];
+  const antioquiaZone = await findOrCreateZone({ name: "Antioquia", level: "department", country: "CO", status: "active" });
+  const nationalZone = await findOrCreateZone({ name: "Resto de Colombia", level: "country", country: "CO", status: "active" });
+  const medellinZone = await findOrCreateZone({ name: "Medellín", level: "city", parentZoneId: antioquiaZone.id, country: "CO", status: "active" });
 
   if (medellinZone) {
     await db

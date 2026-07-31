@@ -170,21 +170,17 @@ export function BarrioPillsBoard({
           {allSelected ? "Deseleccionar todo" : `Seleccionar todo (${allIds.length})`}
         </button>
       </div>
-      {moveState.status === "error" ? (
-        <p role="alert" className="rounded-md bg-danger-soft p-2 text-sm text-danger">
-          {moveState.message}
-        </p>
-      ) : null}
-      {moveManyState.status === "error" ? (
-        <p role="alert" className="rounded-md bg-danger-soft p-2 text-sm text-danger">
-          {moveManyState.message}
-        </p>
-      ) : null}
-      {deleteManyState.status === "error" ? (
-        <p role="alert" className="rounded-md bg-danger-soft p-2 text-sm text-danger">
-          {deleteManyState.message}
-        </p>
-      ) : null}
+      {[moveState, moveManyState, deleteManyState].map((state, index) =>
+        state.status !== "idle" ? (
+          <p
+            key={index}
+            role={state.status === "error" ? "alert" : "status"}
+            className={cn("rounded-md p-2 text-sm", state.status === "error" ? "bg-danger-soft text-danger" : "bg-success-soft text-success")}
+          >
+            {state.message}
+          </p>
+        ) : null,
+      )}
       {selected.size > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/30 bg-brand-soft p-3 text-sm">
           <span className="font-semibold text-brand">{selected.size} barrio(s) seleccionado(s)</span>
@@ -295,6 +291,7 @@ function Column({
 
   return (
     <div
+      data-group={group}
       onDragOver={(event) => {
         event.preventDefault();
         onDragOverColumn();
