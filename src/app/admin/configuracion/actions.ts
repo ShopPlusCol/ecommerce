@@ -9,6 +9,7 @@ import { auditLogs, settings } from "@/infrastructure/db/schema";
 import { actionError, type AdminActionState } from "@/modules/admin/action-state";
 import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
 import type { SiteTextsSettings } from "@/modules/settings/site-texts";
+import { LOCKED_CHECKOUT_FIELDS, NO_REQUIRED_TOGGLE_FIELDS, type CheckoutFieldConfig, type CheckoutFieldId } from "@/modules/checkout/checkout-fields";
 
 const optionalUrl = z.union([
   z.literal(""),
@@ -163,6 +164,41 @@ export async function saveSiteTextsSettingsAction(_state: AdminActionState, form
     revalidatePath("/admin/configuracion");
     revalidatePath("/", "layout");
     return { status: "success", message: "Textos del sitio guardados." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+const CHECKOUT_FIELD_IDS = ["fullName", "phone", "email", "location", "addressLine", "addressComplement", "deliveryInstructions", "marketingConsent"] as const;
+
+export async function saveCheckoutFieldsSettingsAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("settings", "update");
+    const orderRaw = z.string().min(1, "Falta el orden de los campos.").parse(formData.get("order"));
+    let parsedOrder: unknown;
+    try {
+      parsedOrder = JSON.parse(orderRaw);
+    } catch {
+      throw new Error("El orden de campos no es válido.");
+    }
+    const order = z.array(z.enum(CHECKOUT_FIELD_IDS)).parse(parsedOrder);
+    if (order.length !== CHECKOUT_FIELD_IDS.length || new Set(order).size !== CHECKOUT_FIELD_IDS.length) {
+      throw new Error("El orden de campos no es válido.");
+    }
+    const fields: CheckoutFieldConfig[] = order.map((id, index) => {
+      const locked = (LOCKED_CHECKOUT_FIELDS as readonly CheckoutFieldId[]).includes(id);
+      const noRequiredToggle = (NO_REQUIRED_TOGGLE_FIELDS as readonly CheckoutFieldId[]).includes(id);
+      const enabled = locked ? true : formData.get(`${id}_enabled`) === "on";
+      const required = locked ? true : noRequiredToggle ? false : formData.get(`${id}_required`) === "on";
+      return { id, enabled, required, order: index };
+    });
+    const db = await getRuntimeDb();
+    await db.insert(settings).values({ key: "checkout_fields", value: fields, updatedByUserId: session.user.id })
+      .onConflictDoUpdate({ target: settings.key, set: { value: fields, updatedByUserId: session.user.id, updatedAt: new Date() } });
+    await db.insert(auditLogs).values({ userId: session.user.id, action: "settings.checkout_fields.update", entityType: "setting", entityId: "checkout_fields", after: { fields } });
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/checkout");
+    return { status: "success", message: "Formulario de checkout guardado." };
   } catch (error) {
     return actionError(error);
   }

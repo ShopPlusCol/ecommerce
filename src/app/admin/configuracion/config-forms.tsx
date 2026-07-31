@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { cn } from "@/lib/utils";
 import { INITIAL_ADMIN_ACTION_STATE } from "@/modules/admin/action-state";
 import type { BrandSettings } from "@/modules/settings/brand";
 import type { ManualTransferSettings } from "@/modules/settings/manual-transfer";
@@ -8,6 +9,13 @@ import type { PrivacySettings } from "@/modules/settings/privacy";
 import type { ShippingMessagesSettings } from "@/modules/settings/shipping-messages";
 import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
 import type { SiteTextsSettings } from "@/modules/settings/site-texts";
+import {
+  CHECKOUT_FIELD_LABELS,
+  LOCKED_CHECKOUT_FIELDS,
+  NO_REQUIRED_TOGGLE_FIELDS,
+  type CheckoutFieldConfig,
+  type CheckoutFieldId,
+} from "@/modules/checkout/checkout-fields";
 import type { PaymentMethodId } from "@/domain/services/payments";
 import { MediaSettingField } from "./media-setting-field";
 import {
@@ -17,6 +25,7 @@ import {
   saveShippingMessagesSettingsAction,
   savePaymentMethodsSettingsAction,
   saveSiteTextsSettingsAction,
+  saveCheckoutFieldsSettingsAction,
 } from "./actions";
 
 const control = "mt-1 h-10 w-full rounded-md border border-border bg-surface px-3";
@@ -186,6 +195,122 @@ export function SiteTextsSettingsForm({
       ))}
       <button disabled={pending} className="h-11 w-fit rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">
         {pending ? "Guardando…" : "Guardar textos"}
+      </button>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function CheckoutFieldsSettingsForm({
+  fields,
+}: {
+  fields: CheckoutFieldConfig[];
+}) {
+  const [state, action, pending] = useActionState(saveCheckoutFieldsSettingsAction, INITIAL_ADMIN_ACTION_STATE);
+  const [order, setOrder] = useState<CheckoutFieldId[]>(() => fields.map((field) => field.id));
+  const [draggingId, setDraggingId] = useState<CheckoutFieldId | null>(null);
+  const [overId, setOverId] = useState<CheckoutFieldId | null>(null);
+  const byId = new Map(fields.map((field) => [field.id, field]));
+
+  function move(from: number, to: number) {
+    if (to < 0 || to >= order.length || from === to) return;
+    const next = [...order];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setOrder(next);
+  }
+
+  function handleDrop(targetId: CheckoutFieldId) {
+    const sourceId = draggingId;
+    setDraggingId(null);
+    setOverId(null);
+    if (!sourceId || sourceId === targetId) return;
+    const from = order.indexOf(sourceId);
+    const to = order.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    move(from, to);
+  }
+
+  return (
+    <form id="checkout" action={action} className="mt-6 grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6">
+      <h2 className="text-lg font-semibold">Formulario de checkout</h2>
+      <p className="text-sm text-text-muted">
+        Activa o desactiva campos, márcalos obligatorios y arrastra (⠿, o usa ↑/↓) para reordenarlos. Nombre, teléfono, ubicación
+        y dirección son necesarios para calcular el envío y contactar al cliente — siempre están activos y obligatorios, pero
+        igual puedes moverlos de posición.
+      </p>
+      <input type="hidden" name="order" value={JSON.stringify(order)} readOnly />
+      <div className="grid gap-2">
+        {order.map((id, index) => {
+          const field = byId.get(id);
+          if (!field) return null;
+          const locked = (LOCKED_CHECKOUT_FIELDS as readonly CheckoutFieldId[]).includes(id);
+          const noRequiredToggle = (NO_REQUIRED_TOGGLE_FIELDS as readonly CheckoutFieldId[]).includes(id);
+          const isDropTarget = overId === id && draggingId !== null && draggingId !== id;
+          return (
+            <div
+              key={id}
+              onDragOver={(event) => {
+                if (!draggingId) return;
+                event.preventDefault();
+                if (overId !== id) setOverId(id);
+              }}
+              onDragLeave={() => setOverId((current) => (current === id ? null : current))}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleDrop(id);
+              }}
+              className={cn(
+                "flex flex-wrap items-center gap-3 rounded-lg border p-3 transition",
+                isDropTarget ? "ring-2 ring-brand ring-offset-2 ring-offset-surface" : "border-border",
+                draggingId === id ? "opacity-50" : "",
+              )}
+            >
+              <button
+                type="button"
+                draggable
+                onDragStart={(event) => {
+                  setDraggingId(id);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", id);
+                }}
+                onDragEnd={() => {
+                  setDraggingId(null);
+                  setOverId(null);
+                }}
+                className="flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-md border border-border text-text-muted hover:border-brand/40 hover:text-brand active:cursor-grabbing"
+                aria-label={`Arrastrar para reordenar "${CHECKOUT_FIELD_LABELS[id]}"`}
+                title="Arrastrar para reordenar"
+              >
+                <span aria-hidden="true">⠿</span>
+              </button>
+              <div className="flex shrink-0 flex-col">
+                <button type="button" onClick={() => move(index, index - 1)} disabled={index === 0} className="text-xs text-text-muted disabled:opacity-30" aria-label={`Subir "${CHECKOUT_FIELD_LABELS[id]}"`}>▲</button>
+                <button type="button" onClick={() => move(index, index + 1)} disabled={index === order.length - 1} className="text-xs text-text-muted disabled:opacity-30" aria-label={`Bajar "${CHECKOUT_FIELD_LABELS[id]}"`}>▼</button>
+              </div>
+              <span className="flex-1 text-sm font-semibold">{CHECKOUT_FIELD_LABELS[id]}</span>
+              {locked ? (
+                <span className="rounded-full bg-surface-sunken px-2 py-1 text-xs font-semibold text-text-muted">Siempre activo y obligatorio</span>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold">
+                    <input type="checkbox" name={`${id}_enabled`} defaultChecked={field.enabled} className="h-3.5 w-3.5 accent-brand" />
+                    Activo
+                  </label>
+                  {noRequiredToggle ? null : (
+                    <label className="flex items-center gap-1.5 text-xs font-semibold">
+                      <input type="checkbox" name={`${id}_required`} defaultChecked={field.required} className="h-3.5 w-3.5 accent-brand" />
+                      Obligatorio
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button disabled={pending} className="h-11 w-fit rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">
+        {pending ? "Guardando…" : "Guardar formulario"}
       </button>
       <Feedback state={state} />
     </form>

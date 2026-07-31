@@ -19,8 +19,15 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
 import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
 import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
-import { getStoreContentAction } from "@/app/(store)/site-content-actions";
+import { getStoreContentAction, getCheckoutFieldsAction } from "@/app/(store)/site-content-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
+import {
+  DEFAULT_CHECKOUT_FIELDS,
+  LOCKED_CHECKOUT_FIELDS,
+  NO_REQUIRED_TOGGLE_FIELDS,
+  type CheckoutFieldConfig,
+  type CheckoutFieldId,
+} from "@/modules/checkout/checkout-fields";
 
 type Contact = { fullName: string; phone: string; email: string };
 type LocationForm = {
@@ -32,14 +39,24 @@ type LocationForm = {
   deliveryInstructions: string;
 };
 
-// Orden visual de arriba a abajo, para saltar al primer campo con error.
-const FIELD_ORDER = [
-  "fullName", "phone", "email", "department", "city", "neighborhood",
-  "addressLine", "quote", "paymentMethod", "terms",
-] as const;
+// Orden visual de arriba a abajo, para saltar al primer campo con error —
+// "location" se expande a sus tres sub-campos, que sí tienen error propio.
+function buildFieldOrder(fieldConfig: CheckoutFieldConfig[]): string[] {
+  const order: string[] = [];
+  for (const field of fieldConfig) {
+    if (field.id === "marketingConsent") continue;
+    if (field.id === "location") {
+      order.push("department", "city", "neighborhood");
+      continue;
+    }
+    order.push(field.id);
+  }
+  order.push("quote", "paymentMethod", "terms");
+  return order;
+}
 
-function scrollToFirstError(errorsMap: Record<string, string>) {
-  const firstKey = FIELD_ORDER.find((key) => errorsMap[key]);
+function scrollToFirstError(errorsMap: Record<string, string>, fieldOrder: string[]) {
+  const firstKey = fieldOrder.find((key) => errorsMap[key]);
   if (!firstKey) return;
   const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`);
   if (!el) return;
@@ -71,6 +88,7 @@ export function CheckoutClient() {
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
   const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
   const [paymentDisclaimer, setPaymentDisclaimer] = React.useState("");
+  const [fieldConfig, setFieldConfig] = React.useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
   const [departments, setDepartments] = React.useState<string[]>([]);
   const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
@@ -121,6 +139,18 @@ export function CheckoutClient() {
     let cancelled = false;
     getStoreContentAction().then(({ texts }) => {
       if (!cancelled) setPaymentDisclaimer(texts.checkoutPaymentDisclaimer);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Qué campos del formulario están activos/obligatorios y en qué orden,
+  // editable desde Configuración → Formulario de checkout.
+  React.useEffect(() => {
+    let cancelled = false;
+    getCheckoutFieldsAction().then((config) => {
+      if (!cancelled) setFieldConfig(config);
     });
     return () => {
       cancelled = true;
@@ -246,20 +276,40 @@ export function CheckoutClient() {
   const neighborhoodOptions = configuredNeighborhoods;
   const showNeighborhoodSelect = neighborhoodOptions.length > 0;
 
+  const fieldConfigById = new Map(fieldConfig.map((field) => [field.id, field]));
+  function isFieldEnabled(id: CheckoutFieldId) {
+    if ((LOCKED_CHECKOUT_FIELDS as readonly CheckoutFieldId[]).includes(id)) return true;
+    return fieldConfigById.get(id)?.enabled ?? true;
+  }
+  function isFieldRequired(id: CheckoutFieldId) {
+    if ((LOCKED_CHECKOUT_FIELDS as readonly CheckoutFieldId[]).includes(id)) return true;
+    if ((NO_REQUIRED_TOGGLE_FIELDS as readonly CheckoutFieldId[]).includes(id)) return false;
+    return fieldConfigById.get(id)?.required ?? false;
+  }
+
   const validate = (): boolean => {
     const next: Record<string, string> = {};
     if (contact.fullName.trim().length < 2) next.fullName = "Ingresa tu nombre completo.";
     if (contact.phone.replace(/\D/g, "").length < 7) next.phone = "Ingresa un teléfono válido.";
-    if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
+    if (isFieldEnabled("email")) {
+      if (isFieldRequired("email") && !contact.email.trim()) next.email = "Ingresa tu correo.";
+      else if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) next.email = "Correo inválido.";
+    }
     if (!location.department) next.department = "Selecciona el departamento.";
     if (cityRequired && !location.city) next.city = "Selecciona la ciudad o municipio.";
     if (!showNeighborhoodSelect && location.neighborhood.trim().length < 2) next.neighborhood = "Escribe tu barrio o sector.";
     if (location.addressLine.trim().length < 3) next.addressLine = "Ingresa la dirección.";
+    if (isFieldEnabled("addressComplement") && isFieldRequired("addressComplement") && !location.addressComplement.trim()) {
+      next.addressComplement = "Completa este campo.";
+    }
+    if (isFieldEnabled("deliveryInstructions") && isFieldRequired("deliveryInstructions") && !location.deliveryInstructions.trim()) {
+      next.deliveryInstructions = "Completa este campo.";
+    }
     if (!quote) next.quote = "Necesitamos una dirección con cobertura para calcular el envío.";
     if (!paymentMethod) next.paymentMethod = "Selecciona un método de pago.";
     if (!consent.terms) next.terms = "Debes aceptar los términos y la política de privacidad.";
     setErrors(next);
-    if (Object.keys(next).length > 0) scrollToFirstError(next);
+    if (Object.keys(next).length > 0) scrollToFirstError(next, buildFieldOrder(fieldConfig));
     return Object.keys(next).length === 0;
   };
 
@@ -306,160 +356,188 @@ export function CheckoutClient() {
     window.location.assign(resolveCheckoutDestination(result.order.checkoutUrl));
   };
 
+  const fieldRenderers: Record<CheckoutFieldId, () => React.ReactNode> = {
+    fullName: () => (
+      <Input
+        key="fullName"
+        label="Nombre completo"
+        required
+        value={contact.fullName}
+        onChange={(e) => setContact((c) => ({ ...c, fullName: e.target.value }))}
+        error={errors.fullName}
+        autoComplete="name"
+        data-field="fullName"
+      />
+    ),
+    phone: () => (
+      <Input
+        key="phone"
+        label="Teléfono"
+        required
+        type="tel"
+        inputMode="tel"
+        value={contact.phone}
+        onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+        error={errors.phone}
+        autoComplete="tel"
+        data-field="phone"
+      />
+    ),
+    email: () => (
+      <Input
+        key="email"
+        label={isFieldRequired("email") ? "Correo" : "Correo (opcional)"}
+        required={isFieldRequired("email")}
+        type="email"
+        inputMode="email"
+        value={contact.email}
+        onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+        error={errors.email}
+        helperText="Para enviarte la confirmación."
+        autoComplete="email"
+        data-field="email"
+      />
+    ),
+    location: () => (
+      <div key="location" className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div data-field="department">
+            <SearchableSelect
+              label="Departamento"
+              required
+              value={location.department}
+              error={errors.department}
+              onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
+              options={departments}
+              placeholder="Escribe para buscar…"
+            />
+          </div>
+          {cityRequired ? (
+            <div data-field="city">
+              <SearchableSelect
+                label="Ciudad o municipio"
+                required
+                value={location.city}
+                error={errors.city}
+                onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
+                options={cities}
+                placeholder="Escribe para buscar…"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {showNeighborhoodSelect ? (
+          <div data-field="neighborhood">
+            <SearchableSelect
+              label="Barrio o sector"
+              value={location.neighborhood}
+              onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
+              options={neighborhoodOptions}
+              placeholder="Escribe para buscar…"
+            />
+          </div>
+        ) : (
+          <Input
+            label="Barrio o sector"
+            required
+            value={location.neighborhood}
+            onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
+            error={errors.neighborhood}
+            data-field="neighborhood"
+          />
+        )}
+
+        {quoteStatus === "loading" ? (
+          <p className="flex items-center gap-2 text-sm text-text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Calculando envío…
+          </p>
+        ) : null}
+        {quoteStatus === "error" ? (
+          <p className="rounded-md bg-warning-soft p-3 text-sm text-warning" role="alert">
+            {quoteError}
+          </p>
+        ) : null}
+        {errors.quote ? (
+          <p data-field="quote" className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
+            {errors.quote}
+          </p>
+        ) : null}
+        {quote ? (
+          <div className="rounded-md bg-surface-sunken p-3 text-sm text-text-muted">
+            <p className="font-medium text-text">
+              Envío: {quote.fee.amount === 0 ? "Gratis" : formatMoney(quote.fee)}
+            </p>
+            <p>{quote.customerMessage}</p>
+            <p className="text-xs text-text-subtle">
+              Entrega estimada: {quote.estimatedBusinessDaysMin === 0 ? "hoy" : `${quote.estimatedBusinessDaysMin}`}
+              {quote.estimatedBusinessDaysMax > quote.estimatedBusinessDaysMin
+                ? ` a ${quote.estimatedBusinessDaysMax} días hábiles`
+                : quote.estimatedBusinessDaysMin === 0
+                  ? ""
+                  : " día(s) hábil(es)"}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    ),
+    addressLine: () => (
+      <Input
+        key="addressLine"
+        label="Dirección"
+        required
+        placeholder="Calle 10 # 20-30"
+        value={location.addressLine}
+        onChange={(e) => setLocation((l) => ({ ...l, addressLine: e.target.value }))}
+        error={errors.addressLine}
+        autoComplete="street-address"
+        data-field="addressLine"
+      />
+    ),
+    addressComplement: () => (
+      <Input
+        key="addressComplement"
+        label={isFieldRequired("addressComplement") ? "Apartamento, torre, bloque" : "Apartamento, torre, bloque (opcional)"}
+        required={isFieldRequired("addressComplement")}
+        value={location.addressComplement}
+        onChange={(e) => setLocation((l) => ({ ...l, addressComplement: e.target.value }))}
+        error={errors.addressComplement}
+        data-field="addressComplement"
+      />
+    ),
+    deliveryInstructions: () => (
+      <Input
+        key="deliveryInstructions"
+        label={isFieldRequired("deliveryInstructions") ? "Indicaciones de entrega" : "Indicaciones de entrega (opcional)"}
+        required={isFieldRequired("deliveryInstructions")}
+        value={location.deliveryInstructions}
+        onChange={(e) => setLocation((l) => ({ ...l, deliveryInstructions: e.target.value }))}
+        error={errors.deliveryInstructions}
+        data-field="deliveryInstructions"
+      />
+    ),
+    // Se renderiza aparte, en la tarjeta de Consentimiento junto a los
+    // términos — nunca a través de este mapa (se filtra antes de mapear).
+    marketingConsent: () => null,
+  };
+
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-8 lg:grid-cols-[1fr_360px]">
       <div className="flex flex-col gap-6">
-        {/* Contacto */}
+        {/* Tus datos y entrega */}
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <StepHeading step={1} title="Contacto" />
-            <Input
-              label="Nombre completo"
-              required
-              value={contact.fullName}
-              onChange={(e) => setContact((c) => ({ ...c, fullName: e.target.value }))}
-              error={errors.fullName}
-              autoComplete="name"
-              data-field="fullName"
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Teléfono"
-                required
-                type="tel"
-                inputMode="tel"
-                value={contact.phone}
-                onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                error={errors.phone}
-                autoComplete="tel"
-                data-field="phone"
-              />
-              <Input
-                label="Correo (opcional)"
-                type="email"
-                inputMode="email"
-                value={contact.email}
-                onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-                error={errors.email}
-                helperText="Para enviarte la confirmación."
-                autoComplete="email"
-                data-field="email"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Ubicación y entrega */}
-        <Card>
-          <CardContent className="flex flex-col gap-4">
-            <StepHeading step={2} title="Ubicación y entrega" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div data-field="department">
-                <SearchableSelect
-                  label="Departamento"
-                  required
-                  value={location.department}
-                  error={errors.department}
-                  onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
-                  options={departments}
-                  placeholder="Escribe para buscar…"
-                />
-              </div>
-              {cityRequired ? (
-                <div data-field="city">
-                  <SearchableSelect
-                    label="Ciudad o municipio"
-                    required
-                    value={location.city}
-                    error={errors.city}
-                    onChange={(value) => setLocation((l) => ({ ...l, city: value, neighborhood: "" }))}
-                    options={cities}
-                    placeholder="Escribe para buscar…"
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            {showNeighborhoodSelect ? (
-              <div data-field="neighborhood">
-                <SearchableSelect
-                  label="Barrio o sector"
-                  value={location.neighborhood}
-                  onChange={(value) => setLocation((l) => ({ ...l, neighborhood: value }))}
-                  options={neighborhoodOptions}
-                  placeholder="Escribe para buscar…"
-                />
-              </div>
-            ) : (
-              <Input
-                label="Barrio o sector"
-                required
-                value={location.neighborhood}
-                onChange={(e) => setLocation((l) => ({ ...l, neighborhood: e.target.value }))}
-                error={errors.neighborhood}
-                data-field="neighborhood"
-              />
-            )}
-
-            <Input
-              label="Dirección"
-              required
-              placeholder="Calle 10 # 20-30"
-              value={location.addressLine}
-              onChange={(e) => setLocation((l) => ({ ...l, addressLine: e.target.value }))}
-              error={errors.addressLine}
-              autoComplete="street-address"
-              data-field="addressLine"
-            />
-            <Input
-              label="Apartamento, torre, bloque (opcional)"
-              value={location.addressComplement}
-              onChange={(e) => setLocation((l) => ({ ...l, addressComplement: e.target.value }))}
-            />
-            <Input
-              label="Indicaciones de entrega (opcional)"
-              value={location.deliveryInstructions}
-              onChange={(e) => setLocation((l) => ({ ...l, deliveryInstructions: e.target.value }))}
-            />
-
-            {quoteStatus === "loading" ? (
-              <p className="flex items-center gap-2 text-sm text-text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Calculando envío…
-              </p>
-            ) : null}
-            {quoteStatus === "error" ? (
-              <p className="rounded-md bg-warning-soft p-3 text-sm text-warning" role="alert">
-                {quoteError}
-              </p>
-            ) : null}
-            {errors.quote ? (
-              <p data-field="quote" className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
-                {errors.quote}
-              </p>
-            ) : null}
-            {quote ? (
-              <div className="rounded-md bg-surface-sunken p-3 text-sm text-text-muted">
-                <p className="font-medium text-text">
-                  Envío: {quote.fee.amount === 0 ? "Gratis" : formatMoney(quote.fee)}
-                </p>
-                <p>{quote.customerMessage}</p>
-                <p className="text-xs text-text-subtle">
-                  Entrega estimada: {quote.estimatedBusinessDaysMin === 0 ? "hoy" : `${quote.estimatedBusinessDaysMin}`}
-                  {quote.estimatedBusinessDaysMax > quote.estimatedBusinessDaysMin
-                    ? ` a ${quote.estimatedBusinessDaysMax} días hábiles`
-                    : quote.estimatedBusinessDaysMin === 0
-                      ? ""
-                      : " día(s) hábil(es)"}
-                </p>
-              </div>
-            ) : null}
+            <StepHeading step={1} title="Tus datos y entrega" />
+            {fieldConfig
+              .filter((field) => field.id !== "marketingConsent" && isFieldEnabled(field.id))
+              .map((field) => fieldRenderers[field.id]())}
           </CardContent>
         </Card>
 
         {/* Pago */}
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <StepHeading step={3} title="Método de pago" />
+            <StepHeading step={2} title="Método de pago" />
             {methods.length === 0 ? (
               <p className="text-sm text-text-muted">
                 Completa tu dirección para ver los métodos de pago disponibles en tu zona.
@@ -530,15 +608,17 @@ export function CheckoutClient() {
                 {errors.terms}
               </p>
             ) : null}
-            <label className="flex items-start gap-3 text-sm text-text-muted">
-              <input
-                type="checkbox"
-                checked={consent.marketing}
-                onChange={(e) => setConsent((c) => ({ ...c, marketing: e.target.checked }))}
-                className="mt-0.5 accent-[var(--tk-cherry-500)]"
-              />
-              <span>Quiero recibir novedades y promociones (opcional).</span>
-            </label>
+            {isFieldEnabled("marketingConsent") ? (
+              <label className="flex items-start gap-3 text-sm text-text-muted" data-field="marketingConsent">
+                <input
+                  type="checkbox"
+                  checked={consent.marketing}
+                  onChange={(e) => setConsent((c) => ({ ...c, marketing: e.target.checked }))}
+                  className="mt-0.5 accent-[var(--tk-cherry-500)]"
+                />
+                <span>Quiero recibir novedades y promociones (opcional).</span>
+              </label>
+            ) : null}
           </CardContent>
         </Card>
       </div>
