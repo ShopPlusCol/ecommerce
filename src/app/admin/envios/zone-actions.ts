@@ -77,40 +77,53 @@ export async function createZoneAction(_state: AdminActionState, formData: FormD
   }
 }
 
-export async function createNeighborhoodsBulkAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+export async function createZonesBulkAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
   try {
     const session = await requirePermission("shipping", "create");
-    const cityId = z.string().min(1).parse(formData.get("cityId"));
-    const namesRaw = z.string().min(1, "Escribe al menos un barrio.").parse(formData.get("names"));
+    const level = z.enum(CREATABLE_LEVELS).parse(formData.get("level"));
+    const parentZoneId = String(formData.get("parentZoneId") ?? "").trim() || null;
+    if (level === "department" && parentZoneId) throw new Error("Un departamento no puede tener una zona padre.");
+    if (level !== "department" && !parentZoneId) throw new Error("Falta la zona padre.");
+
+    const namesRaw = z.string().min(1, "Escribe al menos un nombre.").parse(formData.get("names"));
     const names = [...new Set(namesRaw.split(/[,\n]/).map((n) => n.trim()).filter(Boolean))];
-    if (names.length === 0) throw new Error("Escribe al menos un barrio.");
+    if (names.length === 0) throw new Error("Escribe al menos un nombre.");
 
     const db = await getRuntimeDb();
-    const city = await loadZone(db, cityId);
-    if (city.level !== "city") throw new Error("Solo se pueden pegar barrios dentro de una ciudad/municipio.");
+    if (parentZoneId) {
+      const parent = await loadZone(db, parentZoneId);
+      const expectedChildLevel = CHILD_LEVEL[parent.level as "department" | "city"];
+      if (!expectedChildLevel || expectedChildLevel !== level) {
+        throw new Error(`Una zona de nivel "${ZONE_LEVEL_LABELS[parent.level as keyof typeof ZONE_LEVEL_LABELS]}" no puede tener hijas de nivel "${ZONE_LEVEL_LABELS[level]}".`);
+      }
+    }
 
-    const existing = await db.select().from(shippingZones).where(and(eq(shippingZones.parentZoneId, cityId), eq(shippingZones.level, "neighborhood")));
+    const existing = await db
+      .select()
+      .from(shippingZones)
+      .where(parentZoneId ? and(eq(shippingZones.parentZoneId, parentZoneId), eq(shippingZones.level, level)) : and(isNull(shippingZones.parentZoneId), eq(shippingZones.level, level)));
     const existingNames = new Set(existing.map((zone) => normalize(zone.name)));
     const toCreate = names.filter((name) => !existingNames.has(normalize(name)));
 
     if (toCreate.length > 0) {
       await db.insert(shippingZones).values(
-        toCreate.map((name) => ({ name, level: "neighborhood" as const, parentZoneId: cityId, country: "CO", status: "active" as const })),
+        toCreate.map((name) => ({ name, level, parentZoneId, country: "CO", status: "active" as const })),
       );
     }
 
     await db.insert(auditLogs).values({
       userId: session.user.id,
-      action: "shippingZone.neighborhood.bulkCreate",
+      action: "shippingZone.bulkCreate",
       entityType: "shippingZone",
-      entityId: cityId,
-      after: { created: toCreate, skipped: names.length - toCreate.length },
+      entityId: parentZoneId ?? "root",
+      after: { level, created: toCreate, skipped: names.length - toCreate.length },
     });
     refresh();
     const skipped = names.length - toCreate.length;
+    const levelLabel = ZONE_LEVEL_LABELS[level];
     return {
       status: "success",
-      message: skipped > 0 ? `${toCreate.length} barrio(s) creado(s); ${skipped} ya existían y se omitieron.` : `${toCreate.length} barrio(s) creado(s).`,
+      message: skipped > 0 ? `${toCreate.length} ${levelLabel.toLowerCase()}(s) creado(s); ${skipped} ya existían y se omitieron.` : `${toCreate.length} ${levelLabel.toLowerCase()}(s) creado(s).`,
     };
   } catch (error) {
     return actionError(error);

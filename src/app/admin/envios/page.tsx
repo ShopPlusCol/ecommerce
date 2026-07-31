@@ -5,6 +5,7 @@ import { ShippingQuoteSimulator } from "./shipping-quote-simulator";
 import { ZoneCard, ZoneEmptyState } from "./zone-cards";
 import { ZoneConfigForm } from "./zone-config-form";
 import { CreateZoneForm } from "./create-zone-form";
+import { BulkZonesForm } from "./bulk-zones-form";
 import { ZoneSearchBox } from "./zone-search-box";
 import { buildZoneConfigFormProps, deleteWarningFor, summarizeZone } from "./zone-view-model";
 
@@ -21,9 +22,15 @@ export default async function Page() {
       <ShippingQuoteSimulator />
       <ZoneSearchBox />
 
-      <section className="mb-6 rounded-xl border border-border bg-surface-raised p-4">
-        <h2 className="mb-3 text-sm font-semibold text-text-muted">Agregar departamento</h2>
-        <CreateZoneForm level="department" label="Nombre del departamento" placeholder="Ej. Antioquia" />
+      <section className="mb-6 grid gap-4 rounded-xl border border-border bg-surface-raised p-4 sm:grid-cols-2">
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-text-muted">Agregar departamento</h2>
+          <CreateZoneForm level="department" label="Nombre del departamento" placeholder="Ej. Antioquia" />
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-text-muted">Pegar varios a la vez</h2>
+          <BulkZonesForm level="department" label="Departamentos (separados por coma o uno por línea)" placeholder="Antioquia, Valle del Cauca, Santander" />
+        </div>
       </section>
 
       <div className="mb-8 grid gap-3">

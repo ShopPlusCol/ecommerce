@@ -6,10 +6,8 @@ import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { shippingNeighborhoodGroupSettings } from "@/infrastructure/db/schema";
 import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
-import { ZoneConfigForm } from "../../zone-config-form";
 import { CreateZoneForm } from "../../create-zone-form";
-import { BulkNeighborhoodsForm } from "../../bulk-neighborhoods-form";
-import { buildZoneConfigFormProps } from "../../zone-view-model";
+import { BulkZonesForm } from "../../bulk-zones-form";
 import { BarrioPillsBoard, type BarrioGroupSettingsData } from "../../barrio-pills-board";
 import { memberGroupFromRule } from "../../barrio-group-derivation";
 
@@ -61,11 +59,10 @@ export default async function CityPage({ params }: { params: Promise<{ departmen
           { label: city.name },
         ]}
       />
-      <AdminPageHeader title={city.name} description="Configuración de la ciudad/municipio y sus barrios." />
-
-      <section className="mb-6">
-        <ZoneConfigForm {...buildZoneConfigFormProps(city.id, zones, rules)} />
-      </section>
+      <AdminPageHeader
+        title={city.name}
+        description="Barrios de esta ciudad/municipio. Para editar la configuración propia de la ciudad, vuelve a la lista anterior y usa «Configurar»."
+      />
 
       <section className="mb-6 grid gap-4 rounded-xl border border-border bg-surface-raised p-4 sm:grid-cols-2">
         <div>
@@ -74,7 +71,7 @@ export default async function CityPage({ params }: { params: Promise<{ departmen
         </div>
         <div>
           <h2 className="mb-3 text-sm font-semibold text-text-muted">Pegar varios a la vez</h2>
-          <BulkNeighborhoodsForm cityId={city.id} />
+          <BulkZonesForm level="neighborhood" parentZoneId={city.id} label="Barrios (separados por coma o uno por línea)" placeholder="El Poblado, Laureles, Belén" />
         </div>
       </section>
 

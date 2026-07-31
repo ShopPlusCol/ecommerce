@@ -6,6 +6,7 @@ import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository
 import { ZoneCard, ZoneEmptyState } from "../zone-cards";
 import { ZoneConfigForm } from "../zone-config-form";
 import { CreateZoneForm } from "../create-zone-form";
+import { BulkZonesForm } from "../bulk-zones-form";
 import { buildZoneConfigFormProps, deleteWarningFor, summarizeZone } from "../zone-view-model";
 
 export default async function DepartmentPage({ params }: { params: Promise<{ departmentId: string }> }) {
@@ -20,15 +21,20 @@ export default async function DepartmentPage({ params }: { params: Promise<{ dep
   return (
     <>
       <AdminBreadcrumb items={[{ label: "Envíos y zonas", href: "/admin/envios" }, { label: department.name }]} />
-      <AdminPageHeader title={department.name} description="Configuración del departamento y sus ciudades o municipios." />
+      <AdminPageHeader
+        title={department.name}
+        description="Ciudades o municipios de este departamento. Para editar la configuración propia del departamento, vuelve a la lista anterior y usa «Configurar»."
+      />
 
-      <section className="mb-6">
-        <ZoneConfigForm {...buildZoneConfigFormProps(department.id, zones, rules)} />
-      </section>
-
-      <section className="mb-6 rounded-xl border border-border bg-surface-raised p-4">
-        <h2 className="mb-3 text-sm font-semibold text-text-muted">Agregar ciudad o municipio</h2>
-        <CreateZoneForm level="city" parentZoneId={department.id} label="Nombre de la ciudad/municipio" placeholder="Ej. Medellín" />
+      <section className="mb-6 grid gap-4 rounded-xl border border-border bg-surface-raised p-4 sm:grid-cols-2">
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-text-muted">Agregar ciudad o municipio</h2>
+          <CreateZoneForm level="city" parentZoneId={department.id} label="Nombre de la ciudad/municipio" placeholder="Ej. Medellín" />
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-text-muted">Pegar varias a la vez</h2>
+          <BulkZonesForm level="city" parentZoneId={department.id} label="Ciudades/municipios (separados por coma o uno por línea)" placeholder="Medellín, Envigado, Itagüí" />
+        </div>
       </section>
 
       <div className="grid gap-3">
