@@ -38,6 +38,9 @@ import { getShippingMessagesSettings } from "@/modules/settings/shipping-message
 import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit";
 import { resolveDestinationLabel, resolveRejectionMessage } from "@/domain/services/shipping";
 import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
+import { getBrandSettings } from "@/modules/settings/brand";
+import { ConfiguredNotificationProvider } from "@/infrastructure/notifications/configured-notification-provider";
+import { buildOrderConfirmationEmail } from "@/modules/notifications/order-confirmation-email";
 
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
@@ -438,6 +441,25 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       },
     };
     await db.update(idempotencyKeys).set({ responseSnapshot: result }).where(eq(idempotencyKeys.key, data.idempotencyKey));
+
+    // Correo de confirmación (sección 38, evento "order_created"): solo si
+    // el cliente dejó su correo, y nunca a costa del pedido — si falla o
+    // SMTP no está configurado, el pedido ya se confirmó igual.
+    if (data.contact.email) {
+      try {
+        const brand = await getBrandSettings();
+        const email = buildOrderConfirmationEmail(result.order, brand.name, process.env.NEXT_PUBLIC_SITE_URL ?? "");
+        await new ConfiguredNotificationProvider().send({
+          event: "order_created",
+          to: data.contact.email,
+          subject: email.subject,
+          data: { html: email.html, text: email.text },
+        });
+      } catch {
+        // Nunca rompe el pedido ya confirmado.
+      }
+    }
+
     return result;
   } catch (error) {
     for (const reservation of reserved) {
