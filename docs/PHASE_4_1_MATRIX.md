@@ -142,3 +142,25 @@ misma tabla (el tablero de pestañas, `neighborhood_names`/`group_kind` y su
 E2E `neighborhood-groups.spec.ts` fueron retirados). Detalle narrativo
 completo, bugs reales encontrados y el incidente de pérdida/restauración de
 datos en `.data/local.db` durante la verificación: `PHASE_STATUS.md`.
+
+# Pastillas de barrios, alta y edición masiva, mensaje global (Ronda 4, 2026-07-31)
+
+| Capacidad | Ruta y controles reales | Persistencia | Verificación |
+|---|---|---|---|
+| Pastillas de barrios por grupo | `/admin/envios/[departamento]/[ciudad]`; 3 columnas fijas (Con cobertura/Sin cobertura/Precio especial), arrastrar o selector accesible, selección múltiple para mover/eliminar en bloque | `shipping_neighborhood_group_settings` (migración `0017`) precarga y aplica en bloque sobre `shipping_rules`; grupo derivado de `coverage`/`fee` propios | `shipping-zones.spec.ts` reescrito para el nuevo flujo; uso real del propietario con 213 barrios de Medellín |
+| 33 departamentos precargados | `/admin/envios`; cada uno configurable individualmente | `shipping_zones` (migración `0016`, `INSERT ... WHERE NOT EXISTS`) | Checkout ofrece los 33 sin lista estática aparte; `seed.ts` corregido para no duplicar "Antioquia" |
+| Sin config redundante del padre | `/admin/envios/[departamento]` y `/[departamento]/[ciudad]` ya no repiten la configuración del nivel anterior | Sin cambio de esquema, solo dónde se muestra el mismo formulario | Revisión visual: la config del padre sigue accesible desde su tarjeta "Configurar" un nivel antes |
+| Alta masiva por coma en todo nivel | Formulario "Pegar varios a la vez" en departamentos, ciudades y barrios | `createZonesBulkAction` (generaliza `createNeighborhoodsBulkAction`) | Dedupe por nombre normalizado, igual que la versión solo-barrios anterior |
+| Edición rápida masiva | Tabla plegable en los listados de departamentos y ciudades: tarifa, cobertura, días hábiles mín/máx | `bulkUpdateZoneConfigAction`; celda vacía no toca ese campo en esa fila | Revisión visual con varias filas editadas y guardadas juntas |
+| Mensaje de "sin cobertura" personalizable | Configuración → Envíos; `{lugar}` sustituido por el destino real | `settings` (`key="shipping_messages"`); `resolveDestinationLabel`/`resolveRejectionMessage` en el dominio de envíos | `shipping-zones.spec.ts`: el checkout muestra el mensaje con el nombre del barrio bloqueado |
+
+Reemplaza el renglón "Checkout conectado al árbol real" de la tabla de la
+Ronda 3 en cuanto a departamentos: `listExtraShippingDepartmentsAction` se
+renombró a `listShippingDepartmentsAction` y ya no combina una lista
+estática con zonas "extra" — todas las zonas de departamento vienen de
+`shipping_zones`. El renglón "Alta rápida y masiva de zonas" de esa misma
+tabla queda generalizado por la fila "Alta masiva por coma en todo nivel"
+de arriba. Detalle narrativo completo, bugs reales encontrados durante la
+verificación y la investigación de una secuencia de movimientos no
+planeada (resuelta: fue el propietario probando el tablero en su propio
+navegador, no un bug) en `PHASE_STATUS.md`.

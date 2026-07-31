@@ -136,13 +136,16 @@ habilites modo producción ni Meta desde el panel por anticipado.
   Colombia"** es el respaldo nacional: se usa solo cuando el departamento del
   pedido no tiene una zona configurada. No se puede eliminar.
 - **Nivel 2 — Ciudades (`/admin/envios/[departamento]`):** breadcrumb,
-  configuración propia/heredada del departamento arriba, tarjetas de sus
-  ciudades/municipios y alta rápida de una nueva ciudad.
+  tarjetas de sus ciudades/municipios y alta rápida de una nueva ciudad
+  (individual o pegando varias a la vez). Desde la Ronda 4 esta pantalla ya
+  no repite la configuración propia del departamento arriba — esa se edita
+  desde su tarjeta "Configurar" en `/admin/envios`, un nivel antes.
 - **Nivel 3 — Barrios (`/admin/envios/[departamento]/[ciudad]`):**
-  breadcrumb, configuración de la ciudad, alta de un barrio individual o
-  **pegar varios a la vez** (separados por coma o uno por línea), y un
-  buscador que aparece automáticamente cuando la ciudad tiene más de 8
-  barrios (Medellín, por ejemplo, tiene más de 200).
+  breadcrumb, alta de un barrio individual o **pegar varios a la vez**
+  (separados por coma o uno por línea). Desde la Ronda 4 tampoco repite la
+  configuración propia de la ciudad arriba (se edita igual, un nivel
+  antes) y los barrios se organizan como pastillas por grupo — ver la
+  sección "Pastillas de barrios" más abajo.
 - **Herencia por campo:** cada zona expone un control **Heredado /
   Personalizado** por cada campo (tarifa, envío gratis desde, cobertura,
   contraentrega, anticipo, mismo día + hora límite, días hábiles, métodos de
@@ -167,16 +170,61 @@ habilites modo producción ni Meta desde el panel por anticipado.
 - **Eliminar una zona** borra también todas sus zonas hijas (con
   confirmación del navegador antes de continuar); no hay forma de dejar
   barrios "huérfanos".
-- **Checkout (`/checkout`):** Departamento siempre muestra los 32
-  departamentos de Colombia + Bogotá D.C. (para que cualquier cliente pueda
-  ubicarse aunque su zona no esté configurada) más cualquier departamento
-  configurado con un nombre distinto a esa lista. Ciudad/Municipio y Barrio
-  solo aparecen si el nivel superior elegido tiene hijos configurados y
-  activos; si no, el checkout no los pide y usa directamente la
-  configuración del nivel superior. Los tres selectores tienen buscador. La
-  tarifa, cobertura, contraentrega, mismo día y tiempo de entrega que ve el
-  cliente son exactamente los que calcula `resolveShippingQuote` — el mismo
-  motor que usa el simulador admin.
+- **Checkout (`/checkout`):** Departamento muestra los 32 departamentos de
+  Colombia + Bogotá D.C., que desde la Ronda 4 son zonas reales
+  precargadas en `/admin/envios` (ver más abajo) — no una lista aparte del
+  checkout. Ciudad/Municipio y Barrio solo aparecen si el nivel superior
+  elegido tiene hijos configurados y activos; si no, el checkout no los
+  pide y usa directamente la configuración del nivel superior. Los tres
+  selectores tienen buscador. La tarifa, cobertura, contraentrega, mismo
+  día y tiempo de entrega que ve el cliente son exactamente los que
+  calcula `resolveShippingQuote` — el mismo motor que usa el simulador
+  admin.
 - **Simulador admin (`/admin/envios`, arriba de todo):** muestra si la
   tarifa aplicada es propia de la zona resuelta o heredada de un ancestro, y
   si el mismo día aplica a la hora actual.
+
+# Envíos y zonas: pastillas por grupo y ajustes (Ronda 4, 2026-07-31)
+
+- **33 departamentos precargados:** una migración crea los 32 departamentos
+  de Colombia + Bogotá D.C. como zonas reales en `/admin/envios` desde el
+  primer arranque (si "Antioquia" ya existía, no la duplica). Cada uno se
+  configura individualmente igual que cualquier otra zona; el checkout ya
+  no depende de una lista estática aparte.
+- **Pastillas de barrios (`/admin/envios/[departamento]/[ciudad]`):**
+  reemplaza la lista de tarjetas de barrios de la Ronda 3 por un tablero de
+  3 columnas fijas — **Con cobertura**, **Sin cobertura** y **Precio
+  especial**. "Con cobertura" siempre hereda de la ciudad y no tiene
+  configuración propia; los otros dos grupos tienen **una sola
+  configuración compartida** (tarifa, envío gratis desde, contraentrega,
+  anticipo, mismo día, días hábiles, métodos de pago, mensaje al cliente)
+  que se aplica de inmediato a **todos** los barrios que estén en ese grupo
+  al momento de guardar, no solo a los que se muevan después.
+  - Mueve una pastilla arrastrándola a otra columna, o con el selector
+    accesible de cada una (alternativa sin arrastrar).
+  - Marca la casilla de varias pastillas (o usa "Todos" por columna /
+    "Seleccionar todo" arriba) para moverlas o eliminarlas juntas de una
+    vez, incluso combinando pastillas de columnas distintas.
+  - Un barrio nuevo siempre nace en "Con cobertura". Mover uno a "Precio
+    especial" exige haber configurado antes la tarifa de ese grupo; "Sin
+    cobertura" no lo exige.
+- **Sin repetir configuración del nivel padre:** entrar a las ciudades de
+  un departamento, o a los barrios de una ciudad, ya no muestra arriba la
+  configuración propia del nivel anterior — esa se sigue editando igual,
+  desde la tarjeta "Configurar" de la pantalla anterior.
+- **Alta masiva por coma en todos los niveles:** pegar varios nombres
+  separados por coma (o uno por línea) ya no es solo para barrios —
+  también está disponible al agregar departamentos (`/admin/envios`) y
+  ciudades/municipios (`/admin/envios/[departamento]`).
+- **Edición rápida masiva:** en los listados de departamentos y de
+  ciudades/municipios, una tabla plegable "Edición rápida masiva" permite
+  fijar tarifa, cobertura y días hábiles mín/máx de varias filas con un
+  solo guardado. Una celda vacía no toca ese campo en esa fila — para
+  volver un campo a "heredado" se sigue usando el formulario individual
+  "Configurar".
+- **Mensaje de "sin cobertura" personalizable:** cuando un destino no
+  tiene tarifa, el checkout muestra el mensaje propio de la zona más
+  específica si tiene uno (heredable, igual que el resto de la
+  configuración), o si no, el mensaje global editable en
+  **Configuración → Envíos**, con `{lugar}` sustituido por el nombre real
+  del destino.

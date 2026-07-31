@@ -379,3 +379,118 @@ en ningún momento de esta ronda.
   descripción editable de métodos de pago, lista curada de textos
   editables del sitio, y editor visual con vista previa en vivo + edición
   de texto en línea.
+
+# Envíos y zonas: pastillas por grupo, alta y edición masiva (Ronda 4, 2026-07-31)
+
+## Diseño
+
+Sobre el árbol Departamento → Ciudad → Barrio de la Ronda 3, el propietario
+pidió: (1) barrios como pastillas arrastrables organizadas en 3 grupos fijos
+("Con cobertura" / "Sin cobertura" / "Precio especial") con configuración
+compartida por grupo, no por barrio; (2) que entrar a los hijos de una zona
+no repita la configuración del padre, ya visible desde su tarjeta
+"Configurar"; (3) alta masiva por coma también para departamentos y
+ciudades, no solo barrios; (4) que los 32 departamentos + Bogotá D.C.
+aparezcan precargados como zonas reales configurables (antes el checkout
+usaba una lista estática aparte); (5) edición rápida masiva (tarifa,
+cobertura, días hábiles) en los listados de departamentos y ciudades; (6)
+un mensaje de "sin cobertura" personalizable globalmente, con el nombre del
+destino. El editor visual con vista previa en vivo queda confirmado para
+después de esta ronda, con el alcance ya acordado (vista previa + edición
+de texto en línea, sin arrastrar/redimensionar bloques).
+
+La configuración de "Sin cobertura"/"Precio especial" vive en una tabla
+nueva (`shipping_neighborhood_group_settings`, una fila por ciudad × grupo)
+que el panel usa para precargar el formulario del grupo y, al guardar,
+escribir en bloque esos mismos valores sobre la `shipping_rules` de cada
+barrio que hoy pertenece a ese grupo. El motor de cotización
+(`resolveShippingQuote`) no cambió: sigue leyendo únicamente
+`shipping_rules` por zona, exactamente igual que antes de esta ronda. El
+grupo de un barrio se deriva de sus propios campos (`coverage`/`fee`), sin
+columna nueva en `shipping_zones`/`shipping_rules`.
+
+Además de lo pedido, durante la verificación con el propietario se agregó
+selección múltiple de pastillas (casilla individual, "Todos" por columna,
+"Seleccionar todo" global) para mover o eliminar varias a la vez en una
+sola acción de servidor.
+
+## Bugs reales encontrados y corregidos durante la verificación
+
+- **`seed.ts` duplicaba "Antioquia" y "Medellín".** El seed de ejemplo
+  insertaba esas zonas sin comprobar si ya existían (el id es aleatorio y
+  nunca choca, así que `onConflictDoNothing()` no evitaba el duplicado).
+  Al correr sobre una base ya migrada con los 33 departamentos precargados
+  (pieza 4 de esta ronda), el checkout terminaba mostrando "Antioquia" dos
+  veces en el selector — lo detectó el propio `test:e2e`
+  (`smoke.spec.ts`, violación de modo estricto de Playwright: 3 opciones
+  "Antioquia"). Se corrigió buscando por nombre/nivel antes de insertar.
+- **El tablero de pastillas no mostraba confirmación de éxito.** Mover una
+  o varias pastillas solo mostraba mensaje si el servidor rechazaba la
+  acción; un movimiento exitoso no daba ninguna señal visible (ni
+  `role="status"` para lectores de pantalla) más allá de que la pastilla
+  cambiara de columna. Se agregó el mensaje de éxito, igual que ya tenían
+  el resto de los formularios del panel.
+- `tests/e2e/shipping-zones.spec.ts` se reescribió para el nuevo flujo de
+  pastillas (antes probaba el formulario "Configurar" por barrio, que el
+  tablero reemplazó).
+
+## Investigación: secuencia de movimientos no planeada durante la verificación
+
+Durante la verificación de esta ronda, una revisión rutinaria de
+`audit_logs` en `.data/local.db` mostró ~64 acciones
+`shippingZone.barrioGroup.move` (todas moviendo barrios distintos de
+"Precio especial" de vuelta a "Con cobertura", una por una, espaciadas
+~1-3 segundos) seguidas de dos `shippingZone.delete` y un
+`shippingZone.neighborhood.bulkCreate` sobre Medellín, en una ventana de
+~90 segundos — ninguna de esas acciones correspondía a algo hecho
+deliberadamente por Claude en esta sesión.
+
+Se investigó antes de asumir que fuera un bug: `PRAGMA integrity_check` =
+`ok`, `PRAGMA foreign_key_check` sin filas, sin nombres de barrio
+duplicados, y el conteo de barrios de Medellín se mantuvo en 213 (64 en
+"Con cobertura" / 0 en "Sin cobertura" / 149 en "Precio especial", suma
+consistente con los 64 movimientos registrados). El `user_id` de todas
+esas entradas correspondía a la cuenta real del propietario
+(`owner@shoppluscol.local`), no a la cuenta de auditoría usada para las
+pruebas automatizadas de esta sesión. Se confirmó directamente con el
+propietario: fue él mismo probando el tablero de pastillas recién
+construido en su propio navegador, en paralelo a esta sesión. No fue un
+bug ni pérdida de datos — dos barrios ("Asomadera" y "Aldea Pablo VI")
+quedaron con id nuevo y configuración por defecto ("Con cobertura") por
+haber sido borrados y vueltos a crear vía pegado masivo durante esa
+prueba; el propietario confirmó que ese estado es el esperado y no pidió
+restaurarlos.
+
+## Verificación
+
+- `typecheck`, `lint`, `test` (99/99), `test:e2e` (15/15), build Next y
+  build Cloudflare: correctos.
+- `npm run security:secrets`: 0 secretos encontrados.
+- Verificado en el navegador real: tablero de pastillas (mover, seleccionar
+  varias, eliminar varias), grupo "Precio especial" configurado y aplicado
+  de inmediato a sus miembros, checkout con los 33 departamentos, mensaje
+  de "sin cobertura" con el nombre del destino sustituido.
+- No se pudo iniciar sesión de administrador vía automatización de
+  navegador para esta ronda (la política de la herramienta bloquea escribir
+  contraseñas, incluso las de una cuenta de prueba propia); la verificación
+  visual del tablero de pastillas la hizo el propietario directamente en su
+  navegador, y quedó confirmada en la conversación.
+
+## Pendiente
+
+- Esta ronda **no aprueba producción, no hace merge y no constituye
+  autorización para desplegar**. Queda pendiente de revisión humana.
+- El mensaje fijo "Cotización requerida para esta dirección..." fue
+  reemplazado por el mensaje global personalizable (pieza 6); si el
+  propietario prefiere el texto anterior, puede escribirlo tal cual en
+  Configuración → Envíos.
+- Los 33 departamentos quedan precargados pero **sin tarifa propia**
+  (salvo Antioquia, que ya la tenía): cada uno sigue sin cotizar hasta que
+  el propietario le asigne una tarifa o mantenga la zona "Resto de
+  Colombia" como respaldo activo — su estado ("Inactiva", preexistente a
+  esta ronda) no se tocó.
+- Puntos 5, 6 y 7 de la ronda de trabajo original (nombre/descripción
+  editable de métodos de pago, lista curada de textos editables del sitio,
+  y editor visual con vista previa en vivo + edición de texto en línea)
+  siguen sin empezar; el editor visual queda explícitamente para después
+  de esta ronda, con el alcance ya acordado.
