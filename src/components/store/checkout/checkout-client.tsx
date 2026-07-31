@@ -15,10 +15,9 @@ import { evaluateRewards } from "@/domain/services/rewards";
 import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
-import { COLOMBIA_DEPARTMENTS } from "@/lib/colombia-departments";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
-import { listExtraShippingDepartmentsAction, listShippingCitiesAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
+import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
@@ -52,7 +51,7 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
-  const [extraDepartments, setExtraDepartments] = React.useState<string[]>([]);
+  const [departments, setDepartments] = React.useState<string[]>([]);
   const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
@@ -73,22 +72,18 @@ export function CheckoutClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length]);
 
-  // Departamentos configurados que no están en la lista real de los 32 + Bogotá
-  // D.C.: ninguna zona configurada por el admin debe quedar inalcanzable
-  // desde el checkout, aunque su nombre no coincida con la lista estándar.
+  // Departamentos configurados y activos (los 32 + Bogotá D.C. vienen
+  // precargados de fábrica, así que normalmente están todos desde el
+  // primer arranque).
   React.useEffect(() => {
     let cancelled = false;
-    listExtraShippingDepartmentsAction().then((names) => {
-      if (!cancelled) setExtraDepartments(names);
+    listShippingDepartmentsAction().then((names) => {
+      if (!cancelled) setDepartments(names);
     });
     return () => {
       cancelled = true;
     };
   }, []);
-  const departmentOptions = React.useMemo(() => {
-    const extra = extraDepartments.filter((name) => !COLOMBIA_DEPARTMENTS.includes(name));
-    return [...COLOMBIA_DEPARTMENTS, ...extra].sort((a, b) => a.localeCompare(b, "es-CO"));
-  }, [extraDepartments]);
 
   // Ciudades/municipios configurados y activos para el departamento elegido
   // (sección 17.3): si el departamento no tiene ninguna, el checkout no pide
@@ -319,7 +314,7 @@ export function CheckoutClient() {
                 value={location.department}
                 error={errors.department}
                 onChange={(value) => setLocation((l) => ({ ...l, department: value, city: "", neighborhood: "" }))}
-                options={departmentOptions}
+                options={departments}
                 placeholder="Escribe para buscar…"
               />
               {cityRequired ? (

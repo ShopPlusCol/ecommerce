@@ -18,13 +18,14 @@ async function loadActiveTree() {
 }
 
 /**
- * Departamentos configurados y activos que no están en la lista estática de
- * los 32 departamentos + Bogotá D.C. (`COLOMBIA_DEPARTMENTS`): si un admin
- * nombra un departamento distinto a esa lista real, el checkout igual debe
- * poder ofrecerlo — nunca queda una zona configurada inalcanzable desde el
- * checkout.
+ * Departamentos configurados y activos (nivel raíz del árbol). Los 32
+ * departamentos de Colombia + Bogotá D.C. vienen precargados de fábrica
+ * (migración `0016`), así que esta lista normalmente los incluye a todos
+ * desde el primer arranque; si el admin agrega uno con un nombre distinto
+ * a esa lista real, también aparece aquí — nunca queda una zona
+ * configurada inalcanzable desde el checkout.
  */
-export async function listExtraShippingDepartmentsAction(): Promise<string[]> {
+export async function listShippingDepartmentsAction(): Promise<string[]> {
   const { zones, isUsable } = await loadActiveTree();
   return zones
     .filter((zone) => zone.level === "department" && isUsable(zone.id))
