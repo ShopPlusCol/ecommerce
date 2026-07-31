@@ -27,9 +27,17 @@ capturas, documentación ni chats compartidos. Abre `/acceso-admin`.
 - Inventario: todo ajuste requiere motivo y no puede invadir reservas.
 - Pedidos/pagos: pedido y pago tienen estados separados. Un comprobante queda
   pendiente hasta revisión explícita; cargarlo nunca aprueba el pago.
-- Configuración: identidad, transferencia, privacidad, retención y exportación.
-  Los logos, iconos, Open Graph y QR pueden seleccionarse de Multimedia o
-  cargarse directamente desde el equipo.
+- Configuración: identidad, transferencia, métodos de pago, mensajes de
+  envío, textos del sitio, privacidad, retención y exportación. Los logos,
+  iconos, Open Graph y QR pueden seleccionarse de Multimedia o cargarse
+  directamente desde el equipo.
+  - **Métodos de pago:** nombre y descripción de cada uno de los 4 métodos
+    (Mercado Pago, contraentrega, anticipo del envío, transferencia total),
+    visibles en el checkout y la confirmación de pedido. No cambia cuáles
+    están disponibles ni cómo se cobran, solo cómo se llaman.
+  - **Textos del sitio:** banner del encabezado, plantillas de mensaje de
+    WhatsApp (consulta general y carrito), aviso de pago del checkout, y
+    los tres textos de la página `/envíos`.
 - Estado del sistema: confirma DB/runtime/revisión y si una integración está
   configurada, sin mostrar secretos.
 - Auditoría: revisa actor, acción, entidad y cambios antes/después.

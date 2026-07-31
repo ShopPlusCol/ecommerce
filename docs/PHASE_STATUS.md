@@ -494,3 +494,39 @@ restaurarlos.
   y editor visual con vista previa en vivo + edición de texto en línea)
   siguen sin empezar; el editor visual queda explícitamente para después
   de esta ronda, con el alcance ya acordado.
+
+# Métodos de pago editables + textos del sitio (2026-07-31)
+
+Implementa los puntos 5 y 6 pendientes de la Ronda 4 (el punto 7, editor
+visual, sigue sin empezar).
+
+- **Métodos de pago:** nombre y descripción por método (`settings`,
+  key="payment_methods"), reflejados en el checkout, el resumen financiero
+  y el simulador admin. El valor por defecto vive en
+  `domain/services/payments.ts` (`DEFAULT_PAYMENT_METHOD_COPY`, dominio
+  puro) para poder importarse desde componentes de cliente sin arrastrar
+  el driver de base de datos al bundle del navegador — el mismo patrón se
+  repitió para `site-texts`.
+- **Textos del sitio:** en vez de implementar una lista abierta, se mapeó
+  primero qué texto del storefront estaba genuinamente hardcodeado y sin
+  ningún mecanismo admin, y se presentó al propietario para elegir alcance
+  (confirmó: solo los textos rápidos de alto impacto). Quedaron editables:
+  banner del encabezado, plantillas de WhatsApp (consulta general y
+  carrito), aviso de pago del checkout, y los tres textos de `/envíos`.
+  Términos, Devoluciones y Cuidados quedan fuera de esta pasada (requieren
+  migrarse al editor visual por bloques, no solo un campo de texto).
+- **Dos bugs reales corregidos de paso** (detectados durante el mapeo, no
+  decisiones de alcance): `/preguntas-frecuentes` ignoraba la tabla `faqs`
+  real (con CRUD funcional en `/admin/contenido`) y mostraba datos de
+  ejemplo fijos; y el botón de WhatsApp del carrito, el de "preguntar por
+  WhatsApp" en la ficha de producto, el footer y `/contacto` usaban el
+  número/correo fijo de `siteConfig` en vez de la marca editable
+  (`brand.whatsapp`/`brand.email`) — solo el botón flotante lo hacía bien.
+
+**Verificación:** `typecheck`, `lint`, `test` (99/99), `test:e2e` (15/15),
+build Next y build Cloudflare, `security:secrets` (0 secretos):
+correctos. No se verificó visualmente en navegador por la misma
+restricción de la ronda anterior (la herramienta de automatización
+bloquea escribir contraseñas de administrador, incluso de una cuenta de
+prueba propia) — el propietario indicó que haría las pruebas manuales.
+No se aprueba producción ni se hace merge.
