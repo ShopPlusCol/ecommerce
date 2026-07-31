@@ -59,6 +59,41 @@ export const shippingRules = sqliteTable(
   (table) => [uniqueIndex("shipping_rules_zone_id_unique").on(table.zoneId)],
 );
 
+/**
+ * Configuración compartida de los dos grupos configurables de barrios
+ * ("Sin cobertura" y "Precio especial"; "Con cobertura" no tiene fila
+ * porque siempre hereda de la ciudad), por ciudad. El panel usa esta tabla
+ * únicamente para (a) precargar el formulario del grupo y (b) al guardar,
+ * escribir en bloque estos mismos valores sobre la fila `shipping_rules`
+ * de cada barrio miembro — `resolveShippingQuote` sigue leyendo solo
+ * `shipping_rules` por zona, sin ningún cambio.
+ */
+export const shippingNeighborhoodGroupSettings = sqliteTable(
+  "shipping_neighborhood_group_settings",
+  {
+    id: idColumn(),
+    cityZoneId: text("city_zone_id")
+      .notNull()
+      .references(() => shippingZones.id, { onDelete: "cascade" }),
+    groupKind: text("group_kind", { enum: ["no_coverage", "special_price"] }).notNull(),
+    fee: integer("fee"),
+    freeShippingThreshold: integer("free_shipping_threshold"),
+    cashOnDeliveryAllowed: integer("cash_on_delivery_allowed", { mode: "boolean" }),
+    requiresAdvancePayment: integer("requires_advance_payment", { mode: "boolean" }),
+    advancePercentage: integer("advance_percentage"),
+    sameDayAvailable: integer("same_day_available", { mode: "boolean" }),
+    sameDayCutoffHour: integer("same_day_cutoff_hour"),
+    estimatedBusinessDaysMin: integer("estimated_business_days_min"),
+    estimatedBusinessDaysMax: integer("estimated_business_days_max"),
+    allowedPaymentMethods: text("allowed_payment_methods", { mode: "json" }).$type<
+      Array<"mercado_pago" | "cash_on_delivery" | "shipping_advance_transfer" | "transfer_full">
+    >(),
+    customerMessage: text("customer_message"),
+    ...timestampColumns,
+  },
+  (table) => [uniqueIndex("shipping_neighborhood_group_settings_city_kind_idx").on(table.cityZoneId, table.groupKind)],
+);
+
 export const shipments = sqliteTable("shipments", {
   id: idColumn(),
   orderId: text("order_id")

@@ -120,6 +120,13 @@
       "when": 1785515669406,
       "tag": "0016_seed_colombia_departments",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1785516205134,
+      "tag": "0017_shipping_neighborhood_group_settings",
+      "breakpoints": true
     }
   ]
 }
