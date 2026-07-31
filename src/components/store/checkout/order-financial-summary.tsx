@@ -1,13 +1,19 @@
 import type { OrderSummary } from "@/domain/services/cart-pricing";
 import { formatMoney } from "@/domain/value-objects/money";
-import { PAYMENT_METHOD_LABELS } from "@/domain/services/payments";
+import { DEFAULT_PAYMENT_METHOD_COPY, type PaymentMethodId, type PaymentMethodCopy } from "@/domain/services/payments";
 
 /**
  * Resumen financiero obligatorio (sección 16.4): productos, descuentos, envío,
  * total, pagar ahora y pagar al recibir. Nunca confunde el anticipo con un
  * descuento; siempre muestra ambos montos por separado.
  */
-export function OrderFinancialSummary({ summary }: { summary: OrderSummary }) {
+export function OrderFinancialSummary({
+  summary,
+  paymentMethods = DEFAULT_PAYMENT_METHOD_COPY,
+}: {
+  summary: OrderSummary;
+  paymentMethods?: Record<PaymentMethodId, PaymentMethodCopy>;
+}) {
   return (
     <dl className="flex flex-col gap-1.5 text-sm">
       <Row label="Productos" value={formatMoney(summary.subtotal)} />
@@ -32,7 +38,7 @@ export function OrderFinancialSummary({ summary }: { summary: OrderSummary }) {
           <dd className="font-semibold text-text tabular-nums">{formatMoney(summary.amountDueOnDelivery)}</dd>
         </div>
         <p className="mt-2 text-xs text-text-muted">
-          {PAYMENT_METHOD_LABELS[summary.paymentMethod]}. {summary.paymentReason}
+          {paymentMethods[summary.paymentMethod].name}. {summary.paymentReason}
         </p>
       </div>
     </dl>

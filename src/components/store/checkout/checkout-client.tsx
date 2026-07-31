@@ -12,12 +12,13 @@ import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
 import { computeOrderSummary, computeSubtotal, totalUnits as sumUnits } from "@/domain/services/cart-pricing";
 import { evaluateRewards } from "@/domain/services/rewards";
-import { PAYMENT_METHOD_LABELS, type PaymentMethodId } from "@/domain/services/payments";
+import { DEFAULT_PAYMENT_METHOD_COPY, type PaymentMethodId, type PaymentMethodCopy } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
 import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
+import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
@@ -51,6 +52,7 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
+  const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
   const [departments, setDepartments] = React.useState<string[]>([]);
   const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
@@ -79,6 +81,17 @@ export function CheckoutClient() {
     let cancelled = false;
     listShippingDepartmentsAction().then((names) => {
       if (!cancelled) setDepartments(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Nombre/descripción de cada método de pago, editables desde Configuración.
+  React.useEffect(() => {
+    let cancelled = false;
+    getPaymentMethodsCopyAction().then((copy) => {
+      if (!cancelled) setPaymentMethodsCopy(copy);
     });
     return () => {
       cancelled = true;
@@ -425,7 +438,12 @@ export function CheckoutClient() {
                       }}
                       className="mt-0.5 accent-[var(--tk-cherry-500)]"
                     />
-                    <span className="text-text">{PAYMENT_METHOD_LABELS[method]}</span>
+                    <span className="flex flex-col">
+                      <span className="text-text">{paymentMethodsCopy[method].name}</span>
+                      {paymentMethodsCopy[method].description ? (
+                        <span className="text-xs text-text-muted">{paymentMethodsCopy[method].description}</span>
+                      ) : null}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -499,7 +517,7 @@ export function CheckoutClient() {
             </ul>
             <div className="border-t border-border pt-3">
               {summary ? (
-                <OrderFinancialSummary summary={summary} />
+                <OrderFinancialSummary summary={summary} paymentMethods={paymentMethodsCopy} />
               ) : (
                 <p className="text-sm text-text-muted">
                   Completa tu dirección y método de pago para ver qué pagas ahora y qué pagas al recibir.

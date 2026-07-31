@@ -3,10 +3,10 @@
 import { z } from "zod";
 import { money } from "@/domain/value-objects/money";
 import {
-  PAYMENT_METHOD_LABELS,
   availablePaymentMethods,
   type PaymentMethodId,
 } from "@/domain/services/payments";
+import { getPaymentMethodsSettings } from "@/modules/settings/payment-methods";
 import { shippingResolver } from "@/lib/container";
 import { requirePermission } from "@/modules/auth/session";
 
@@ -61,6 +61,7 @@ export async function quoteShippingAdminAction(
       };
     }
     const methods = availablePaymentMethods(quote);
+    const paymentMethodsCopy = await getPaymentMethodsSettings();
     return {
       status: "success",
       message: "Cotización resuelta con el mismo motor utilizado por el checkout.",
@@ -70,7 +71,7 @@ export async function quoteShippingAdminAction(
         fee: quote.fee.amount,
         feeSource: quote.feeSource,
         freeShippingThreshold: quote.freeShippingThreshold?.amount ?? null,
-        methods: methods.map((id) => ({ id, label: PAYMENT_METHOD_LABELS[id] })),
+        methods: methods.map((id) => ({ id, label: paymentMethodsCopy[id].name })),
         requiresAdvancePayment: quote.requiresAdvancePayment,
         advancePercentage: quote.advancePercentage,
         estimatedBusinessDaysMin: quote.estimatedBusinessDaysMin,

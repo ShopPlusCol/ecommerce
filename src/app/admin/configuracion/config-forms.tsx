@@ -6,8 +6,16 @@ import type { BrandSettings } from "@/modules/settings/brand";
 import type { ManualTransferSettings } from "@/modules/settings/manual-transfer";
 import type { PrivacySettings } from "@/modules/settings/privacy";
 import type { ShippingMessagesSettings } from "@/modules/settings/shipping-messages";
+import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
+import type { PaymentMethodId } from "@/domain/services/payments";
 import { MediaSettingField } from "./media-setting-field";
-import { saveBrandSettingsAction, saveManualTransferSettingsAction, savePrivacySettingsAction, saveShippingMessagesSettingsAction } from "./actions";
+import {
+  saveBrandSettingsAction,
+  saveManualTransferSettingsAction,
+  savePrivacySettingsAction,
+  saveShippingMessagesSettingsAction,
+  savePaymentMethodsSettingsAction,
+} from "./actions";
 
 const control = "mt-1 h-10 w-full rounded-md border border-border bg-surface px-3";
 
@@ -87,6 +95,54 @@ export function ManualTransferSettingsForm({
       ))}
       <div className="sm:col-span-2"><MediaSettingField name="qrUrl" label="QR bancario" value={transfer.qrUrl} assets={assets} /></div>
       <button disabled={pending} className="h-11 rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60 sm:col-span-2">{pending ? "Guardando…" : "Guardar transferencia"}</button>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+const PAYMENT_METHOD_IDS: Array<{ id: PaymentMethodId; caption: string }> = [
+  { id: "mercado_pago", caption: "Mercado Pago" },
+  { id: "cash_on_delivery", caption: "Contraentrega" },
+  { id: "shipping_advance_transfer", caption: "Anticipo del envío" },
+  { id: "transfer_full", caption: "Transferencia total" },
+];
+
+export function PaymentMethodsSettingsForm({
+  paymentMethods,
+}: {
+  paymentMethods: PaymentMethodsSettings;
+}) {
+  const [state, action, pending] = useActionState(savePaymentMethodsSettingsAction, INITIAL_ADMIN_ACTION_STATE);
+  return (
+    <form id="metodos-pago" action={action} className="mt-6 grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6">
+      <h2 className="text-lg font-semibold">Métodos de pago</h2>
+      <p className="text-sm text-text-muted">
+        El nombre y la descripción se muestran al cliente en el checkout y en la confirmación del pedido. No cambia cuáles
+        métodos están disponibles ni cómo se cobran — eso depende de la integración y de la configuración de envíos.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {PAYMENT_METHOD_IDS.map(({ id, caption }) => (
+          <fieldset key={id} className="grid gap-2 rounded-lg border border-border p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-text-subtle">{caption}</legend>
+            <label className="text-sm font-semibold">
+              Nombre
+              <input name={`${id}_name`} defaultValue={paymentMethods[id].name} required maxLength={60} className={control} />
+            </label>
+            <label className="text-sm font-semibold">
+              Descripción
+              <textarea
+                name={`${id}_description`}
+                defaultValue={paymentMethods[id].description}
+                maxLength={200}
+                className="mt-1 min-h-16 w-full rounded-md border border-border bg-surface p-3 text-sm font-normal"
+              />
+            </label>
+          </fieldset>
+        ))}
+      </div>
+      <button disabled={pending} className="h-11 w-fit rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">
+        {pending ? "Guardando…" : "Guardar métodos de pago"}
+      </button>
       <Feedback state={state} />
     </form>
   );

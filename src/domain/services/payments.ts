@@ -16,6 +16,27 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethodId, string> = {
   transfer_full: "Transferencia del total por anticipado",
 };
 
+/** Nombre corto + descripción de cada método de pago, personalizables desde Configuración (módulo `settings/payment-methods`). Vive aquí (dominio puro, sin acceso a datos) para poder importarse desde componentes de cliente sin arrastrar el driver de base de datos. */
+export type PaymentMethodCopy = { name: string; description: string };
+export const DEFAULT_PAYMENT_METHOD_COPY: Record<PaymentMethodId, PaymentMethodCopy> = {
+  mercado_pago: {
+    name: "Mercado Pago",
+    description: "Pago total en línea con tarjeta, PSE o efectivo.",
+  },
+  cash_on_delivery: {
+    name: "Pago contraentrega",
+    description: "Pagas todo en efectivo o datáfono cuando recibes el pedido.",
+  },
+  shipping_advance_transfer: {
+    name: "Anticipo del envío + saldo contraentrega",
+    description: "Transfieres el valor del envío ahora; el resto de los productos queda pendiente para cuando recibas el pedido.",
+  },
+  transfer_full: {
+    name: "Transferencia total anticipada",
+    description: "Transfieres el valor completo del pedido antes de que se despache.",
+  },
+};
+
 /**
  * Métodos disponibles según la regla de envío resuelta. Si la zona exige
  * anticipo (fuera de cobertura contra entrega), no se ofrece contra entrega

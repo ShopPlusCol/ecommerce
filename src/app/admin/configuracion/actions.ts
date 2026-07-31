@@ -7,6 +7,7 @@ import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { auditLogs, settings } from "@/infrastructure/db/schema";
 import { actionError, type AdminActionState } from "@/modules/admin/action-state";
+import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
 
 const optionalUrl = z.union([
   z.literal(""),
@@ -131,6 +132,34 @@ export async function saveShippingMessagesSettingsAction(_state: AdminActionStat
     await db.insert(auditLogs).values({ userId: session.user.id, action: "settings.shipping_messages.update", entityType: "setting", entityId: "shipping_messages", after: parsed });
     revalidatePath("/admin/configuracion");
     return { status: "success", message: "Mensaje de envíos guardado." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+const paymentMethodCopySchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre.").max(60),
+  description: z.string().trim().max(200),
+});
+
+export async function savePaymentMethodsSettingsAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("settings", "update");
+    const ids = ["mercado_pago", "cash_on_delivery", "shipping_advance_transfer", "transfer_full"] as const;
+    const parsed = {} as PaymentMethodsSettings;
+    for (const id of ids) {
+      parsed[id] = paymentMethodCopySchema.parse({
+        name: formData.get(`${id}_name`),
+        description: formData.get(`${id}_description`),
+      });
+    }
+    const db = await getRuntimeDb();
+    await db.insert(settings).values({ key: "payment_methods", value: parsed, updatedByUserId: session.user.id })
+      .onConflictDoUpdate({ target: settings.key, set: { value: parsed, updatedByUserId: session.user.id, updatedAt: new Date() } });
+    await db.insert(auditLogs).values({ userId: session.user.id, action: "settings.payment_methods.update", entityType: "setting", entityId: "payment_methods", after: parsed });
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/checkout");
+    return { status: "success", message: "Métodos de pago guardados." };
   } catch (error) {
     return actionError(error);
   }
