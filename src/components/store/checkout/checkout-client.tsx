@@ -19,6 +19,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
 import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
 import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
+import { getStoreContentAction } from "@/app/(store)/site-content-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 
 type Contact = { fullName: string; phone: string; email: string };
@@ -53,6 +54,7 @@ export function CheckoutClient() {
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
   const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
+  const [paymentDisclaimer, setPaymentDisclaimer] = React.useState("");
   const [departments, setDepartments] = React.useState<string[]>([]);
   const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
@@ -92,6 +94,17 @@ export function CheckoutClient() {
     let cancelled = false;
     getPaymentMethodsCopyAction().then((copy) => {
       if (!cancelled) setPaymentMethodsCopy(copy);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Aviso de pago, editable desde Configuración → Textos del sitio.
+  React.useEffect(() => {
+    let cancelled = false;
+    getStoreContentAction().then(({ texts }) => {
+      if (!cancelled) setPaymentDisclaimer(texts.checkoutPaymentDisclaimer);
     });
     return () => {
       cancelled = true;
@@ -453,10 +466,7 @@ export function CheckoutClient() {
                 {errors.paymentMethod}
               </p>
             ) : null}
-            <p className="rounded-md bg-info-soft p-3 text-xs text-info">
-              El pedido se registra al confirmar. Mercado Pago solo aparece cuando está configurado;
-              las transferencias quedan pendientes de revisión y un comprobante no equivale a pago aprobado.
-            </p>
+            {paymentDisclaimer ? <p className="rounded-md bg-info-soft p-3 text-xs text-info">{paymentDisclaimer}</p> : null}
           </CardContent>
         </Card>
 

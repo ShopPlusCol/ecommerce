@@ -182,28 +182,6 @@ export const demoProducts: Product[] = [
   },
 ];
 
-export const demoFaqs: Array<{ question: string; answer: string }> = [
-  {
-    question: "¿Necesito fórmula médica para comprar?",
-    answer:
-      "No. Todos nuestros lentes son cosméticos, sin fórmula y sin aumento, pensados para cambiar el color de tus ojos.",
-  },
-  {
-    question: "¿El tono se verá igual que en la foto?",
-    answer:
-      "El resultado varía según la iluminación, la cámara y el color natural de tu iris. Las fotos son orientativas.",
-  },
-  {
-    question: "¿Cómo pago el envío en Medellín?",
-    answer:
-      "En Medellín y el Área Metropolitana puedes pagar contraentrega. En el resto de Colombia, el envío se paga por anticipado.",
-  },
-  {
-    question: "¿Puedo cambiar de tono si no me gusta?",
-    answer: "Sí, revisa nuestra política de cambios y devoluciones para conocer los plazos y condiciones.",
-  },
-];
-
 export const demoTestimonials: Array<{ name: string; city: string; quote: string }> = [
   { name: "Valentina R.", city: "Medellín", quote: "Llegó el mismo día y el color se ve precioso." },
   { name: "Camila G.", city: "Envigado", quote: "Primera vez que compro lentes cosméticos y la atención fue clarísima." },

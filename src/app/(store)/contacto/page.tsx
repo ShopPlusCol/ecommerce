@@ -7,12 +7,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PhaseNotice } from "@/components/store/phase-notice";
-import { siteConfig } from "@/lib/site-config";
+import { getBrandSettings } from "@/modules/settings/brand";
 
 export const metadata: Metadata = { title: "Contacto" };
 
-export default function ContactPage() {
-  const whatsappHref = `https://wa.me/${siteConfig.contact.whatsappNumber}`;
+export default async function ContactPage() {
+  const brand = await getBrandSettings();
+  const whatsappHref = `https://wa.me/${brand.whatsapp}`;
 
   return (
     <>
@@ -30,13 +31,13 @@ export default function ContactPage() {
               </CardContent>
             </Card>
           </a>
-          <a href={`mailto:${siteConfig.contact.supportEmail}`}>
+          <a href={`mailto:${brand.email}`}>
             <Card className="h-full transition-shadow duration-base hover:shadow-md">
               <CardContent className="flex items-start gap-3">
                 <Mail className="h-6 w-6 text-brand" aria-hidden="true" />
                 <div>
                   <p className="font-medium text-text">Correo</p>
-                  <p className="text-sm text-text-muted">{siteConfig.contact.supportEmail}</p>
+                  <p className="text-sm text-text-muted">{brand.email}</p>
                 </div>
               </CardContent>
             </Card>

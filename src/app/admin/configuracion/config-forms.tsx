@@ -7,6 +7,7 @@ import type { ManualTransferSettings } from "@/modules/settings/manual-transfer"
 import type { PrivacySettings } from "@/modules/settings/privacy";
 import type { ShippingMessagesSettings } from "@/modules/settings/shipping-messages";
 import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
+import type { SiteTextsSettings } from "@/modules/settings/site-texts";
 import type { PaymentMethodId } from "@/domain/services/payments";
 import { MediaSettingField } from "./media-setting-field";
 import {
@@ -15,6 +16,7 @@ import {
   savePrivacySettingsAction,
   saveShippingMessagesSettingsAction,
   savePaymentMethodsSettingsAction,
+  saveSiteTextsSettingsAction,
 } from "./actions";
 
 const control = "mt-1 h-10 w-full rounded-md border border-border bg-surface px-3";
@@ -142,6 +144,48 @@ export function PaymentMethodsSettingsForm({
       </div>
       <button disabled={pending} className="h-11 w-fit rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">
         {pending ? "Guardando…" : "Guardar métodos de pago"}
+      </button>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+const SITE_TEXT_FIELDS: Array<{ name: keyof SiteTextsSettings; label: string; hint?: string; long?: boolean }> = [
+  { name: "headerAnnouncement", label: "Barra de anuncio del encabezado", hint: "Se muestra arriba de todo, en cada página." },
+  { name: "whatsappInquiryTemplate", label: "Mensaje de WhatsApp — consulta general", hint: 'Botón flotante y ficha de producto. Debe incluir "{marca}".' },
+  { name: "whatsappCartIntro", label: "Mensaje de WhatsApp — inicio del carrito" },
+  { name: "whatsappCartClosingNote", label: "Mensaje de WhatsApp — nota final del carrito" },
+  { name: "checkoutPaymentDisclaimer", label: "Aviso de pago en el checkout", long: true },
+  { name: "shippingPageMedellinBody", label: '"/envíos" — texto de Medellín y Área Metropolitana', long: true },
+  { name: "shippingPageRestBody", label: '"/envíos" — texto del resto de Colombia', long: true },
+  { name: "shippingPageNote", label: '"/envíos" — nota al pie', long: true },
+];
+
+export function SiteTextsSettingsForm({
+  siteTexts,
+}: {
+  siteTexts: SiteTextsSettings;
+}) {
+  const [state, action, pending] = useActionState(saveSiteTextsSettingsAction, INITIAL_ADMIN_ACTION_STATE);
+  return (
+    <form id="textos" action={action} className="mt-6 grid max-w-5xl gap-4 rounded-xl border border-border bg-surface-raised p-6">
+      <h2 className="text-lg font-semibold">Textos del sitio</h2>
+      <p className="text-sm text-text-muted">
+        Textos de alta visibilidad que no dependen de ninguna otra sección de Configuración.
+      </p>
+      {SITE_TEXT_FIELDS.map(({ name, label, hint, long }) => (
+        <label key={name} className="text-sm font-semibold">
+          {label}
+          {long ? (
+            <textarea name={name} defaultValue={siteTexts[name]} required maxLength={400} className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface p-3 text-sm font-normal" />
+          ) : (
+            <input name={name} defaultValue={siteTexts[name]} required maxLength={200} className={control} />
+          )}
+          {hint ? <span className="mt-1 block text-xs font-normal text-text-muted">{hint}</span> : null}
+        </label>
+      ))}
+      <button disabled={pending} className="h-11 w-fit rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">
+        {pending ? "Guardando…" : "Guardar textos"}
       </button>
       <Feedback state={state} />
     </form>

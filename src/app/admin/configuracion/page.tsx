@@ -8,17 +8,26 @@ import { getManualTransferSettings } from "@/modules/settings/manual-transfer";
 import { getPrivacySettings } from "@/modules/settings/privacy";
 import { getShippingMessagesSettings } from "@/modules/settings/shipping-messages";
 import { getPaymentMethodsSettings } from "@/modules/settings/payment-methods";
-import { BrandSettingsForm, ManualTransferSettingsForm, PrivacySettingsForm, ShippingMessagesSettingsForm, PaymentMethodsSettingsForm } from "./config-forms";
+import { getSiteTextsSettings } from "@/modules/settings/site-texts";
+import {
+  BrandSettingsForm,
+  ManualTransferSettingsForm,
+  PrivacySettingsForm,
+  ShippingMessagesSettingsForm,
+  PaymentMethodsSettingsForm,
+  SiteTextsSettingsForm,
+} from "./config-forms";
 
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function AdminSettingsPage() {
-  const [brand, transfer, privacy, shippingMessages, paymentMethods, media] = await Promise.all([
+  const [brand, transfer, privacy, shippingMessages, paymentMethods, siteTexts, media] = await Promise.all([
     getBrandSettings(),
     getManualTransferSettings(),
     getPrivacySettings(),
     getShippingMessagesSettings(),
     getPaymentMethodsSettings(),
+    getSiteTextsSettings(),
     (await getRuntimeDb()).select().from(mediaAssets),
   ]);
   const assets = media.map((asset) => ({ url: asset.url, label: asset.altText || asset.storageKey }));
@@ -30,6 +39,7 @@ export default async function AdminSettingsPage() {
         <a href="#pagos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Transferencias</a>
         <a href="#metodos-pago" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Métodos de pago</a>
         <a href="#envios" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Envíos</a>
+        <a href="#textos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Textos del sitio</a>
         <a href="#privacidad" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Privacidad</a>
         <a href="#datos" className="rounded-md border border-border px-3 py-2 text-sm font-semibold">Datos</a>
       </nav>
@@ -37,6 +47,7 @@ export default async function AdminSettingsPage() {
       <ManualTransferSettingsForm transfer={transfer} assets={assets} />
       <PaymentMethodsSettingsForm paymentMethods={paymentMethods} />
       <ShippingMessagesSettingsForm shippingMessages={shippingMessages} />
+      <SiteTextsSettingsForm siteTexts={siteTexts} />
       <PrivacySettingsForm privacy={privacy} />
       <section id="datos" className="mt-6 max-w-5xl rounded-xl border border-border bg-surface-raised p-6">
         <h2 className="text-lg font-semibold">Portabilidad de datos</h2>

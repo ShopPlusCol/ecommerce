@@ -20,7 +20,7 @@ const NAV_LINKS = [
 const ICON_BUTTON =
   "flex h-control-md w-control-md items-center justify-center rounded-full text-text transition-colors duration-fast hover:bg-surface-sunken";
 
-export function SiteHeader({ brand }: { brand: BrandSettings }) {
+export function SiteHeader({ brand, announcement }: { brand: BrandSettings; announcement: string }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
@@ -44,7 +44,7 @@ export function SiteHeader({ brand }: { brand: BrandSettings }) {
       {/* Barra de anuncio editorial */}
       <div className="bg-text text-text-inverted">
         <p className="mx-auto max-w-(--content-max-width) px-[var(--content-padding-x)] py-2 text-center text-[11px] font-medium uppercase tracking-[0.14em]">
-          Envío el mismo día en Medellín · Lentes cosméticos sin fórmula
+          {announcement}
         </p>
       </div>
 

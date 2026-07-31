@@ -8,6 +8,7 @@ import { getRuntimeDb } from "@/infrastructure/db/client";
 import { auditLogs, settings } from "@/infrastructure/db/schema";
 import { actionError, type AdminActionState } from "@/modules/admin/action-state";
 import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
+import type { SiteTextsSettings } from "@/modules/settings/site-texts";
 
 const optionalUrl = z.union([
   z.literal(""),
@@ -141,6 +142,31 @@ const paymentMethodCopySchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre.").max(60),
   description: z.string().trim().max(200),
 });
+
+export async function saveSiteTextsSettingsAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    const session = await requirePermission("settings", "update");
+    const parsed = z.object({
+      headerAnnouncement: z.string().trim().min(1, "Escribe un texto.").max(140),
+      whatsappInquiryTemplate: z.string().trim().min(1, "Escribe un texto.").max(200).refine((value) => value.includes("{marca}"), 'El mensaje debe incluir "{marca}".'),
+      whatsappCartIntro: z.string().trim().min(1, "Escribe un texto.").max(140),
+      whatsappCartClosingNote: z.string().trim().min(1, "Escribe un texto.").max(200),
+      checkoutPaymentDisclaimer: z.string().trim().min(1, "Escribe un texto.").max(400),
+      shippingPageMedellinBody: z.string().trim().min(1, "Escribe un texto.").max(400),
+      shippingPageRestBody: z.string().trim().min(1, "Escribe un texto.").max(400),
+      shippingPageNote: z.string().trim().min(1, "Escribe un texto.").max(400),
+    }).parse(Object.fromEntries(formData)) satisfies SiteTextsSettings;
+    const db = await getRuntimeDb();
+    await db.insert(settings).values({ key: "site_texts", value: parsed, updatedByUserId: session.user.id })
+      .onConflictDoUpdate({ target: settings.key, set: { value: parsed, updatedByUserId: session.user.id, updatedAt: new Date() } });
+    await db.insert(auditLogs).values({ userId: session.user.id, action: "settings.site_texts.update", entityType: "setting", entityId: "site_texts", after: parsed });
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/", "layout");
+    return { status: "success", message: "Textos del sitio guardados." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
 
 export async function savePaymentMethodsSettingsAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
   try {

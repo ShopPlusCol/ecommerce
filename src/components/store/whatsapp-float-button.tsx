@@ -6,10 +6,8 @@ import type { BrandSettings } from "@/modules/settings/brand";
  * de ninguna integración de backend, así que es funcional desde la Fase 1.
  * Número y marca se reciben desde la configuración persistida.
  */
-export function WhatsAppFloatButton({ brand }: { brand: BrandSettings }) {
-  const message = encodeURIComponent(
-    `Hola, tengo una pregunta sobre los lentes de ${brand.name}.`,
-  );
+export function WhatsAppFloatButton({ brand, inquiryTemplate }: { brand: BrandSettings; inquiryTemplate: string }) {
+  const message = encodeURIComponent(inquiryTemplate.replace("{marca}", brand.name));
   const href = `https://wa.me/${brand.whatsapp}?text=${message}`;
 
   return (
