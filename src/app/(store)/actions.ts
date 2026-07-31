@@ -246,6 +246,13 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   const lookupToken = randomBytes(24).toString("base64url");
   const lookupTokenHash = createHash("sha256").update(lookupToken).digest("hex");
   const reserved: Array<{ id: string; quantity: number }> = [];
+  // Sin transacción real (D1 no soporta transacciones interactivas): si algo
+  // falla después de crear el pedido (p. ej. Mercado Pago rechaza la
+  // preferencia), hay que borrar a mano lo que ya se insertó. `orders` borra
+  // en cascada order_items/order_status_history/order_adjustments/payments,
+  // así que basta con guardar estos dos ids.
+  let createdOrderId: string | null = null;
+  let createdConsentRecordId: string | null = null;
 
   try {
     for (const line of lines) {
@@ -328,6 +335,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       utmFirstAttribution: firstAttribution,
       utmLastAttribution: attribution,
     }).returning();
+    createdOrderId = order.id;
 
     await db.insert(orderItems).values(lines.map((line) => ({
       orderId: order.id,
@@ -374,12 +382,13 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       externalReference: order.orderNumber,
       idempotencyKey: `payment:${data.idempotencyKey}`,
     }).returning();
-    await db.insert(consentRecords).values({
+    const [consentRecord] = await db.insert(consentRecords).values({
       subjectId: customer.id,
       analytics: data.consent.analytics,
       marketing: data.consent.marketing,
       policyVersion: "2026-07-29",
-    });
+    }).returning();
+    createdConsentRecordId = consentRecord.id;
 
     let checkoutUrl: string | null = null;
     if (data.paymentMethod === "mercado_pago") {
@@ -437,6 +446,12 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
         updatedAt: new Date(),
       }).where(eq(inventoryItems.id, reservation.id));
     }
+    // Deshace lo que ya se insertó antes del fallo (p. ej. Mercado Pago
+    // rechazó la preferencia después de crear el pedido): si no se borra el
+    // pedido aquí, un reintento con la misma idempotencyKey del cliente
+    // choca con la fila `payments` ya creada (UNIQUE en idempotency_key).
+    if (createdOrderId) await db.delete(orders).where(eq(orders.id, createdOrderId));
+    if (createdConsentRecordId) await db.delete(consentRecords).where(eq(consentRecords.id, createdConsentRecordId));
     await db.delete(idempotencyKeys).where(eq(idempotencyKeys.key, data.idempotencyKey));
     return { ok: false, error: error instanceof Error ? error.message : "No fue posible crear el pedido." };
   }

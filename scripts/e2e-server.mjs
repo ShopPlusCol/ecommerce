@@ -31,7 +31,20 @@ const env = {
   ADMIN_OWNER_PASSWORD: password,
   STORAGE_DRIVER: "local",
   MEDIA_PUBLIC_URL: `${baseUrl}/uploads`,
-  MERCADOPAGO_TEST_MODE: "true",
+  // Next.js carga `.env` directamente del disco dentro de cada proceso hijo
+  // (build/start) para cualquier variable que no venga ya definida aquí —
+  // sin este bloqueo explícito, credenciales reales del `.env` local del
+  // desarrollador (Mercado Pago, Meta, SMTP) se filtrarían al entorno
+  // aislado de e2e y harían pruebas no determinísticas contra proveedores
+  // externos reales. Vacío = "no configurado" para el código de la app.
+  MERCADO_PAGO_ACCESS_TOKEN: "",
+  MERCADO_PAGO_WEBHOOK_SECRET: "",
+  MERCADO_PAGO_TEST_MODE: "true",
+  META_PIXEL_ID: "",
+  META_CONVERSIONS_ACCESS_TOKEN: "",
+  SMTP_HOST: "",
+  SMTP_USER: "",
+  SMTP_PASSWORD: "",
 };
 
 await writeFile(credentialsFile, JSON.stringify({ email, password }), {

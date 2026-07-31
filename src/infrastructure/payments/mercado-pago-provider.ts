@@ -20,6 +20,11 @@ export class MercadoPagoProvider implements PaymentProvider {
   async createPaymentIntent(request: PaymentIntentRequest): Promise<PaymentIntentResult> {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
     if (!baseUrl) throw new Error("NEXT_PUBLIC_SITE_URL es obligatorio para Mercado Pago.");
+    // Mercado Pago rechaza la preferencia entera (400 "auto_return invalid")
+    // si back_url.success no es una URL https públicamente resoluble — pasa
+    // siempre en desarrollo local (http://localhost). Solo se pide el
+    // regreso automático cuando el sitio ya tiene una URL https real.
+    const canAutoReturn = baseUrl.startsWith("https://");
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
@@ -35,12 +40,15 @@ export class MercadoPagoProvider implements PaymentProvider {
           pending: `${baseUrl}/checkout/confirmacion`,
           failure: `${baseUrl}/checkout`,
         },
-        auto_return: "approved",
+        ...(canAutoReturn ? { auto_return: "approved" } : {}),
         notification_url: `${baseUrl}/api/webhooks/mercado-pago`,
       }),
       cache: "no-store",
     });
-    if (!response.ok) throw new Error(`Mercado Pago rechazó la preferencia (${response.status}).`);
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`Mercado Pago rechazó la preferencia (${response.status}).${detail ? ` ${detail}` : ""}`);
+    }
     const data = await response.json() as MercadoPagoPreference;
     return {
       providerPaymentId: data.id,
