@@ -530,3 +530,171 @@ restricción de la ronda anterior (la herramienta de automatización
 bloquea escribir contraseñas de administrador, incluso de una cuenta de
 prueba propia) — el propietario indicó que haría las pruebas manuales.
 No se aprueba producción ni se hace merge.
+
+# Mercado Pago, confirmaciones por correo, checkout configurable y
+# auditoría de pre-lanzamiento (2026-07-31 → 2026-08-01)
+
+## Configuración e integración de Mercado Pago
+
+Se acompañó al propietario paso a paso por el dashboard real de Mercado
+Pago (Checkout Pro, Access Token, evento de webhook "Pagos (legacy)",
+URL de webhook provisional) hasta dejar `MERCADO_PAGO_ACCESS_TOKEN` y
+`MERCADO_PAGO_WEBHOOK_SECRET` reales en `.env`. De paso, `/admin/
+integraciones` dejó de mostrar como "pendiente" integraciones que en
+realidad ya estaban configuradas (R2/D1 comprobaban variables de entorno
+que el proyecto no usa; ahora comprueban los bindings reales de
+Cloudflare) y ganó una guía "Cómo configurarlo" por integración.
+
+**Dos bugs reales de pago corregidos**, reproducidos primero contra la
+API real de Mercado Pago antes de tocar código:
+- **"Mercado Pago rechazó la preferencia (400)"**: `auto_return` exige un
+  `back_url.success` HTTPS real; con la URL provisional no-HTTPS de
+  pruebas, Mercado Pago rechazaba la preferencia completa. Ahora
+  `auto_return` solo se envía cuando la URL base es HTTPS.
+- **`UNIQUE constraint failed: payments.idempotency_key`** al reintentar
+  un pedido tras un fallo a mitad de camino: `createDemoOrderAction` no
+  deshacía el pedido/pago ya insertados antes de fallar, así que el
+  reintento con la misma clave de idempotencia chocaba. Se agregó
+  limpieza (rollback manual) de `orders`/`payments`/`consentRecords` en
+  el `catch`.
+
+Efecto secundario real encontrado al depurar: secretos reales de `.env`
+se filtraban al entorno aislado de `test:e2e` porque Next.js carga `.env`
+directamente del disco dentro de cada proceso hijo para cualquier
+variable no definida explícitamente — `scripts/e2e-server.mjs` ahora
+bloquea explícitamente (cadena vacía) las variables sensibles.
+
+## Correos de confirmación, salto al primer error, checkout configurable
+
+- **Correos de confirmación de pedido:** `ConfiguredNotificationProvider`
+  pasa de stub a envío real por SMTP (`nodemailer`); si el cliente dejó
+  correo, `createDemoOrderAction` envía una confirmación con los datos
+  reales del pedido sin bloquear la respuesta si el envío falla.
+- **Salto al primer campo con error:** al fallar la validación del
+  checkout, la página hace scroll y da foco al primer campo con error en
+  vez de dejar el mensaje fuera de vista. De paso se corrigió que
+  `errors.quote` (falta de cobertura de envío) nunca se mostraba en
+  pantalla.
+- **Formulario de checkout configurable:** cada campo (excepto
+  nombre/teléfono/ubicación/dirección, siempre obligatorios) puede
+  activarse/desactivarse, marcarse obligatorio u opcional, y reordenarse
+  desde Configuración → Formulario de checkout (`checkout_fields` en
+  `settings`, validado y forzado en servidor para los campos bloqueados).
+
+## Auditoría de pre-lanzamiento y correcciones (Fase E)
+
+A pedido del propietario ("Estoy a punto de lanzar... revisa
+exhaustivamente...") se hizo primero una auditoría de solo lectura (sin
+tocar código/datos) cruzando checkout, pagos, inventario, envíos,
+seguridad y configuración de producción, con hallazgos clasificados por
+severidad. El propietario autorizó corregir todo lo que no fuera "solo
+configurar un valor en el panel" (eso lo completa él mismo tras el
+lanzamiento). Se corrigió, cada pieza verificada con `typecheck`/`lint`/
+`test`/`build`/`cf:build` y su propio commit:
+
+- **Límites de uso de cupones:** `usageLimitTotal`, `usageLimitPerCustomer`
+  y `firstOrderOnly` existían en la tabla y el panel pero nunca se
+  validaban — cualquier cupón se podía usar un número ilimitado de veces.
+  Ahora `validateCoupon()` los evalúa contra `coupon_redemptions`
+  (autoritativo en `createDemoOrderAction`) y cada pedido registra su
+  canje.
+- **Transiciones de estado de pedido sin validar:** un pedido "entregado"
+  se podía regresar a "borrador" sin ninguna restricción. Se agregó una
+  matriz de transiciones válidas (`src/domain/services/order-status.ts`)
+  exigida en servidor y reflejada en los selectores del panel (detalle y
+  listado de pedidos).
+- **Inventario no se reponía al cancelar/devolver un pedido:** quedaba
+  bloqueado indefinidamente. `restockOrderInventory` libera reservas
+  activas y repone a stock disponible las ya vendidas, al entrar a
+  "cancelled"/"returned".
+- **Guard `newlyApproved` del webhook de Mercado Pago no era atómico:**
+  dos entregas concurrentes del mismo webhook podían descontar inventario
+  dos veces. Ahora la transición a "approved" se reclama con un
+  `UPDATE ... WHERE status != 'approved'`.
+- **`searchZonesAction` sin `requirePermission`:** cualquiera podía
+  invocar la server action y enumerar todo el árbol de zonas sin sesión
+  de admin. `validateCouponAction` no tenía límite de tasa (fuerza bruta
+  de cupones). Ambos corregidos.
+- **Reservas de inventario vencidas solo se liberaban al confirmar un
+  pedido:** un carrito abandonado bloqueaba stock hasta que otra persona
+  completara una compra. `quoteShippingAction` (mucho más frecuente,
+  cada cambio de dirección) también las libera ahora.
+- **Secretos horneados en el build de Cloudflare:** confirmado y
+  reproducido con un `cf:build` real — el Access Token y Webhook Secret
+  reales de Mercado Pago quedaban en texto plano en
+  `.open-next/cloudflare/next-env.mjs` (fallback que vuelca todo
+  `process.env` visto durante el build) y como copia literal de `.env`
+  en `.open-next/server-functions/default/.env` (trazado de archivos de
+  Next.js). Ambos quedan dentro de lo que `wrangler deploy` sube.
+  `scripts/run-cloudflare.mjs` ahora limpia esos valores después de cada
+  build; verificado con grep sobre `.open-next/` que no queda rastro del
+  secreto real.
+- **Catálogo se hidrataba 4-5 veces por vista de producto:** cada llamada
+  a `getProductBySlug`/`getRelatedProducts`/`getUpsellProducts`
+  relanzaba las mismas 5 consultas sobre el catálogo completo.
+  `React.cache()` las deduplica dentro de la misma petición de servidor.
+- **Listados admin sin paginación real:** `/admin/pedidos`,
+  `/admin/clientes`, `/admin/productos` y `/admin/pagos` hacían `SELECT`
+  sin límite (clientes, además, cargaba la tabla completa al navegador
+  para paginar ahí). Ahora los cuatro filtran y paginan con
+  `LIMIT`/`OFFSET` en el servidor, igual que `/admin/auditoria`.
+- **Índices de base de datos faltantes:** `audit_logs.created_at`,
+  `carts.session_token`, `order_items.order_id`,
+  `manual_transfer_proofs.payment_id`, `inventory_reservations.order_id`
+  y `(status, expires_at)`. Migración `0018`, generada con `drizzle-kit`
+  y aplicada/verificada sobre `local.db`.
+- **Montaje del checkout disparaba 4 fetches de cliente evitables**
+  (departamentos, copy de métodos de pago, textos del sitio, config de
+  campos): ninguno depende del carrito ni de la sesión, así que ahora se
+  resuelven en el server component antes de renderizar. Se marcó la ruta
+  `force-dynamic` explícitamente — sin eso, Next.js podía prerenderizar
+  esos valores administrables en build y congelarlos hasta el próximo
+  despliegue (se detectó porque `/checkout` seguía apareciendo como
+  ruta estática después del cambio).
+
+### Verificación
+
+- `typecheck`, `lint`, `test` (116/116 en 19 archivos, incluidas pruebas
+  nuevas para límites de cupón y transiciones de estado), build Next y
+  `cf:build`: correctos en cada commit de esta ronda.
+- `test:e2e`: 12-15/15 según la corrida — ver "Pendiente" abajo, un caso
+  puntual queda documentado como investigación separada, no oculto.
+- `cf:build` real ejecutado dos veces con los secretos reales del
+  propietario en `.env`; confirmado con `grep` que ninguno sobrevive en
+  `.open-next/` tras la limpieza.
+- Login de administrador vía navegador automatizado sigue bloqueado por
+  la misma política de esta sesión (no se escriben contraseñas, ni de
+  cuentas de prueba propias); las cuatro páginas de listado con
+  paginación nueva se verificaron por tipos/lint/build y por espejar
+  exactamente el patrón ya probado de `/admin/auditoria`, no con una
+  sesión de admin en vivo.
+
+### Pendiente
+
+- **`tests/e2e/shipping-zones.spec.ts:90` falla de forma consistente**
+  (4/4 corridas) contra el harness de E2E (build de producción + base
+  fresca), pero no se reproduce en el servidor de desarrollo normal.
+  Falla específicamente al seleccionar un departamento recién creado en
+  el mismo test serial; "Bogotá D.C." (departamento pre-sembrado) es
+  intermitente. Se investigó y descartó una hipótesis de doble
+  codificación UTF-8 (confirmada como artefacto de las herramientas de
+  inspección, no un bug real, con inspección directa del DOM). No se
+  encontró la causa raíz; no bloquea el resto de esta ronda pero sigue
+  abierto como investigación aparte.
+- **Cuenta de prueba con rol Propietario** (`auditoria-claude@
+  shoppluscol.local`, creada en una ronda anterior de esta sesión) sigue
+  en `.data/local.db`; el propietario prefirió eliminarla él mismo en
+  vez de que lo hiciera Claude.
+- **Dos cuentas de propietario** coexisten en `.data/local.db`:
+  `owner@shopluscol.local` (typo, nunca inició sesión) y
+  `owner@shoppluscol.local` (la que sí se usa). Señalado al propietario;
+  no se eliminó ninguna — es su decisión.
+- Todo lo explícitamente excluido por el propietario de esta ronda sigue
+  pendiente y es intencional, no un olvido: secretos/credenciales reales
+  (Mercado Pago producción, SMTP, `BETTER_AUTH_SECRET`), creación del D1
+  real y reemplazo del `database_id` placeholder en `wrangler.jsonc`,
+  activación de la zona "Resto de Colombia" y tarifas de departamentos
+  fuera de Antioquia, y cualquier otro ajuste que se hace desde el panel.
+- Esta ronda **no aprueba producción, no hace merge, no despliega y no
+  constituye autorización para lanzar**. Queda pendiente de revisión y
+  decisión del propietario.
