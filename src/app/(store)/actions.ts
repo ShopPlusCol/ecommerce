@@ -21,6 +21,7 @@ import type {
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import {
   consentRecords,
+  couponRedemptions,
   customers,
   idempotencyKeys,
   inventoryItems,
@@ -92,10 +93,21 @@ export async function validateCouponAction(input: unknown): Promise<ValidateCoup
   if (!parsed.success) return { ok: false, error: "Datos de cupón inválidos." };
 
   const coupon = await promotionsRepository.findCouponByCode(parsed.data.code);
+  // Límite total de usos: se puede comprobar aquí sin conocer todavía al
+  // cliente. El límite por cliente y "solo primera compra" solo se conocen
+  // con certeza en createDemoOrderAction (ahí sí es autoritativo); esta
+  // previsualización nunca es la última palabra.
+  let totalRedemptions: number | undefined;
+  if (coupon) {
+    const db = await getRuntimeDb();
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions).where(eq(couponRedemptions.couponId, coupon.id));
+    totalRedemptions = Number(row?.count ?? 0);
+  }
   const result = validateCoupon(coupon, {
     subtotal: money(parsed.data.subtotal),
     totalUnits: parsed.data.totalUnits,
     now: new Date(),
+    totalRedemptions,
   });
   if (!result.valid) return { ok: false, error: result.reason };
   return { ok: true, coupon: result.coupon };
@@ -180,12 +192,34 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   const cart: Cart = { lines: nonZeroLines, couponCode: data.couponCode };
   const subtotal = computeSubtotal(cart);
 
-  // Cupón (autoritativo).
+  // Cupón (autoritativo): límites de uso total/por cliente y "solo primera
+  // compra" se comprueban aquí, contra coupon_redemptions y orders reales
+  // — nunca solo en la previsualización del cliente (validateCouponAction).
   let coupon = null;
   if (data.couponCode) {
     const found = await promotionsRepository.findCouponByCode(data.couponCode);
-    const validation = validateCoupon(found, { subtotal, totalUnits: totalUnits(cart), now: new Date() });
-    if (validation.valid) coupon = validation.coupon;
+    if (found) {
+      const [existingCustomerForCoupon] = await db.select({ id: customers.id }).from(customers).where(eq(customers.phone, data.contact.phone)).limit(1);
+      const [totalRow] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions).where(eq(couponRedemptions.couponId, found.id));
+      let customerRedemptions = 0;
+      let isFirstOrder = true;
+      if (existingCustomerForCoupon) {
+        const [customerRow] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions)
+          .where(and(eq(couponRedemptions.couponId, found.id), eq(couponRedemptions.customerId, existingCustomerForCoupon.id)));
+        customerRedemptions = Number(customerRow?.count ?? 0);
+        const [orderCountRow] = await db.select({ count: sql<number>`count(*)` }).from(orders).where(eq(orders.customerId, existingCustomerForCoupon.id));
+        isFirstOrder = Number(orderCountRow?.count ?? 0) === 0;
+      }
+      const validation = validateCoupon(found, {
+        subtotal,
+        totalUnits: totalUnits(cart),
+        now: new Date(),
+        totalRedemptions: Number(totalRow?.count ?? 0),
+        customerRedemptions,
+        isFirstOrder,
+      });
+      if (validation.valid) coupon = validation.coupon;
+    }
   }
 
   // Envío (se resuelve antes que las recompensas: el envío gratis puede
@@ -392,6 +426,18 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       policyVersion: "2026-07-29",
     }).returning();
     createdConsentRecordId = consentRecord.id;
+
+    // Registra el uso del cupón (cascada con el pedido si algo falla después
+    // de esto y hay que deshacerlo) — es lo que hace cumplibles sus límites
+    // de uso total/por cliente en el próximo pedido.
+    if (coupon) {
+      await db.insert(couponRedemptions).values({
+        couponId: coupon.id,
+        orderId: order.id,
+        customerId: customer.id,
+        discountAmount: summary.couponDiscount.amount,
+      });
+    }
 
     let checkoutUrl: string | null = null;
     if (data.paymentMethod === "mercado_pago") {

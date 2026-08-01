@@ -209,6 +209,7 @@ export const accessoryProductIds = ["prod-solucion-120", "prod-pinza", "prod-est
 /** Cupones de ejemplo ACTIVOS para poder probar el flujo en la Fase 2. */
 export const coupons: Coupon[] = [
   {
+    id: "demo-coupon-bienvenida10",
     code: "BIENVENIDA10",
     discountType: "percentage",
     discountValue: 10,
@@ -216,9 +217,13 @@ export const coupons: Coupon[] = [
     endsAt: null,
     minPurchaseAmount: null,
     minQuantity: null,
+    usageLimitTotal: null,
+    usageLimitPerCustomer: null,
+    firstOrderOnly: false,
     status: "active",
   },
   {
+    id: "demo-coupon-enviogratis",
     code: "ENVIOGRATIS",
     discountType: "free_shipping",
     discountValue: 0,
@@ -226,6 +231,9 @@ export const coupons: Coupon[] = [
     endsAt: null,
     minPurchaseAmount: money(80_000),
     minQuantity: null,
+    usageLimitTotal: null,
+    usageLimitPerCustomer: null,
+    firstOrderOnly: false,
     status: "active",
   },
 ];
