@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { asc, eq } from "drizzle-orm";
 import type {
   CatalogRepository,
@@ -31,17 +32,25 @@ function sortProducts(list: Product[], sort: ProductSort) {
   return copy.sort((a, b) => Number(b.featured) - Number(a.featured));
 }
 
-export class DrizzleCatalogRepository implements CatalogRepository {
-  private async hydrate(): Promise<Product[]> {
-    const db = await getRuntimeDb();
-    const [rows, colors, media, categoriesMap, inventory] = await Promise.all([
-      db.select().from(products).where(eq(products.status, "active")).orderBy(asc(products.order)),
-      db.select().from(colorFamilies),
-      db.select().from(productMedia).orderBy(asc(productMedia.order)),
-      db.select().from(productCategories),
-      db.select().from(inventoryItems),
-    ]);
-    return rows.map((row) => {
+/**
+ * Hidrata el catálogo completo (producto + color + media + categorías +
+ * inventario) en 5 consultas paralelas. `getProductBySlug`,
+ * `getProductsByIds`, `getRelatedProducts` y `getUpsellProducts` la llaman
+ * de forma independiente, y una sola vista de producto invoca varias de
+ * ellas — sin memoizar, eso eran 4-5 hidrataciones completas del catálogo
+ * por cada carga de página. `React.cache` la deduplica dentro del mismo
+ * render de servidor (una petición = una hidratación real).
+ */
+const hydrateCatalog = cache(async (): Promise<Product[]> => {
+  const db = await getRuntimeDb();
+  const [rows, colors, media, categoriesMap, inventory] = await Promise.all([
+    db.select().from(products).where(eq(products.status, "active")).orderBy(asc(products.order)),
+    db.select().from(colorFamilies),
+    db.select().from(productMedia).orderBy(asc(productMedia.order)),
+    db.select().from(productCategories),
+    db.select().from(inventoryItems),
+  ]);
+  return rows.map((row) => {
       const compare = row.compareAtPrice && row.compareAtPrice > row.price ? row.compareAtPrice : null;
       const stockRows = inventory.filter((item) => item.productId === row.id);
       const stock = stockRows.reduce((sum, item) => sum + item.quantityOnHand - item.quantityReserved, 0);
@@ -71,7 +80,12 @@ export class DrizzleCatalogRepository implements CatalogRepository {
             ? { categoryId: row.limitCategoryId, maxUnitsPerCategoryUnit: row.maxUnitsPerCategoryUnit }
             : null,
       };
-    });
+  });
+});
+
+export class DrizzleCatalogRepository implements CatalogRepository {
+  private hydrate(): Promise<Product[]> {
+    return hydrateCatalog();
   }
 
   async listProducts(query: ProductQuery): Promise<ProductListResult> {
