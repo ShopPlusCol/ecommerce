@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import {
@@ -43,12 +43,28 @@ export async function POST(request: Request) {
     const mapped = authoritative.status === "approved" ? "approved"
       : authoritative.status === "rejected" ? "rejected"
       : authoritative.status === "in_process" ? "in_process" : "pending";
-    const newlyApproved = mapped === "approved" && payment.status !== "approved";
-    await db.update(payments).set({
-      providerPaymentId: String(authoritative.id),
-      status: mapped,
-      updatedAt: new Date(),
-    }).where(eq(payments.id, payment.id));
+    // Reclama la transición a "approved" con un UPDATE condicionado al estado
+    // actual en base de datos (no al valor leído en memoria), para que dos
+    // entregas concurrentes del mismo webhook nunca reconcilien inventario y
+    // analítica dos veces (sección 12, integridad de pagos).
+    let claimedApproval: { id: string } | undefined;
+    if (mapped === "approved") {
+      [claimedApproval] = await db.update(payments).set({
+        providerPaymentId: String(authoritative.id),
+        status: mapped,
+        updatedAt: new Date(),
+      }).where(and(eq(payments.id, payment.id), sql`${payments.status} != 'approved'`)).returning({ id: payments.id });
+      if (!claimedApproval) {
+        await db.update(payments).set({ providerPaymentId: String(authoritative.id), updatedAt: new Date() }).where(eq(payments.id, payment.id));
+      }
+    } else {
+      await db.update(payments).set({
+        providerPaymentId: String(authoritative.id),
+        status: mapped,
+        updatedAt: new Date(),
+      }).where(eq(payments.id, payment.id));
+    }
+    const newlyApproved = Boolean(claimedApproval);
     if (newlyApproved) {
       const reservations = await db.select().from(inventoryReservations).where(eq(inventoryReservations.orderId, payment.orderId));
       for (const reservation of reservations.filter((item) => item.status === "active")) {
