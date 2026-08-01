@@ -12,17 +12,14 @@ import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
 import { computeOrderSummary, computeSubtotal, totalUnits as sumUnits } from "@/domain/services/cart-pricing";
 import { evaluateRewards } from "@/domain/services/rewards";
-import { DEFAULT_PAYMENT_METHOD_COPY, type PaymentMethodId, type PaymentMethodCopy } from "@/domain/services/payments";
+import type { PaymentMethodId, PaymentMethodCopy } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
-import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
-import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
-import { getStoreContentAction, getCheckoutFieldsAction } from "@/app/(store)/site-content-actions";
+import { listShippingCitiesAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 import {
-  DEFAULT_CHECKOUT_FIELDS,
   LOCKED_CHECKOUT_FIELDS,
   NO_REQUIRED_TOGGLE_FIELDS,
   type CheckoutFieldConfig,
@@ -74,7 +71,17 @@ const EMPTY_LOCATION: LocationForm = {
   deliveryInstructions: "",
 };
 
-export function CheckoutClient() {
+export function CheckoutClient({
+  initialDepartments,
+  initialPaymentMethodsCopy,
+  initialPaymentDisclaimer,
+  initialFieldConfig,
+}: {
+  initialDepartments: string[];
+  initialPaymentMethodsCopy: Record<PaymentMethodId, PaymentMethodCopy>;
+  initialPaymentDisclaimer: string;
+  initialFieldConfig: CheckoutFieldConfig[];
+}) {
   const { cart, lines, coupon, rewards, rewardRules, totals, clearCart, isHydrated } = useCart();
   const { track, consent: analyticsConsent } = useAnalytics();
   const idempotencyKey = React.useRef(crypto.randomUUID());
@@ -86,10 +93,10 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
-  const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
-  const [paymentDisclaimer, setPaymentDisclaimer] = React.useState("");
-  const [fieldConfig, setFieldConfig] = React.useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
-  const [departments, setDepartments] = React.useState<string[]>([]);
+  const paymentMethodsCopy = initialPaymentMethodsCopy;
+  const paymentDisclaimer = initialPaymentDisclaimer;
+  const fieldConfig = initialFieldConfig;
+  const departments = initialDepartments;
   const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
@@ -109,53 +116,6 @@ export function CheckoutClient() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length]);
-
-  // Departamentos configurados y activos (los 32 + Bogotá D.C. vienen
-  // precargados de fábrica, así que normalmente están todos desde el
-  // primer arranque).
-  React.useEffect(() => {
-    let cancelled = false;
-    listShippingDepartmentsAction().then((names) => {
-      if (!cancelled) setDepartments(names);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Nombre/descripción de cada método de pago, editables desde Configuración.
-  React.useEffect(() => {
-    let cancelled = false;
-    getPaymentMethodsCopyAction().then((copy) => {
-      if (!cancelled) setPaymentMethodsCopy(copy);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Aviso de pago, editable desde Configuración → Textos del sitio.
-  React.useEffect(() => {
-    let cancelled = false;
-    getStoreContentAction().then(({ texts }) => {
-      if (!cancelled) setPaymentDisclaimer(texts.checkoutPaymentDisclaimer);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Qué campos del formulario están activos/obligatorios y en qué orden,
-  // editable desde Configuración → Formulario de checkout.
-  React.useEffect(() => {
-    let cancelled = false;
-    getCheckoutFieldsAction().then((config) => {
-      if (!cancelled) setFieldConfig(config);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Ciudades/municipios configurados y activos para el departamento elegido
   // (sección 17.3): si el departamento no tiene ninguna, el checkout no pide
