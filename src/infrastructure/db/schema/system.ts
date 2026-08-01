@@ -97,7 +97,10 @@ export const auditLogs = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index("audit_logs_entity_idx").on(table.entityType, table.entityId)],
+  (table) => [
+    index("audit_logs_entity_idx").on(table.entityType, table.entityId),
+    index("audit_logs_created_at_idx").on(table.createdAt),
+  ],
 );
 
 /** Idempotencia genérica para creación de pedidos, pagos y webhooks. */

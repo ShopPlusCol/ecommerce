@@ -113,7 +113,7 @@ export const orderItems = sqliteTable("order_items", {
   quantity: integer("quantity").notNull(),
   discount: integer("discount").notNull().default(0),
   isGift: integer("is_gift", { mode: "boolean" }).notNull().default(false),
-});
+}, (table) => [index("order_items_order_idx").on(table.orderId)]);
 
 export const orderAdjustments = sqliteTable("order_adjustments", {
   id: idColumn(),

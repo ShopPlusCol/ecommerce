@@ -73,4 +73,4 @@ export const manualTransferProofs = sqliteTable("manual_transfer_proofs", {
   reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
   rejectionReason: text("rejection_reason"),
   ...timestampColumns,
-});
+}, (table) => [index("manual_transfer_proofs_payment_idx").on(table.paymentId)]);
