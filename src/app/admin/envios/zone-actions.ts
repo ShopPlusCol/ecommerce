@@ -335,6 +335,7 @@ export type ZoneSearchResult = {
 };
 
 export async function searchZonesAction(query: string): Promise<ZoneSearchResult[]> {
+  await requirePermission("shipping", "read");
   const q = normalize(query);
   if (!q) return [];
   const db = await getRuntimeDb();

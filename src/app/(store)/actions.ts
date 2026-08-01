@@ -89,6 +89,12 @@ const createOrderSchema = z.object({
 
 /** Valida un cupón en servidor (autoritativo, sección 13). */
 export async function validateCouponAction(input: unknown): Promise<ValidateCouponResult> {
+  try {
+    await enforceRateLimit("coupon_validate", 20, 60);
+  } catch (error) {
+    if (error instanceof RateLimitError) return { ok: false, error: error.message };
+    throw error;
+  }
   const parsed = couponSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Datos de cupón inválidos." };
 
