@@ -133,6 +133,11 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
   const parsed = quoteSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: "Datos de destino inválidos." };
 
+  // Se llama en cada cambio de dirección durante el checkout (mucho más
+  // frecuente que pedidos completados), así que libera reservas vencidas
+  // aquí también: reduce la ventana en la que stock reservado por un
+  // carrito abandonado queda bloqueado sin que nadie más complete un pedido.
+  await releaseExpiredReservations();
   const quote = await shippingResolver.resolve(parsed.data.destination, money(parsed.data.productsTotal));
   if (!quote) {
     return { ok: false, reason: await resolveNoCoverageMessage(parsed.data.destination) };
