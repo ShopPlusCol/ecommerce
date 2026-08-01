@@ -19,6 +19,8 @@ import {
   products,
 } from "@/infrastructure/db/schema";
 import { ORDER_STATUSES } from "@/infrastructure/db/schema/orders";
+import { canTransitionOrderStatus, type OrderStatus } from "@/domain/services/order-status";
+import { restockOrderInventory } from "@/modules/inventory/reservations";
 
 const productSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -118,6 +120,9 @@ export async function changeOrderStatusAction(formData: FormData) {
   const db = await getRuntimeDb();
   const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   if (!order) throw new Error("Pedido no encontrado.");
+  if (!canTransitionOrderStatus(order.status as OrderStatus, toStatus)) {
+    throw new Error(`No se puede pasar de "${order.status}" a "${toStatus}".`);
+  }
   await db.update(orders).set({ status: toStatus, updatedAt: new Date() }).where(eq(orders.id, id));
   await db.insert(orderStatusHistory).values({
     orderId: id,
@@ -135,7 +140,11 @@ export async function changeOrderStatusAction(formData: FormData) {
     after: { status: toStatus },
     reason: note,
   });
+  if (toStatus === "cancelled" || toStatus === "returned") {
+    await restockOrderInventory(id, `Pedido pasó a "${toStatus}": ${note}`);
+  }
   revalidatePath("/admin/pedidos");
+  revalidatePath("/admin/inventario");
 }
 
 export async function reviewManualTransferAction(formData: FormData) {
