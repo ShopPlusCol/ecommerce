@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { asc, desc } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { PackageSearch } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
@@ -14,34 +14,43 @@ import { isVideoUrl } from "@/lib/media-type";
 
 export const metadata: Metadata = { title: "Productos" };
 
+const PAGE_SIZE = 30;
+
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
 }) {
   await requirePermission("catalog", "read");
   const params = await searchParams;
-  const query = params.q?.trim().toLocaleLowerCase("es-CO") ?? "";
+  const query = params.q?.trim() ?? "";
   const statusFilter = params.status ?? "all";
+  const page = Math.max(1, Number(params.page) || 1);
   const db = await getRuntimeDb();
-  const [rows, imageRows] = await Promise.all([
-    db.select().from(products).orderBy(desc(products.updatedAt)),
-    db.select().from(productMedia).orderBy(asc(productMedia.order)),
+  const filters = and(
+    query ? or(like(products.name, `%${query}%`), like(products.sku, `%${query}%`)) : undefined,
+    statusFilter !== "all" ? eq(products.status, statusFilter as "draft" | "active" | "archived") : undefined,
+  );
+  const [rows, countRows, [{ total: totalProducts }]] = await Promise.all([
+    db.select().from(products).where(filters).orderBy(desc(products.updatedAt)).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE),
+    db.select({ count: sql<number>`count(*)` }).from(products).where(filters),
+    db.select({ total: sql<number>`count(*)` }).from(products),
   ]);
+  const filteredTotal = Number(countRows[0]?.count ?? 0);
+  const imageRows = rows.length
+    ? await db.select().from(productMedia).where(inArray(productMedia.productId, rows.map((row) => row.id))).orderBy(asc(productMedia.order))
+    : [];
   const coverByProduct = new Map<string, string>();
   for (const image of imageRows) {
     if (!coverByProduct.has(image.productId)) coverByProduct.set(image.productId, image.url);
   }
-  const filteredRows = rows.filter((product) => {
-    const matchesQuery = !query || `${product.name} ${product.sku}`.toLocaleLowerCase("es-CO").includes(query);
-    return matchesQuery && (statusFilter === "all" || product.status === statusFilter);
-  });
+  const urlParams = new URLSearchParams(Object.entries(params).filter(([key, value]) => key !== "page" && value).map(([key, value]) => [key, value!]));
 
   return (
     <>
       <AdminPageHeader
         title="Productos"
-        description={`${rows.length} producto${rows.length === 1 ? "" : "s"} persistidos.`}
+        description={`${totalProducts} producto${Number(totalProducts) === 1 ? "" : "s"} persistidos.`}
         actions={<Link href="/admin/productos/edicion-masiva" className="inline-flex h-10 items-center rounded-md border border-border bg-surface-raised px-4 text-sm font-semibold">Editar varios productos</Link>}
       />
       <CsvImportForm />
@@ -64,9 +73,9 @@ export default async function AdminProductsPage({
       <section className="overflow-hidden rounded-xl border border-border bg-surface-raised">
         <div className="border-b border-border p-4">
           <h2>Catálogo</h2>
-          <p className="mt-1 text-sm text-text-muted">{filteredRows.length} producto(s) coinciden con los filtros.</p>
+          <p className="mt-1 text-sm text-text-muted">{filteredTotal} producto(s) coinciden con los filtros.</p>
         </div>
-        {filteredRows.length ? (
+        {rows.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-surface-sunken/70 text-left">
@@ -79,7 +88,7 @@ export default async function AdminProductsPage({
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row) => {
+                {rows.map((row) => {
                   const cover = coverByProduct.get(row.id);
                   return (
                     <tr key={row.id} className="border-t border-border align-middle hover:bg-surface-sunken/30">
@@ -119,10 +128,19 @@ export default async function AdminProductsPage({
         ) : (
           <div className="p-10 text-center">
             <PackageSearch className="mx-auto h-8 w-8 text-text-subtle" />
-            <h3 className="mt-3">{rows.length ? "No hay productos con estos filtros" : "Todavía no hay productos"}</h3>
-            <p className="mt-1 text-sm text-text-muted">{rows.length ? "Cambia la búsqueda o el estado." : "Crea el primero con el formulario de arriba o impórtalo por CSV."}</p>
+            <h3 className="mt-3">{Number(totalProducts) ? "No hay productos con estos filtros" : "Todavía no hay productos"}</h3>
+            <p className="mt-1 text-sm text-text-muted">{Number(totalProducts) ? "Cambia la búsqueda o el estado." : "Crea el primero con el formulario de arriba o impórtalo por CSV."}</p>
           </div>
         )}
+        {filteredTotal > PAGE_SIZE ? (
+          <nav className="flex items-center justify-between border-t border-border p-4 text-sm" aria-label="Paginación de productos">
+            <span>Página {page} de {Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE))}</span>
+            <div className="flex gap-2">
+              {page > 1 ? <a className="rounded-md border border-border px-3 py-2" href={`?${urlParams}&page=${page - 1}`}>Anterior</a> : null}
+              {page * PAGE_SIZE < filteredTotal ? <a className="rounded-md border border-border px-3 py-2" href={`?${urlParams}&page=${page + 1}`}>Siguiente</a> : null}
+            </div>
+          </nav>
+        ) : null}
       </section>
     </>
   );

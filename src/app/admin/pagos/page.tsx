@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { Banknote, Clock, FileCheck } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
@@ -18,19 +18,25 @@ const PURPOSE_LABEL: Record<string, string> = {
   balance_on_delivery: "Saldo contraentrega",
 };
 
-export default async function Page() {
+const PAGE_SIZE = 30;
+
+export default async function Page({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   await requirePermission("payments", "read");
+  const params = await searchParams;
+  const page = Math.max(1, Number(params.page) || 1);
   const db = await getRuntimeDb();
-  const rows = await db
+  const baseQuery = db
     .select({ payment: payments, proof: manualTransferProofs, asset: mediaAssets, orderNumber: orders.orderNumber })
     .from(payments)
     .innerJoin(orders, eq(orders.id, payments.orderId))
     .leftJoin(manualTransferProofs, eq(manualTransferProofs.paymentId, payments.id))
-    .leftJoin(mediaAssets, eq(mediaAssets.id, manualTransferProofs.mediaAssetId))
-    .orderBy(desc(payments.createdAt));
-
-  const pendingCount = rows.filter(({ proof }) => proof?.status === "pending").length;
-  const approvedCount = rows.filter(({ payment }) => payment.status === "approved").length;
+    .leftJoin(mediaAssets, eq(mediaAssets.id, manualTransferProofs.mediaAssetId));
+  const [rows, [{ total }], [{ pendingCount }], [{ approvedCount }]] = await Promise.all([
+    baseQuery.orderBy(desc(payments.createdAt)).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE),
+    db.select({ total: sql<number>`count(*)` }).from(payments),
+    db.select({ pendingCount: sql<number>`count(*)` }).from(manualTransferProofs).where(eq(manualTransferProofs.status, "pending")),
+    db.select({ approvedCount: sql<number>`count(*)` }).from(payments).where(eq(payments.status, "approved")),
+  ]);
 
   return (
     <>
@@ -38,7 +44,7 @@ export default async function Page() {
       <section className="mb-6 grid gap-3 sm:grid-cols-3" aria-label="Resumen de pagos">
         <article className="flex items-center gap-4 rounded-xl border border-border bg-surface-raised p-4">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand-soft text-brand"><Banknote className="h-5 w-5" aria-hidden="true" /></span>
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-text-subtle">Pagos registrados</p><p className="text-2xl font-semibold tabular-nums">{rows.length}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-text-subtle">Pagos registrados</p><p className="text-2xl font-semibold tabular-nums">{total}</p></div>
         </article>
         <article className="flex items-center gap-4 rounded-xl border border-border bg-surface-raised p-4">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-warning-soft text-warning"><Clock className="h-5 w-5" aria-hidden="true" /></span>
@@ -52,7 +58,7 @@ export default async function Page() {
       <section className="overflow-hidden rounded-xl border border-border bg-surface-raised">
         <div className="border-b border-border p-4">
           <h2>Movimientos de pago</h2>
-          <p className="mt-1 text-sm text-text-muted">{rows.length} pago(s) asociados a pedidos.</p>
+          <p className="mt-1 text-sm text-text-muted">{total} pago(s) asociados a pedidos.</p>
         </div>
         {rows.length ? (
           <div className="overflow-x-auto">
@@ -105,6 +111,15 @@ export default async function Page() {
             <p className="mt-1 text-sm text-text-muted">Aparecerán aquí cuando un pedido registre un pago o un comprobante de transferencia.</p>
           </div>
         )}
+        {Number(total) > PAGE_SIZE ? (
+          <nav className="flex items-center justify-between border-t border-border p-4 text-sm" aria-label="Paginación de pagos">
+            <span>Página {page} de {Math.max(1, Math.ceil(Number(total) / PAGE_SIZE))}</span>
+            <div className="flex gap-2">
+              {page > 1 ? <a className="rounded-md border border-border px-3 py-2" href={`?page=${page - 1}`}>Anterior</a> : null}
+              {page * PAGE_SIZE < Number(total) ? <a className="rounded-md border border-border px-3 py-2" href={`?page=${page + 1}`}>Siguiente</a> : null}
+            </div>
+          </nav>
+        ) : null}
       </section>
     </>
   );
