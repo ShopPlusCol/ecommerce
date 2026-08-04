@@ -17,7 +17,7 @@
  * Lo que NO hace: desplegar nada, tocar Cloudflare, ni contactar con
  * proveedores externos por su cuenta.
  */
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -34,15 +34,45 @@ mkdirSync(uploads, { recursive: true });
 const baseUrl = process.env.STAGING_URL ?? `http://localhost:${port}`;
 
 /**
+ * Parser mínimo de archivos .env: `CLAVE=valor`, ignorando comentarios y
+ * líneas vacías, y quitando comillas envolventes. No se usa una dependencia
+ * porque solo hace falta esto.
+ */
+function parseEnvFile(contents) {
+  const values = {};
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separator = line.indexOf("=");
+    if (separator === -1) continue;
+    const key = line.slice(0, separator).trim();
+    if (!key) continue;
+    let value = line.slice(separator + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"') && value.length > 1) ||
+      (value.startsWith("'") && value.endsWith("'") && value.length > 1)
+    ) {
+      value = value.slice(1, -1);
+    }
+    values[key] = value;
+  }
+  return values;
+}
+
+/**
  * `.env.staging` (si existe) manda sobre `.env`. Se carga explícitamente en
  * vez de dejar que Next.js mezcle: así queda claro de dónde sale cada
  * credencial y no se hereda por accidente un token de producción.
  */
 const stagingEnvFile = path.resolve(workspace, ".env.staging");
-const env = {
-  ...process.env,
+/**
+ * Variables que este script impone siempre, por encima de `.env` y de
+ * `.env.staging`. Son las que garantizan el aislamiento: si `.env.staging`
+ * pudiera sobrescribirlas, un descuido bastaría para que la validación
+ * escribiera en la base real o cobrara de verdad.
+ */
+const FORCED = {
   APP_ENVIRONMENT: "staging",
-  NODE_ENV: mode === "seed" ? "development" : process.env.NODE_ENV ?? "production",
   SQLITE_PATH: database,
   // Carpeta propia bajo `public/`, para no mezclar los archivos de una
   // validación con los medios reales de la tienda.
@@ -50,16 +80,36 @@ const env = {
   MEDIA_PUBLIC_URL: `${baseUrl}/uploads-staging`,
   NEXT_PUBLIC_SITE_URL: baseUrl,
   BETTER_AUTH_URL: baseUrl,
-  // Un secreto propio del entorno de pruebas: nunca el de producción.
-  BETTER_AUTH_SECRET: process.env.STAGING_AUTH_SECRET ?? randomBytes(48).toString("base64url"),
-  // Mercado Pago SIEMPRE en modo prueba aquí, pase lo que pase en .env.
   MERCADO_PAGO_TEST_MODE: "true",
   MAINTENANCE_MODE: "false",
 };
 
+const env = {
+  ...process.env,
+  ...FORCED,
+  NODE_ENV: mode === "seed" ? "development" : process.env.NODE_ENV ?? "production",
+  // Un secreto propio del entorno de pruebas: nunca el de producción.
+  BETTER_AUTH_SECRET: process.env.STAGING_AUTH_SECRET ?? randomBytes(48).toString("base64url"),
+};
+
 if (existsSync(stagingEnvFile)) {
-  console.log(`[staging] Cargando variables de ${path.relative(workspace, stagingEnvFile)}`);
-  env.ENV_FILE = stagingEnvFile;
+  // Se parsea aquí a mano y se inyecta en el entorno del proceso hijo.
+  // Next.js no lee `.env.staging` por su cuenta (solo `.env`, `.env.local`
+  // y `.env.<NODE_ENV>`), así que sin esto el archivo quedaba en el disco
+  // sin efecto alguno: las credenciales de prueba nunca llegaban.
+  const parsed = parseEnvFile(readFileSync(stagingEnvFile, "utf8"));
+  Object.assign(env, parsed);
+  // Las variables que este script fuerza vuelven a aplicarse DESPUÉS, para
+  // que `.env.staging` no pueda, por ejemplo, sacar a Mercado Pago del modo
+  // de prueba.
+  Object.assign(env, FORCED);
+  // El secreto de sesión se resuelve después de cargar el archivo: si
+  // `.env.staging` define STAGING_AUTH_SECRET, las sesiones sobreviven a un
+  // reinicio en vez de cerrarse cada vez.
+  if (env.STAGING_AUTH_SECRET) env.BETTER_AUTH_SECRET = env.STAGING_AUTH_SECRET;
+  console.log(
+    `[staging] Cargadas ${Object.keys(parsed).length} variables de ${path.relative(workspace, stagingEnvFile)}`,
+  );
 } else {
   console.log(
     "[staging] No hay .env.staging: se usan las variables actuales, salvo las que este script fuerza.\n" +
