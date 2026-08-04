@@ -21,9 +21,14 @@ declare global {
  * `fbq('consent','revoke')` como sustituto: si la persona no aceptó
  * marketing, el script de Meta sencillamente nunca entra a la página.
  *
- * El PageView inicial lo dispara este componente una sola vez tras
- * inicializar; los cambios de ruta posteriores los cubre `PageViewTracker`
- * a través del contexto, para no contar dos veces la misma vista.
+ * **Este componente no dispara ningún PageView.** Solo inicializa el píxel.
+ * La vista de página la emite `PageViewTracker`, que es la única fuente:
+ * antes ambos lo hacían, así que cada carga contaba dos veces, y el de aquí
+ * salía además sin `event_id`, de modo que Meta tampoco podía deduplicarlo
+ * contra el envío de la Conversions API.
+ *
+ * `fbq("init")` por sí solo no emite PageView — lo emite la línea explícita
+ * del fragmento estándar de Meta, que aquí se omite a propósito.
  */
 export function MetaPixel({ pixelId }: { pixelId: string }) {
   const { consent } = useAnalytics();
@@ -55,7 +60,6 @@ export function MetaPixel({ pixelId }: { pixelId: string }) {
     document.head.appendChild(script);
 
     window.fbq?.("init", pixelId);
-    window.fbq?.("track", "PageView");
   }, [consent.marketing, pixelId]);
 
   return null;

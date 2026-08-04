@@ -6,6 +6,12 @@ export type ClientAnalyticsEvent = {
   value?: number;
   currency?: "COP";
   contentIds?: string[];
+  /**
+   * Cantidades alineadas por índice con `contentIds`. Se envían al servidor
+   * para que calcule el importe real desde el catálogo; el `value` del
+   * cliente solo se usa para el píxel del navegador.
+   */
+  quantities?: number[];
   contentType?: "product" | "product_group";
   extra?: Record<string, unknown>;
 };

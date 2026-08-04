@@ -45,6 +45,7 @@ export function AddToCartButton({
       value: product.price.amount * quantity,
       currency: "COP",
       contentIds: [product.id],
+      quantities: [quantity],
       contentType: "product",
     });
     setJustAdded(true);

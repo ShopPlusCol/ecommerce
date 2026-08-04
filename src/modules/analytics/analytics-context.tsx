@@ -45,6 +45,37 @@ export type AnalyticsContextValue = {
 
 const AnalyticsContext = React.createContext<AnalyticsContextValue | null>(null);
 
+/**
+ * Arma el payload mínimo que acepta el servidor para cada tipo de evento.
+ * Deliberadamente no incluye texto libre (p. ej. el término buscado) ni el
+ * importe: lo primero es dato personal innecesario y lo segundo se calcula
+ * en servidor.
+ */
+function buildForwardPayload(
+  name: ConversionEventName,
+  event: ClientAnalyticsEvent,
+  extra: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  switch (name) {
+    case "ViewContent":
+    case "AddToWishlist":
+      return event.contentIds?.length ? { contentIds: [event.contentIds[0]] } : {};
+    case "AddToCart":
+    case "InitiateCheckout":
+      return event.contentIds?.length
+        ? { contentIds: event.contentIds, ...(event.quantities ? { quantities: event.quantities } : {}) }
+        : {};
+    case "Contact":
+      return {
+        ...(event.contentIds?.length ? { contentIds: event.contentIds } : {}),
+        ...(event.quantities ? { quantities: event.quantities } : {}),
+        ...(typeof extra?.source === "string" ? { source: extra.source } : {}),
+      };
+    default:
+      return {};
+  }
+}
+
 function writeConsentCookie(value: { analytics: boolean; marketing: boolean }) {
   try {
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
@@ -117,6 +148,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         value: payload.value,
         currency: payload.currency,
         contentIds: payload.contentIds,
+        quantities: payload.quantities,
         contentType: payload.contentType,
         extra: payload.extra,
       };
@@ -146,13 +178,14 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (FORWARDABLE.has(name)) {
+        // No se manda `value`: el importe lo resuelve el servidor desde el
+        // catálogo. Lo que el navegador envía son solo identificadores y
+        // cantidades, que el servidor vuelve a validar y valorar.
         void forwardConversionEventAction({
           eventName: name,
           eventId,
           eventSourceUrl: window.location.href,
-          value: event.value,
-          contentIds: event.contentIds,
-          contentType: event.contentType,
+          payload: buildForwardPayload(name, event, payload.extra),
         }).catch(() => {
           // La analítica nunca interrumpe la navegación.
         });

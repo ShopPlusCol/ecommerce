@@ -31,11 +31,15 @@ export function StoreProviders({
         <CartProvider rewardRules={rewardRules}>
           {children}
           <CartDrawer />
+          {/* MetaPixel va ANTES de PageViewTracker a propósito: los efectos
+              de hermanos corren en orden de montaje, y el tracker necesita
+              que `window.fbq` ya exista para que la primera vista llegue
+              también al píxel y no solo a la Conversions API.
+              El componente no carga nada sin consentimiento de marketing. */}
+          {metaPixelId ? <MetaPixel pixelId={metaPixelId} /> : null}
           <PageViewTracker />
           <UtmAttribution />
           <WebVitalsReporter />
-          {/* El propio componente no carga nada sin consentimiento de marketing. */}
-          {metaPixelId ? <MetaPixel pixelId={metaPixelId} /> : null}
         </CartProvider>
       </FavoritesProvider>
     </AnalyticsProvider>

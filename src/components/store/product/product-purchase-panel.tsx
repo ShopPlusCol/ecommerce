@@ -115,6 +115,7 @@ export function ProductPurchasePanel({
             value: product.price.amount * quantity,
             currency: "COP",
             contentIds: [product.id],
+            quantities: [quantity],
             contentType: "product",
             extra: { source: "product" },
           })

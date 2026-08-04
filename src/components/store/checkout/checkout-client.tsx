@@ -112,6 +112,7 @@ export function CheckoutClient({
       value: totals.productsTotal.amount,
       currency: "COP",
       contentIds: lines.map((l) => l.productId),
+      quantities: lines.map((l) => l.quantity),
       contentType: "product",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

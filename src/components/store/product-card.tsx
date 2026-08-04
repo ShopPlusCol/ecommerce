@@ -44,6 +44,7 @@ export function ProductCard({ product }: { product: Product }) {
       value: product.price.amount,
       currency: "COP",
       contentIds: [product.id],
+      quantities: [1],
       contentType: "product",
     });
   };

@@ -38,6 +38,7 @@ export function WhatsAppCartButton({ onClick }: { onClick?: () => void }) {
       value: totals.productsTotal.amount,
       currency: "COP",
       contentIds: lines.map((line) => line.productId),
+      quantities: lines.map((line) => line.quantity),
       contentType: "product",
       extra: { source: "cart" },
     });

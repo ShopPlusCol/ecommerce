@@ -59,6 +59,23 @@ export const analyticsEvents = sqliteTable(
     utmCampaign: text("utm_campaign"),
     sentToServer: integer("sent_to_server", { mode: "boolean" }).notNull().default(false),
     sentToBrowser: integer("sent_to_browser", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Estado de entrega del evento de servidor (bandeja de salida). Antes
+     * bastaba con que la fila existiera para dar el evento por despachado,
+     * así que un fallo temporal de Meta perdía la compra para siempre:
+     * el reintento veía la fila y se retiraba. Con el estado explícito, una
+     * compra `pending`/`failed` se puede volver a intentar, y una `sent`
+     * nunca se reenvía.
+     */
+    deliveryStatus: text("delivery_status", { enum: ["pending", "sent", "failed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastAttemptAt: integer("last_attempt_at", { mode: "timestamp_ms" }),
+    /** Momento a partir del cual otro proceso puede reclamar el reintento. */
+    nextRetryAt: integer("next_retry_at", { mode: "timestamp_ms" }),
+    /** Motivo saneado del último fallo (código, nunca el cuerpo de la respuesta). */
+    lastErrorCode: text("last_error_code"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -66,6 +83,8 @@ export const analyticsEvents = sqliteTable(
   (table) => [
     uniqueIndex("analytics_events_event_id_idx").on(table.eventId),
     index("analytics_events_name_idx").on(table.eventName),
+    // Soporta la búsqueda de eventos pendientes vencidos sin recorrer la tabla.
+    index("analytics_events_delivery_idx").on(table.deliveryStatus, table.nextRetryAt),
   ],
 );
 
