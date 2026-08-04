@@ -19,8 +19,9 @@ import {
   products,
 } from "@/infrastructure/db/schema";
 import { ORDER_STATUSES } from "@/infrastructure/db/schema/orders";
-import { canTransitionOrderStatus, type OrderStatus } from "@/domain/services/order-status";
+import { directTransitionBlockedReason, type OrderStatus } from "@/domain/services/order-status";
 import { restockOrderInventory } from "@/modules/inventory/reservations";
+import { adminStatusLabel } from "@/modules/admin/status-labels";
 
 const productSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -116,13 +117,16 @@ export async function changeOrderStatusAction(formData: FormData) {
   const session = await requirePermission("orders", "update");
   const id = z.string().min(1).parse(formData.get("id"));
   const toStatus = z.enum(ORDER_STATUSES).parse(formData.get("status"));
-  const note = z.string().trim().max(500).parse(formData.get("note"));
+  // La nota es OPCIONAL: obligarla hacía que quien solo quería marcar
+  // "Entregado" escribiera cualquier cosa, y el historial se llenaba de
+  // texto sin valor. El historial ya registra estado anterior, nuevo, fecha
+  // y usuario por su cuenta.
+  const note = z.string().trim().max(500).optional().parse(formData.get("note") ?? undefined) || null;
   const db = await getRuntimeDb();
   const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   if (!order) throw new Error("Pedido no encontrado.");
-  if (!canTransitionOrderStatus(order.status as OrderStatus, toStatus)) {
-    throw new Error(`No se puede pasar de "${order.status}" a "${toStatus}".`);
-  }
+  const blocked = directTransitionBlockedReason(order.status as OrderStatus, toStatus);
+  if (blocked) throw new Error(blocked);
   await db.update(orders).set({ status: toStatus, updatedAt: new Date() }).where(eq(orders.id, id));
   await db.insert(orderStatusHistory).values({
     orderId: id,
@@ -140,10 +144,17 @@ export async function changeOrderStatusAction(formData: FormData) {
     after: { status: toStatus },
     reason: note,
   });
-  if (toStatus === "cancelled" || toStatus === "returned") {
-    await restockOrderInventory(id, `Pedido pasó a "${toStatus}": ${note}`);
+  // La devolución al stock solo ocurre al ENTRAR en un estado que la
+  // implica desde uno que no la tenía. `restockOrderInventory` es además
+  // idempotente (reclama cada reserva antes de devolverla), así que un
+  // segundo paso entre estados devueltos no puede duplicar inventario.
+  const inventoryReturning: OrderStatus[] = ["cancelled", "returned"];
+  const wasReturned = inventoryReturning.includes(order.status as OrderStatus) || order.status === "refunded";
+  if (inventoryReturning.includes(toStatus) && !wasReturned) {
+    await restockOrderInventory(id, `Pedido pasó a "${adminStatusLabel(toStatus)}"${note ? `: ${note}` : ""}`);
   }
   revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${id}`);
   revalidatePath("/admin/inventario");
 }
 

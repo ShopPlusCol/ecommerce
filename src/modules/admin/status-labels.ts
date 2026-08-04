@@ -66,6 +66,16 @@ const STATUS_LABELS: Record<string, string> = {
   cash_on_delivery: "Pago contraentrega",
   shipping_advance_transfer: "Anticipo por transferencia",
   transfer_full: "Transferencia total",
+  // Propósitos de pago (`payments.purpose`): salían en crudo en la ficha
+  // del pedido.
+  shipping_advance: "Anticipo del domicilio",
+  full_payment: "Pago total",
+  balance_on_delivery: "Saldo por pagar al recibir",
+  // Métodos de entrega y otros códigos visibles en el panel.
+  delivery: "Domicilio",
+  pickup: "Recogida en tienda",
+  local: "Almacenamiento local",
+  r2: "Cloudflare R2",
   PageView: "Visita",
   ViewContent: "Vista de producto",
   AddToCart: "Producto agregado",
