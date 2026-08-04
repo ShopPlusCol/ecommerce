@@ -1,31 +1,20 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/infrastructure/db/schema";
+import { createTestDb } from "./test-db";
 
 let sqlite: Database.Database;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 
-function applyMigration(file: string) {
-  const source = readFileSync(resolve("drizzle", file), "utf8");
-  for (const statement of source.split("--> statement-breakpoint").map((value) => value.trim()).filter(Boolean)) {
-    sqlite.exec(statement);
-  }
-}
-
+// Antes esta prueba mantenía a mano una lista fija de migraciones, que quedó
+// desactualizada frente al esquema real (p. ej. `orders.marketing_consent`
+// pasó a ser nullable en 0019 y la base de prueba seguía con NOT NULL).
+// `createTestDb` aplica todas las migraciones en orden, así que no vuelve a
+// desincronizarse.
 beforeEach(() => {
-  sqlite = new Database(":memory:");
-  sqlite.pragma("foreign_keys = ON");
-  applyMigration("0000_faulty_roxanne_simpson.sql");
-  applyMigration("0001_fast_thunderball.sql");
-  applyMigration("0002_gifted_ultragirl.sql");
-  applyMigration("0003_thick_stark_industries.sql");
-  applyMigration("0004_robust_silverclaw.sql");
-  applyMigration("0009_perpetual_anthem.sql");
-  db = drizzle(sqlite, { schema });
+  ({ sqlite, db } = createTestDb());
 });
 afterEach(() => sqlite.close());
 

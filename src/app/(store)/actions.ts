@@ -393,7 +393,9 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
         fullName: data.contact.fullName,
         phone: data.contact.phone,
         email: data.contact.email || null,
-        marketingConsent: data.consent.marketing,
+        // El cliente no admite "no presentado": si la casilla no se mostró,
+        // el cliente nuevo arranca sin consentimiento de marketing.
+        marketingConsent: marketingConsentValue ?? false,
         firstOrderAt: new Date(),
         lastOrderAt: new Date(),
       }).returning();
@@ -401,7 +403,9 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       await db.update(customers).set({
         fullName: data.contact.fullName,
         email: data.contact.email || customer.email,
-        marketingConsent: data.consent.marketing,
+        // Si la casilla no se presentó en este pedido, se conserva la
+        // preferencia previa del cliente en vez de revocarla en silencio.
+        ...(marketingConsentValue === null ? {} : { marketingConsent: marketingConsentValue }),
         lastOrderAt: new Date(),
       }).where(eq(customers.id, customer.id));
     }
@@ -436,7 +440,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       couponCode: coupon?.code ?? null,
       appliedPromotions: rewards.unlocked.map((reward) => reward.rule.name),
       termsVersionAccepted: "2026-07-29",
-      marketingConsent: data.consent.marketing,
+      marketingConsent: marketingConsentValue,
       utmSource: attribution.source,
       utmMedium: attribution.medium,
       utmCampaign: attribution.campaign,
