@@ -29,7 +29,10 @@
     "cf:preview": "node scripts/run-cloudflare.mjs preview",
     "cf:preview:staging": "node scripts/run-cloudflare.mjs preview --env staging",
     "cf:deploy": "node scripts/run-cloudflare.mjs deploy",
-    "cf:deploy:staging": "node scripts/run-cloudflare.mjs deploy --env staging"
+    "cf:deploy:staging": "node scripts/run-cloudflare.mjs deploy --env staging",
+    "staging": "node scripts/run-staging.mjs",
+    "staging:seed": "node scripts/run-staging.mjs seed",
+    "staging:clean": "node scripts/clean-test-data.mjs"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.25",

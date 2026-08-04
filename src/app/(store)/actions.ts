@@ -41,6 +41,7 @@ import { resolveDestinationLabel, resolveRejectionMessage } from "@/domain/servi
 import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
 import { getBrandSettings } from "@/modules/settings/brand";
 import { emitPurchaseEventOnce } from "@/modules/analytics/purchase-event";
+import { applyTestOrderPrefix, resolveEnvironment } from "@/modules/settings/environment";
 import { ConfiguredNotificationProvider } from "@/infrastructure/notifications/configured-notification-provider";
 import { buildOrderConfirmationEmail } from "@/modules/notifications/order-confirmation-email";
 import { getCheckoutFieldsSettings } from "@/modules/settings/checkout-fields";
@@ -353,7 +354,14 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       : { ok: false, error: "El pedido ya se está procesando. Espera un momento." };
   }
 
-  const orderNumber = `SPC-${Date.now().toString(36).toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
+  // Fuera de producción el número lleva prefijo TEST-, para que un pedido de
+  // validación sea reconocible a simple vista en el panel, en el correo de
+  // confirmación y en los exports, sin depender de recordar en qué entorno
+  // se creó ni de mirar la fecha.
+  const orderNumber = applyTestOrderPrefix(
+    `SPC-${Date.now().toString(36).toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`,
+    resolveEnvironment(process.env),
+  );
   const lookupToken = randomBytes(24).toString("base64url");
   const lookupTokenHash = createHash("sha256").update(lookupToken).digest("hex");
   const reserved: Array<{ id: string; quantity: number }> = [];

@@ -4,6 +4,7 @@ import { getRuntimeDb } from "@/infrastructure/db/client";
 import { integrationSettings } from "@/infrastructure/db/schema";
 import { getCloudflareEnv } from "@/infrastructure/cloudflare/env";
 import { IntegrationForm } from "./integration-form";
+import { RecoverPurchasesForm } from "./recover-purchases-form";
 
 const definitions = [
   {
@@ -135,7 +136,12 @@ export default async function Page() {
               </details>
 
               {definition.configurable ? (
-                <IntegrationForm provider={definition.provider} enabled={row?.isEnabled ?? false} testMode={row?.isTestMode ?? true} />
+                <>
+                  <IntegrationForm provider={definition.provider} enabled={row?.isEnabled ?? false} testMode={row?.isTestMode ?? true} />
+                  {/* Solo Meta: es el único proveedor con bandeja de salida
+                      de eventos reintentables. */}
+                  {definition.provider === "meta_conversions_api" ? <RecoverPurchasesForm /> : null}
+                </>
               ) : (
                 <p className="mt-4 rounded-lg bg-info-soft p-3 text-sm">
                   Se prepara localmente y requiere crear o vincular el recurso externo con autorización. No se ha probado conectividad.

@@ -26,6 +26,8 @@
 .DS_Store
 *.pem
 /public/uploads/
+# Medios del entorno de pruebas
+/public/uploads-staging/
 
 # debug
 npm-debug.log*
@@ -36,6 +38,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.staging.example
 
 # vercel
 .vercel

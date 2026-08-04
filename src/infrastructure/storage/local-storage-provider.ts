@@ -2,9 +2,19 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import type { StorageProvider } from "@/application/ports/storage-provider";
 
+/**
+ * Carpeta pública donde se guardan los archivos subidos.
+ *
+ * Configurable para que el entorno de pruebas escriba en su propia carpeta
+ * (`uploads-staging`) y no mezcle los archivos de una validación con los
+ * medios reales de la tienda. Por defecto se comporta exactamente como
+ * antes.
+ */
+const MEDIA_DIRECTORY = process.env.MEDIA_DIRECTORY?.trim() || "uploads";
+
 export class LocalStorageProvider implements StorageProvider {
   readonly id = "local";
-  private readonly root = join(process.cwd(), "public", "uploads");
+  private readonly root = join(process.cwd(), "public", MEDIA_DIRECTORY);
 
   private pathFor(key: string) {
     const safe = normalize(key).replace(/^(\.\.(\\|\/|$))+/, "");
@@ -25,6 +35,6 @@ export class LocalStorageProvider implements StorageProvider {
     throw new Error("La carga local se realiza a través del servidor.");
   }
   getPublicUrl(key: string) {
-    return `/uploads/${key.replaceAll("\\", "/")}`;
+    return `/${MEDIA_DIRECTORY}/${key.replaceAll("\\", "/")}`;
   }
 }
