@@ -129,3 +129,76 @@ verificó mediante el build Node equivalente, typecheck y revisión estática.
 
 Ver [RECOVERY.md](./RECOVERY.md), [STAGING.md](./STAGING.md) y
 [PHASE_4_CHECKLIST.md](./PHASE_4_CHECKLIST.md).
+
+## Entorno de pruebas (staging)
+
+Hay dos formas de tener un staging. **La local no necesita ningún recurso en
+la nube y es la que debe usarse para la validación previa al lanzamiento.**
+
+### Opción A — Staging local (recomendada para validar)
+
+```bash
+npm run staging:seed   # una sola vez: crea .data/staging.db con datos de ejemplo
+npm run staging        # arranca en http://localhost:3300
+npm run staging:clean  # borra los datos de prueba al terminar
+```
+
+Qué queda separado de desarrollo y de producción:
+
+| Recurso | Producción / desarrollo | Staging |
+| --- | --- | --- |
+| Base de datos | `.data/local.db` o D1 | `.data/staging.db` |
+| Archivos subidos | `public/uploads` | `public/uploads-staging` |
+| Variables | `.env` | `.env.staging` |
+| Mercado Pago | Según `.env` | **Forzado a modo prueba** |
+| Número de pedido | `SPC-…` | `TEST-SPC-…` |
+| Panel | Sin aviso | Franja "ENTORNO DE PRUEBAS" |
+
+`scripts/run-staging.mjs` fuerza `APP_ENVIRONMENT=staging`,
+`SQLITE_PATH`, `MEDIA_DIRECTORY` y `MERCADO_PAGO_TEST_MODE=true`
+independientemente de lo que diga `.env`, y avisa si `META_PIXEL_ID` está
+definido sin `META_TEST_EVENT_CODE` (los eventos irían como reales).
+
+**No copia ningún secreto de producción.** Las credenciales de prueba se
+ponen a mano en `.env.staging` (plantilla en `.env.staging.example`).
+
+### Opción B — Staging en Cloudflare
+
+`wrangler.jsonc` ya define el entorno `staging` con worker, D1 y buckets R2
+separados, y `MAINTENANCE_MODE=true`.
+
+**Requiere crear los recursos primero** (no están creados):
+
+```bash
+npx wrangler d1 create shoppluscol-db-staging
+npx wrangler r2 bucket create shoppluscol-media-staging
+npx wrangler r2 bucket create shoppluscol-ecommerce-staging-cache
+```
+
+Después hay que pegar el `database_id` real en `wrangler.jsonc` (hoy dice
+`REPLACE_WITH_STAGING_D1_DATABASE_ID`) y cargar los secretos con
+`npx wrangler secret put <NOMBRE> --env staging`.
+
+Solo entonces:
+
+```bash
+npm run cf:preview:staging
+npm run cf:deploy:staging
+```
+
+> `cf:deploy:staging` **publica** el worker. No lo ejecutes sin haber
+> revisado antes que los recursos apuntan a staging y no a producción.
+
+### Identificar y limpiar datos de prueba
+
+Todo lo creado fuera de producción es reconocible:
+
+- **Pedidos**: número con prefijo `TEST-`.
+- **Productos de las pruebas E2E**: SKU con prefijo `TEST-`.
+- **Eventos de Meta**: llevan `test_event_code` y aparecen solo en "Probar
+  eventos", no en las métricas de campaña.
+
+`npm run staging:clean` borra pedidos `TEST-`, sus eventos de analítica, los
+clientes que quedan sin ningún pedido y los productos de prueba. Admite
+`--dry-run` y **se niega a operar sobre una base que no sea staging** salvo
+que se pase `--database=<ruta>` explícito.

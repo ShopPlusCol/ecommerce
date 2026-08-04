@@ -911,3 +911,67 @@ Trazas disponibles en `test-results/product-gallery-*/trace.zip`
 (`npx playwright show-trace <ruta>`), junto con vídeo y captura del fallo.
 
 **No se enmascaró subiendo el timeout ni con `retries`.** Queda abierto.
+
+# Preparación de la validación en staging (2026-08-04, tercera parte)
+
+Rama `validacion-final-staging-2026-08`, creada desde `origin/main`
+actualizado (el propietario fusionó la ronda de conversión en el PR #2, así
+que main ya contiene todo ese trabajo). Sin push, sin merge, sin despliegue.
+
+## `product-gallery.spec.ts`: causa raíz encontrada y cerrada
+
+La prueba operaba sobre "Amazon Brown", el mismo producto que usan
+`product-video`, `smoke`, `shipping-zones` y las capturas de UX: le añadía
+dos imágenes y no las quitaba. Dependía de encontrarlo intacto y además
+dejaba el catálogo modificado para el resto de la suite.
+
+Ahora **crea su propio producto** en la base de E2E y lo borra en
+`afterEach`, pase o falle; los identificadores son únicos por ejecución (con
+un id fijo por módulo, `--repeat-each` hacía que todas las repeticiones
+compartieran producto: 4 de 5 fallaban por eso); y está dividida en seis
+`test.step()` para que un fallo diga en qué paso fue.
+
+**No se tocó ningún timeout.** Resultado: 5/5 aislado con `--repeat-each=5`
+y tiempos estables (1,4-1,8 s), y suite completa 21/21.
+
+## Entorno de pruebas
+
+- `npm run staging:seed` / `npm run staging` / `npm run staging:clean`.
+- Base, almacenamiento y variables separados; Mercado Pago forzado a modo
+  de prueba; aviso "ENTORNO DE PRUEBAS" en el panel; pedidos con prefijo
+  `TEST-`.
+- `resolveEnvironment` ante un valor no reconocido asume desarrollo, nunca
+  producción: un entorno mal etiquetado como pruebas invitaría a hacer
+  pedidos de mentira contra datos reales.
+- Se reutilizó `AdminDevBanner`, que estaba muerto y además mentía (avisaba
+  de que el panel no tenía autenticación, cierto solo en una fase antigua).
+- El almacenamiento local pasa a ser configurable (`MEDIA_DIRECTORY`); antes
+  estaba fijo en `public/uploads` y staging habría mezclado sus archivos con
+  los medios reales.
+- Acción en `/admin/integraciones` para reintentar compras que no llegaron a
+  Meta, sin tocar código.
+
+## Verificación
+
+| Comando | Resultado |
+| --- | --- |
+| `typecheck` / `lint` | Limpios |
+| `test` | 172/172 en 25 archivos |
+| `test:e2e` | 21/21 (una sola ejecución) |
+| `build` / `cf:build` | Correctos |
+| `security:secrets` | 0 secretos en 451 archivos |
+
+Staging arrancado y comprobado: tienda, catálogo y panel responden 200 en
+`http://localhost:3300`, con `.data/staging.db` propia y `.data/local.db`
+intacta.
+
+## Pendiente
+
+- **Staging en Cloudflare no está creado**: `wrangler.jsonc` tiene el entorno
+  definido pero el `database_id` de D1 sigue siendo un placeholder y los
+  buckets R2 no existen. Requiere autorización y crear recursos reales.
+- **Lo pendiente de contenido sigue igual** (7 de 8 productos sin foto
+  propia, Alaska Gris por confirmar): no impide validar el flujo técnico,
+  pero sí lanzar. Ver `docs/CONTENT_REQUIRED.md`.
+- **LCP 3,3-3,5 s** sobre el objetivo de 2,5 s, sin cambios.
+- Esta ronda **no aprueba producción, no hace merge y no despliega**.
