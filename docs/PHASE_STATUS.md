@@ -698,3 +698,87 @@ lanzamiento). Se corrigió, cada pieza verificada con `typecheck`/`lint`/
 - Esta ronda **no aprueba producción, no hace merge, no despliega y no
   constituye autorización para lanzar**. Queda pendiente de revisión y
   decisión del propietario.
+
+# Ronda de conversión, UX y analítica (2026-08-04)
+
+Rama `mejora-conversion-ecommerce-2026-08`, desde `5bee800`. Sin push, sin
+despliegue, sin aprobación de producción.
+
+## Punto de partida: la línea base venía rota
+
+El árbol de trabajo tenía cambios sin confirmar de una sesión previa
+(migración `0019` + canjes de cupón) a medio cablear: **2 errores de
+TypeScript y 1 prueba fallando**. Se preservaron primero en su propio commit
+(`3ce9912`) y en `git stash` como punto de recuperación, y luego se
+completaron:
+
+- `marketingConsentValue` (tres estados: null = la casilla no se presentó)
+  se calculaba pero los tres puntos de escritura usaban el valor crudo del
+  cliente.
+- `normalizedContact` descartaba los campos desactivados en configuración,
+  pero el pedido seguía guardando `data.contact` sin normalizar: un cliente
+  manipulado podía escribir en campos que el comercio tenía apagados.
+- `claimCouponRedemption` (reclamo atómico, ya escrito y probado) no estaba
+  conectado: dos pedidos simultáneos podían pasarse ambos del cupo del cupón.
+- `phase3-persistence.test.ts` mantenía a mano una lista de migraciones ya
+  desactualizada, lo que ocultaba el desajuste del esquema.
+
+## Entregado
+
+- **Hero comercial**: precio real del catálogo (marcador `{precio}`), qué
+  incluye/no incluye, soporte de fotografía real. Ver
+  `docs/CONVERSION_UX_AUDIT.md`.
+- **Promesas acotadas por datos**: `store-promise.ts` + `storefront/offer.ts`
+  — "mismo día" y "contra entrega" solo se muestran donde y cuando la
+  configuración real de zonas lo permite, con la misma herencia que usa el
+  checkout. Antes eran texto fijo en cuatro lugares.
+- **Testimonios**: solo se publican los verificados; sin ninguno, la sección
+  desaparece.
+- **Meta Pixel + Conversions API completos**: el píxel no existía en el
+  navegador. Nueve eventos, deduplicación por `event_id` compartido,
+  `Purchase` solo desde servidor con garantía de una vez por pedido vía el
+  índice único de `analytics_events.event_id`. Ver `docs/ANALYTICS_EVENTS.md`.
+- **Ficha de producto**: incluye/no incluye + WhatsApp con intención de
+  compra (producto, cantidad, precio, qué incluye, URL).
+- **Consentimiento**: aviso compacto con tres categorías separadas, que ya no
+  puede tapar el botón de confirmar del checkout.
+- **Auditoría de contenido**: `scripts/audit-content.mjs` detecta productos
+  sin foto real, imágenes reutilizadas, slugs inválidos, descuentos falsos y
+  desajustes nombre/familia. Ver `docs/CONTENT_REQUIRED.md`.
+
+## Verificación
+
+- `typecheck`, `lint`: limpios (0 errores, 0 avisos).
+- `test`: 135/135 en 22 archivos (11 nuevas).
+- `test:e2e`: 15 pasan, 2 fallan — ver "Pendiente".
+- `build` y `cf:build`: correctos.
+- `security:secrets`: 0 secretos en 478 archivos.
+
+### Incidencia de entorno: pnpm rompía el build de Cloudflare
+
+`cf:build` fallaba con "Acceso denegado" leyendo dentro de
+`node_modules/.pnpm/`: **`node_modules` estaba instalado con pnpm** aunque el
+proyecto declara npm (`package-lock.json` es el lockfile versionado).
+OpenNext no puede recorrer los enlaces de pnpm en Windows. Se reinstaló con
+`npm ci` y el build volvió a pasar. Quedan `pnpm-lock.yaml` y
+`pnpm-workspace.yaml` sin versionar en el repositorio: **si alguien vuelve a
+ejecutar `pnpm install`, el build de Cloudflare se rompe otra vez.**
+
+## Pendiente
+
+- **`shipping-zones.spec.ts:98` y `:120` siguen fallando** al seleccionar una
+  opción del combobox de departamento. Es el mismo fallo ya documentado en la
+  ronda anterior (`:90`, 4/4 corridas) y **no se investigó en esta ronda**;
+  ninguno de los archivos implicados (`SearchableSelect`, `checkout-client`,
+  zonas de envío) fue modificado aquí.
+- **No se rediseñaron catálogo, carrito ni checkout.** El encargo los
+  incluía; se priorizó lo que ataca directamente los 244 contactos de baja
+  calidad. Es la continuación natural.
+- **No hay capturas antes/después**: la sesión no tenía panel de navegador
+  visible. La verificación fue textual (DOM y árbol de accesibilidad).
+- **Sin sesión de administrador en navegador** (la herramienta no escribe
+  contraseñas): los cambios del panel se verificaron por tipos, lint, build y
+  pruebas.
+- Contenido real pendiente: ver `docs/CONTENT_REQUIRED.md`.
+- Esta ronda **no aprueba producción, no hace merge y no autoriza a
+  desplegar**.
