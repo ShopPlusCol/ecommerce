@@ -873,3 +873,41 @@ control de versiones y regenerables.
   llamarse "Gris" — **no se corrigió a propósito**, requiere tu confirmación).
 - Esta ronda **no aprueba producción, no hace merge y no autoriza a
   desplegar**.
+
+## Investigación de `product-gallery.spec.ts` (intermitente, sin cerrar)
+
+Aislado con `--repeat-each` y `--trace=on`, según lo pedido.
+
+**Dos causas encontradas y corregidas:**
+
+1. **Defecto real del panel** (no de la prueba): el botón "Guardar producto
+   completo" solo se deshabilitaba durante el guardado (`pending`), no
+   mientras las imágenes seguían subiendo (`uploading`). Guardar en mitad de
+   una carga persistía solo las imágenes ya terminadas y **descartaba en
+   silencio las que seguían en vuelo**, sin ningún aviso.
+2. **Prueba no idempotente**: asumía que Amazon Brown empieza con exactamente
+   una imagen, pero ella misma le añade dos y no las quita. Reproducido:
+   **7 de 8 repeticiones fallaban** con "Expected 3, Received 5". Ahora todo
+   se mide en relación al número inicial.
+
+Efecto medido: de 1/8 a 8/10 y 10/10 en repeticiones aisladas.
+
+**Residuo sin cerrar.** En la suite completa sigue fallando de forma
+intermitente (aproximadamente 1 de cada 4-6 ejecuciones). Diagnóstico exacto
+de lo observado, sin conjeturas:
+
+- El fallo es siempre `Test timeout of 30000ms exceeded` **sin locator
+  atribuido** en el registro de llamadas — es decir, no se queda esperando un
+  selector concreto, que es lo que descarta un selector inestable.
+- Cuando pasa, el test tarda **1,2-2,3 s**; cuando falla, agota los 30 s.
+  No es una degradación gradual: algo se bloquea.
+- Aislado (`npx playwright test tests/e2e/product-gallery.spec.ts`) pasa
+  siempre. Solo aparece dentro de la suite completa, donde es el cuarto test.
+- Descartado: el bucle de realimentación del encabezado (corregido aparte,
+  ver arriba), la acumulación de imágenes (corregida), y el N+1 del catálogo
+  (corregido). Ninguno lo explica del todo.
+
+Trazas disponibles en `test-results/product-gallery-*/trace.zip`
+(`npx playwright show-trace <ruta>`), junto con vídeo y captura del fallo.
+
+**No se enmascaró subiendo el timeout ni con `retries`.** Queda abierto.
