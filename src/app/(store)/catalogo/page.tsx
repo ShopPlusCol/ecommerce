@@ -23,7 +23,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const query = parseCatalogParams(params);
 
-  const [result, categories, colorFamilies, collections, allProducts] = await Promise.all([
+  const [result, categories, colorFamilies, collections, allProducts, collectionMembership] = await Promise.all([
     catalogRepository.listProducts(query),
     catalogRepository.listCategories(),
     catalogRepository.listColorFamilies(),
@@ -32,21 +32,8 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     // productos hay realmente detrás de cada filtro y no ofrecer filtros
     // que llevarían a un resultado vacío.
     catalogRepository.listProducts({ pageSize: 200 }),
+    catalogRepository.listCollectionMembership(),
   ]);
-
-  // Conteo real por colección: el puerto no expone la pertenencia, así que
-  // se resuelve consultando cada colección una vez.
-  const collectionMembership = new Map<string, string[]>(
-    await Promise.all(
-      collections.map(async (collection) => {
-        const inCollection = await catalogRepository.listProducts({
-          filters: { collectionSlug: collection.slug },
-          pageSize: 200,
-        });
-        return [collection.slug, inCollection.products.map((product) => product.id)] as [string, string[]];
-      }),
-    ),
-  );
 
   const facets = computeCatalogFacets(allProducts.products, {
     colorFamilies,

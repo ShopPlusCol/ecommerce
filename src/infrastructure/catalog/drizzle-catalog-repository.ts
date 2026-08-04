@@ -155,6 +155,29 @@ export class DrizzleCatalogRepository implements CatalogRepository {
   async getCollectionBySlug(slug: string) {
     return (await this.listCollections()).find((collection) => collection.slug === slug) ?? null;
   }
+  /**
+   * Pertenencia de productos a colecciones, en **una sola consulta**.
+   *
+   * La primera versión de las facetas del catálogo resolvía esto llamando a
+   * `listProducts({ collectionSlug })` una vez por colección, y cada una de
+   * esas llamadas hidrata el catálogo completo. Con eso la página del
+   * catálogo llegó a no renderizar dentro del tiempo de la prueba (`<main>`
+   * vacío). Aquí es un único SELECT sobre la tabla de unión.
+   */
+  async listCollectionMembership(): Promise<Map<string, string[]>> {
+    const db = await getRuntimeDb();
+    const rows = await db
+      .select({ slug: collections.slug, productId: collectionProducts.productId })
+      .from(collectionProducts)
+      .innerJoin(collections, eq(collections.id, collectionProducts.collectionId));
+    const membership = new Map<string, string[]>();
+    for (const row of rows) {
+      const list = membership.get(row.slug);
+      if (list) list.push(row.productId);
+      else membership.set(row.slug, [row.productId]);
+    }
+    return membership;
+  }
   async getRelatedProducts(productId: string, limit: number) {
     const all = await this.hydrate();
     const source = all.find((product) => product.id === productId);
