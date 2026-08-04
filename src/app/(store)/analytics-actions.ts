@@ -22,6 +22,7 @@ const CLIENT_FORWARDABLE_EVENTS = [
   "AddToCart",
   "InitiateCheckout",
   "AddPaymentInfo",
+  "Contact",
 ] as const satisfies readonly ConversionEventName[];
 
 const schema = z.object({

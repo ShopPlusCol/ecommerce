@@ -5,6 +5,7 @@ import { MessageCircle } from "lucide-react";
 import { useCart } from "@/modules/cart/cart-context";
 import { buildWhatsAppCartMessage, buildWhatsAppUrl } from "@/modules/whatsapp/cart-message";
 import { getStoreContentAction } from "@/app/(store)/site-content-actions";
+import { useAnalytics } from "@/modules/analytics/analytics-context";
 
 const FALLBACK_INTRO = "Hola, quiero realizar este pedido:";
 const FALLBACK_CLOSING_NOTE = "(Este es un resumen de mi carrito, no un pedido pagado.)";
@@ -12,6 +13,7 @@ const FALLBACK_CLOSING_NOTE = "(Este es un resumen de mi carrito, no un pedido p
 /** Envía el resumen del carrito por WhatsApp (sección 20.2). */
 export function WhatsAppCartButton({ onClick }: { onClick?: () => void }) {
   const { lines, totals, coupon } = useCart();
+  const { track } = useAnalytics();
   const contentRef = React.useRef<{ whatsapp: string; intro: string; closingNote: string } | null>(null);
 
   React.useEffect(() => {
@@ -28,6 +30,16 @@ export function WhatsAppCartButton({ onClick }: { onClick?: () => void }) {
       couponCode: coupon?.code ?? null,
       intro: content?.intro ?? FALLBACK_INTRO,
       closingNote: content?.closingNote ?? FALLBACK_CLOSING_NOTE,
+    });
+    // Contacto desde el carrito: se reporta con el valor real del carrito,
+    // que es lo que permite comparar la demanda que sale por WhatsApp
+    // contra la que termina comprando en la tienda.
+    track("Contact", {
+      value: totals.productsTotal.amount,
+      currency: "COP",
+      contentIds: lines.map((line) => line.productId),
+      contentType: "product",
+      extra: { source: "cart" },
     });
     window.open(buildWhatsAppUrl(message, content?.whatsapp), "_blank", "noopener,noreferrer");
     onClick?.();

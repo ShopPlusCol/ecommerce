@@ -29,6 +29,7 @@ const FORWARDABLE: ReadonlySet<ConversionEventName> = new Set([
   "AddToCart",
   "InitiateCheckout",
   "AddPaymentInfo",
+  "Contact",
 ]);
 
 export type AnalyticsContextValue = {

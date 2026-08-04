@@ -5,6 +5,7 @@ import { Container } from "@/components/ui/container";
 import { Section } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProductGrid } from "@/components/store/product-grid";
+import { SearchTracker } from "@/components/store/search-tracker";
 import { catalogRepository } from "@/lib/container";
 
 export const metadata: Metadata = { title: "Buscar", robots: { index: false } };
@@ -19,6 +20,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <>
       <PageHeader title="Buscar" description="Busca por nombre de tono, categoría o accesorio." />
+      {query ? <SearchTracker query={query} resultCount={result?.total ?? 0} /> : null}
       <Section spacing="sm">
         <Container>
           <form action="/buscar" role="search" className="max-w-md">

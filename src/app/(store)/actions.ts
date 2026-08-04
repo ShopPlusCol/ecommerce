@@ -273,7 +273,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   if (data.couponCode) {
     const found = await promotionsRepository.findCouponByCode(data.couponCode);
     if (found) {
-      const [existingCustomerForCoupon] = await db.select({ id: customers.id }).from(customers).where(eq(customers.phone, data.contact.phone)).limit(1);
+      const [existingCustomerForCoupon] = await db.select({ id: customers.id }).from(customers).where(eq(customers.phone, normalizedContact.phone)).limit(1);
       const [totalRow] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions).where(eq(couponRedemptions.couponId, found.id));
       let customerRedemptions = 0;
       let isFirstOrder = true;
@@ -388,12 +388,12 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       if (updated) reserved.push({ id: updated.id, quantity: line.quantity });
     }
 
-    let [customer] = await db.select().from(customers).where(eq(customers.phone, data.contact.phone)).limit(1);
+    let [customer] = await db.select().from(customers).where(eq(customers.phone, normalizedContact.phone)).limit(1);
     if (!customer) {
       [customer] = await db.insert(customers).values({
-        fullName: data.contact.fullName,
-        phone: data.contact.phone,
-        email: data.contact.email || null,
+        fullName: normalizedContact.fullName,
+        phone: normalizedContact.phone,
+        email: normalizedContact.email || null,
         // El cliente no admite "no presentado": si la casilla no se mostró,
         // el cliente nuevo arranca sin consentimiento de marketing.
         marketingConsent: marketingConsentValue ?? false,
@@ -402,8 +402,8 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       }).returning();
     } else {
       await db.update(customers).set({
-        fullName: data.contact.fullName,
-        email: data.contact.email || customer.email,
+        fullName: normalizedContact.fullName,
+        email: normalizedContact.email || customer.email,
         // Si la casilla no se presentó en este pedido, se conserva la
         // preferencia previa del cliente en vez de revocarla en silencio.
         ...(marketingConsentValue === null ? {} : { marketingConsent: marketingConsentValue }),
@@ -421,15 +421,15 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       paymentMethod: data.paymentMethod,
       lookupTokenHash,
       deliveryMethod: "delivery",
-      customerFullName: data.contact.fullName,
-      customerPhone: data.contact.phone,
-      customerEmail: data.contact.email || null,
+      customerFullName: normalizedContact.fullName,
+      customerPhone: normalizedContact.phone,
+      customerEmail: normalizedContact.email || null,
       shippingDepartment: data.destination.department,
       shippingCity: data.destination.city,
       shippingNeighborhood: data.destination.neighborhood,
-      shippingAddressLine: data.contact.addressLine,
-      shippingAddressComplement: data.contact.addressComplement,
-      deliveryInstructions: data.contact.deliveryInstructions,
+      shippingAddressLine: normalizedContact.addressLine,
+      shippingAddressComplement: normalizedContact.addressComplement,
+      deliveryInstructions: normalizedContact.deliveryInstructions,
       shippingRuleIdSnapshot: quote.ruleId,
       shippingRuleLevelSnapshot: quote.ruleLevel,
       subtotal: summary.subtotal.amount,
@@ -505,16 +505,27 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     }).returning();
     createdConsentRecordId = consentRecord.id;
 
-    // Registra el uso del cupón (cascada con el pedido si algo falla después
-    // de esto y hay que deshacerlo) — es lo que hace cumplibles sus límites
-    // de uso total/por cliente en el próximo pedido.
+    // Registra el uso del cupón con un reclamo atómico: los límites se
+    // evalúan dentro del mismo INSERT, así que dos pedidos simultáneos no
+    // pueden pasarse ambos del cupo. Un INSERT simple sí lo permitía,
+    // porque la validación previa ocurre bastantes líneas antes.
     if (coupon) {
-      await db.insert(couponRedemptions).values({
+      const claimed = await claimCouponRedemption(db, {
         couponId: coupon.id,
         orderId: order.id,
         customerId: customer.id,
         discountAmount: summary.couponDiscount.amount,
+        usageLimitTotal: coupon.usageLimitTotal,
+        usageLimitPerCustomer: coupon.usageLimitPerCustomer,
+        firstOrderOnly: coupon.firstOrderOnly,
       });
+      if (!claimed) {
+        // Perdió la carrera: se deshace todo (lo maneja el catch) en vez de
+        // cobrar el pedido con un descuento al que ya no tiene derecho.
+        throw new CouponRaceLostError(
+          "El cupón dejó de estar disponible mientras confirmábamos tu pedido. Vuelve a intentarlo sin el cupón.",
+        );
+      }
     }
 
     let checkoutUrl: string | null = null;
@@ -548,7 +559,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
         lookupToken,
         checkoutUrl,
         manualTransfer,
-        contact: data.contact,
+        contact: normalizedContact,
         destination: data.destination,
         paymentMethod: data.paymentMethod,
         quote,
@@ -569,13 +580,13 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     // Correo de confirmación (sección 38, evento "order_created"): solo si
     // el cliente dejó su correo, y nunca a costa del pedido — si falla o
     // SMTP no está configurado, el pedido ya se confirmó igual.
-    if (data.contact.email) {
+    if (normalizedContact.email) {
       try {
         const brand = await getBrandSettings();
         const email = buildOrderConfirmationEmail(result.order, brand.name, process.env.NEXT_PUBLIC_SITE_URL ?? "");
         await new ConfiguredNotificationProvider().send({
           event: "order_created",
-          to: data.contact.email,
+          to: normalizedContact.email,
           subject: email.subject,
           data: { html: email.html, text: email.text },
         });
@@ -594,8 +605,8 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
           orderId: order.id,
           value: summary.total.amount,
           eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmacion`,
-          email: data.contact.email || null,
-          phone: data.contact.phone,
+          email: normalizedContact.email || null,
+          phone: normalizedContact.phone,
           utmSource: attribution.source ?? null,
           utmCampaign: attribution.campaign ?? null,
           marketingConsent: marketingConsentValue === true,
