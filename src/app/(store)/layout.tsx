@@ -27,6 +27,10 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       <SiteHeader brand={brand} announcement={texts.headerAnnouncement} />
       <main className="flex-1">{maintenance ? <MaintenanceNotice /> : children}</main>
       <SiteFooter brand={brand} />
+      {/* Espacio reservado mientras el aviso de privacidad está en pantalla:
+          así el contenido siempre puede desplazarse por debajo de él y el
+          aviso no tapa el botón de confirmar del checkout en móvil. */}
+      <div aria-hidden="true" style={{ height: "var(--consent-banner-space, 0px)" }} />
       <WhatsAppFloatButton brand={brand} inquiryTemplate={texts.whatsappInquiryTemplate} />
       <ConsentBanner />
       {maintenance || popups.length === 0 ? null : <PromoPopup popups={popups} />}
