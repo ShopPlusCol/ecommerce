@@ -44,18 +44,98 @@ La decisión se guarda en `localStorage` y en la cookie
 comprobarla: la server action de reenvío es un endpoint público y vuelve a
 exigir el consentimiento por su cuenta, sin fiarse del cliente.
 
+## PageView: una sola fuente
+
+`MetaPixel` **solo inicializa** el píxel; no emite ninguna vista.
+`PageViewTracker` es la única fuente de `PageView`, y emite con `event_id`
+para que píxel y Conversions API se deduplican.
+
+Antes ambos emitían: cada carga contaba dos veces y el del píxel salía sin
+`event_id`, así que ni siquiera podía deduplicarse. La decisión vive en
+`shouldEmitPageView` (pura, con pruebas):
+
+| Situación | Comportamiento |
+| --- | --- |
+| Antes de decidir | No se emite nada |
+| Rechaza todo | No se emite nada |
+| Acepta solo marketing | Se emite (antes no: el efecto dependía de `analytics`) |
+| Acepta todas | Una sola vista |
+| Preferencia ya guardada, al hidratar | Una sola vista, no dos |
+| Cambio de ruta | Una vista por navegación |
+| Acepta marketing estando ya en la página | Se reemite una vez, para que Meta reciba esa vista |
+
+`MetaPixel` se monta **antes** que `PageViewTracker` en el árbol: los
+efectos de hermanos corren en orden de montaje, y el tracker necesita que
+`window.fbq` exista cuando emite la primera vista.
+
 ## Deduplicación
 
 Cada acción genera **un solo `event_id`** que se envía por las dos vías (el
 píxel del navegador y la Conversions API). Meta las une en una sola
 conversión en lugar de contarlas dos veces.
 
-Para `Purchase` la garantía es más fuerte, porque una compra duplicada
-distorsiona directamente el costo por venta: el envío se reclama con el
-índice único de `analytics_events.event_id`. Quien logra insertar la fila
-envía; el resto ve un conflicto y se retira. Esto resiste dos entregas
-concurrentes del mismo webhook, que un simple "comprobar y luego escribir"
-no resiste.
+## Purchase: bandeja de salida con reintentos
+
+Una compra duplicada distorsiona el costo por venta; una compra perdida
+distorsiona el ROAS. `analytics_events` funciona como bandeja de salida
+(migración `0020`):
+
+| Columna | Para qué |
+| --- | --- |
+| `delivery_status` | `pending` / `sent` / `failed` |
+| `attempts` | Intentos realizados |
+| `last_attempt_at` | Último intento |
+| `next_retry_at` | Desde cuándo se puede reclamar el reintento |
+| `last_error_code` | Motivo saneado (código, nunca el cuerpo de la respuesta) |
+
+El reclamo es atómico por dos vías:
+
+- El **INSERT** choca con el índice único de `event_id`: solo uno entra, y
+  nace con `next_retry_at` en el futuro, así que el webhook concurrente que
+  pierde tampoco puede reclamarlo como reintento.
+- El **UPDATE** de reclamo exige `delivery_status <> 'sent'` y que el
+  reintento haya vencido, y desplaza `next_retry_at` en la misma sentencia.
+
+Antes bastaba con que la fila existiera para dar la compra por despachada:
+si Meta fallaba, **la compra se perdía para siempre** porque el reintento
+veía la fila y se retiraba.
+
+Espera exponencial: 1, 2, 4… minutos, con techo de una hora y un máximo de
+8 intentos.
+
+### Recuperar compras pendientes
+
+```
+recoverPendingPurchaseEvents({ limit: 50 })
+```
+
+Reintenta las compras no entregadas cuyo reintento ya venció. Es segura de
+ejecutar en paralelo (cada evento se vuelve a reclamar atómicamente).
+
+**No hay planificador en la arquitectura, así que no se ejecuta sola.** Es
+una decisión consciente, no un olvido: añadir un cron a Cloudflare Workers
+requiere configuración de despliegue que está fuera del alcance de esta
+ronda. Mientras tanto, se invoca a mano cuando Meta haya tenido una caída.
+
+## Protección del endpoint de reenvío
+
+`forwardConversionEventAction` es una **server action**, es decir un
+endpoint público invocable desde fuera de la tienda. Aplica, en orden:
+
+1. Consentimiento de marketing comprobado en servidor (cookie), no en el
+   cliente.
+2. Origen acotado: la `eventSourceUrl` debe pertenecer al dominio
+   configurado o al de la propia petición. Sin esto se podían atribuir
+   eventos desde cualquier dominio.
+3. Límite de tasa por IP (hasheada, nunca almacenada en claro) y **un solo
+   uso por `event_id`**, para que no se pueda repetir una conversión.
+4. Esquema **estricto por tipo de evento**: una clave de más rechaza el
+   evento en vez de descartarse en silencio.
+5. **El importe lo calcula el servidor** desde el catálogo. El navegador ya
+   no manda `value`: de él dependen el ROAS y el aprendizaje de las
+   campañas, así que no puede venir de un número inventable.
+6. No se acepta texto libre (el término buscado no viaja), ni se registran
+   IP, payload ni el cuerpo de la respuesta de Meta.
 
 ## Tabla de eventos
 

@@ -782,3 +782,94 @@ ejecutar `pnpm install`, el build de Cloudflare se rompe otra vez.**
 - Contenido real pendiente: ver `docs/CONTENT_REQUIRED.md`.
 - Esta ronda **no aprueba producción, no hace merge y no autoriza a
   desplegar**.
+
+# Continuación: cierre de la ronda de conversión (2026-08-04, segunda parte)
+
+Continúa sobre `mejora-conversion-ecommerce-2026-08`. Se integró
+`origin/main` (merge `6ab3ef3`): su árbol es idéntico al de `8db5e7f`, ya
+ancestro de esta rama, así que no aportó cambios de contenido — solo deja la
+historia enlazada. Sin push, sin merge a main, sin despliegue.
+
+## Los dos E2E "preexistentes" tenían una causa real, y era un bug de la tienda
+
+No eran fallos de las pruebas. El encabezado es `sticky` (ocupa sitio en el
+flujo) y **encogía de 72px a 64px cuando `scrollY > 8`**: el umbral era
+exactamente igual al cambio de altura, así que encoger volvía a cruzar el
+umbral y disparaba el cambio contrario. La página vibraba de forma
+permanente cerca del inicio.
+
+Medido en navegador real: `window.scrollY` cambiaba en cada frame
+(13, 13, 12, 11, 9, 6…) y la caja de una opción del desplegable se movía
+~0,86px indefinidamente. Por eso Playwright fallaba con **"element is not
+stable"** y no con "not found". Explicaba además la inestabilidad
+intermitente de `product-gallery`.
+
+Altura fija + señal de desplazamiento solo en la sombra (no afecta al
+layout, no puede realimentarse). **`test:e2e` pasa 21/21 de forma
+consistente**; Lighthouse reporta ahora **CLS 0** en inicio y producto.
+
+## Analítica corregida
+
+- **PageView duplicado**: `MetaPixel` y `PageViewTracker` lo emitían ambos, y
+  el del píxel sin `event_id`. Ahora el píxel solo inicializa y hay una única
+  fuente. El efecto dependía de `consent.analytics`, así que aceptar solo
+  marketing no generaba ninguna vista y una preferencia guardada generaba dos
+  al hidratar. Decisión extraída a `shouldEmitPageView` (pura, 9 pruebas).
+- **Endpoint de reenvío endurecido**: origen acotado, límite de tasa por IP
+  hasheada, un solo uso por `event_id`, esquema estricto por tipo de evento
+  e **importe calculado en servidor** (el navegador ya no manda `value`).
+- **Purchase reintentable**: bandeja de salida con
+  `delivery_status`/`attempts`/`next_retry_at`/`last_error_code` (migración
+  `0020`, aditiva y con backfill). Antes, un fallo de Meta perdía la compra
+  para siempre. `recoverPendingPurchaseEvents` recupera lo pendiente.
+
+## Rediseño completado
+
+- **Catálogo**: filtros derivados de facetas reales con conteo (ya no se
+  ofrecen filtros que llevan a resultado vacío), filtro por colección, panel
+  inferior en móvil, objetivos táctiles de 44px.
+- **Tarjetas**: se corrigió un **descuento falso** (el precio anterior se
+  tachaba aunque no fuera mayor), etiqueta "Foto de ejemplo", "Lentes +
+  estuche", disponibilidad y selector de imagen usable en táctil.
+- **Carrito**: trampa de foco real y devolución del foco, familia y qué
+  incluye por línea, CTA "Finalizar por WhatsApp".
+- **Checkout**: barra fija inferior en móvil con total y confirmar, resumen
+  plegable. **El aviso de privacidad tapaba ese botón**: se reservaban 10rem
+  fijos y el aviso mide ~194px; ahora la altura se mide con `ResizeObserver`.
+
+## Verificación (todos los scripts reales del proyecto)
+
+| Comando | Resultado |
+| --- | --- |
+| `typecheck` | Limpio |
+| `lint` | Limpio (0 avisos) |
+| `test` | 162/162 en 24 archivos |
+| `test:e2e` | 21/21 |
+| `test:a11y` | 1/1, sin violaciones serias o críticas |
+| `test:responsive` | 2/2 |
+| `test:lighthouse` | Inicio 92/100/100/100 · Producto 91/100/100/100 · **CLS 0** |
+| `build` | Correcto |
+| `cf:build` | Correcto |
+| `security:secrets` | 0 secretos en 451 archivos |
+
+`test:lighthouse` **no se podía ejecutar** en esta máquina: el Chrome
+completo de Playwright falla con "la configuración en paralelo no es
+correcta" (falta el runtime de Visual C++). `resolveChromeExecutable` usa
+ahora el headless shell como respaldo.
+
+Capturas en `artifacts/ux-audit/` (10 archivos), generadas con
+`npx playwright test tests/e2e/ux-screenshots.spec.ts`. Excluidas del
+control de versiones y regenerables.
+
+## Pendiente real
+
+- **LCP 3,3-3,5 s**, por encima del objetivo de 2,5 s. No es una regresión
+  (venía igual de rondas anteriores) y está ligado a que el hero no tiene
+  fotografía real: hoy el elemento mayor es texto. Queda sin resolver.
+- **No hay planificador para reintentar compras pendientes.** La función
+  existe y es segura, pero hay que invocarla a mano tras una caída de Meta.
+- Contenido real pendiente: ver `docs/CONTENT_REQUIRED.md` (7 de 8 productos
+  sin foto propia; Alaska Gris con slug "21" y familia "Verde" pese a
+  llamarse "Gris" — **no se corrigió a propósito**, requiere tu confirmación).
+- Esta ronda **no aprueba producción, no hace merge y no autoriza a
+  desplegar**.

@@ -11,6 +11,12 @@ decisiones y activos que solo tú puedes aportar. Mientras falten, la tienda
 muestra respaldos honestos (marcadores identificables, secciones ocultas), no
 contenido inventado.
 
+> Estos avisos también aparecen **dentro del panel**, donde se trabaja:
+> `/admin/productos` marca cada producto con "Sin imagen", "Foto de ejemplo"
+> o "Imagen repetida", y `/admin/categorias` marca las categorías sin foto.
+> En la tienda pública, una foto de ejemplo se muestra etiquetada como tal en
+> la tarjeta del producto.
+
 ## 1. Fotografías de producto — 7 de 8 productos (severidad alta)
 
 Siete productos se muestran hoy con una imagen de ejemplo. Peor: **la misma
