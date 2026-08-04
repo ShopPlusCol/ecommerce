@@ -994,3 +994,88 @@ intacta.
   pero sí lanzar. Ver `docs/CONTENT_REQUIRED.md`.
 - **LCP 3,3-3,5 s** sobre el objetivo de 2,5 s, sin cambios.
 - Esta ronda **no aprueba producción, no hace merge y no despliega**.
+
+# Validación final y panel de pedidos (2026-08-04, cuarta parte)
+
+Rama `validacion-final-pedidos-2026-08`, desde `origin/main` (que ya
+contiene la ronda de staging). Sin push, sin merge, sin despliegue.
+
+## Atribución UTM: diagnóstico y dos defectos
+
+Consultando `.data/staging.db` directamente, el UTM **sí se guardaba**
+(`utm_campaign = 'prueba_validacion'`, con primera y última atribución).
+El caso era el **(b): se guardaba pero no aparecía en el panel**. La ficha
+del pedido nunca renderizaba esos campos. Corregido con la sección
+"Origen del pedido", en lenguaje humano y sin JSON crudo.
+
+Al probarlo apareció un **segundo defecto, este sí de captura**: el UTM solo
+se leía dentro de un `useEffect`, así que la cookie no existía hasta que
+React hidrataba. Medido en navegador: justo tras cargar la portada la
+cookie **no estaba**. Quien llega desde un anuncio y toca un producto antes
+de que React arranque —en un Android modesto con datos móviles, el público
+real de esta tienda— perdía su atribución y el pedido quedaba como tráfico
+directo.
+
+Primer intento: `src/proxy.ts` (el Middleware de Next 16). **Rompió
+`cf:build`**: en Next 16 Proxy queda fijado al runtime de Node, su
+`runtime` no es configurable, y OpenNext para Cloudflare no lo admite
+("Node.js middleware is not currently supported"). Revertido. La solución
+final es un guion en línea que corre durante el análisis del HTML: consigue
+lo mismo sin tocar el despliegue.
+
+## Panel de pedidos
+
+- **"Información lista para copiar"**: bloque visible + botón al
+  portapapeles, con respaldo por `execCommand` para contextos no seguros
+  (http:// en una IP de la red local, que es como se prueba desde el
+  celular). El texto visible y el copiado son el mismo, generado por
+  `buildOrderCopyText` (pura, 10 pruebas).
+- **Saltos directos de estado**: se ofrece todo el catálogo `ORDER_STATUSES`
+  en vez de solo el siguiente paso. La nota deja de ser obligatoria. Los
+  estados delicados piden una confirmación de un clic, nunca texto.
+- **Códigos técnicos traducidos** desde la fuente centralizada
+  (`adminStatusLabel`): proveedor y propósito de pago, forma de pago,
+  método de entrega. El historial muestra el nombre del administrador en
+  vez de su id interno.
+
+### Protección de inventario (sin ella, abrir los saltos corrompía datos)
+
+`restockOrderInventory` **no era idempotente** para reservas ya vendidas:
+reponía el stock sin marcar la reserva. No era alcanzable mientras los
+estados avanzaban en secuencia, pero sí en cuanto se permiten saltos
+(cancelado → devuelto), y habría devuelto el inventario dos veces. Ahora
+reclama la reserva antes de reponer, usando el estado `restocked` que ya
+existía en el enum sin usarse. Cubierto por
+`tests/integration/restock-idempotency.test.ts`.
+
+**Única transición bloqueada**: reactivar un pedido que ya devolvió su
+inventario (cancelado/devuelto/reembolsado → estado activo). Motivo: esas
+unidades pudieron venderse a otra persona. Se explica en pantalla en vez de
+bloquear todos los saltos.
+
+## Verificación
+
+| Comando | Resultado |
+| --- | --- |
+| `typecheck` / `lint` | Limpios |
+| `test` | 204/204 en 29 archivos |
+| `test:e2e` | 23/24 — ver abajo |
+| `test:a11y` / `test:responsive` | 1/1 · 2/2 |
+| `test:lighthouse` | Inicio 93/100/100/100 · Producto 92/100/100/100 · **CLS 0** |
+| `build` / `cf:build` | Correctos |
+| `security:secrets` | 0 secretos en 466 archivos |
+
+## Pendiente
+
+- **`product-gallery.spec.ts` sigue intermitente** (~1 de cada 3-5
+  ejecuciones de la suite completa), siempre con `Test timeout` sin paso
+  atribuido pese a los `test.step()`. Aislado y repetido pasa. Ya se
+  cerraron tres causas reales en rondas anteriores. **No se enmascaró con
+  timeouts ni `retries`.**
+- **Mercado Pago y Meta no se pudieron probar**: `.env.staging` no tiene
+  credenciales. Es el comportamiento correcto — sin `META_TEST_EVENT_CODE`
+  no se envía nada y la integración queda desactivada, no simulada.
+- **LCP 3,2-3,4 s** sobre el objetivo de 2,5 s, sin cambios.
+- Contenido pendiente sin variación: 7 de 8 productos sin foto propia,
+  Alaska Gris por confirmar, 3 categorías sin imagen, testimonios sin
+  verificar. Ver `docs/CONTENT_REQUIRED.md`.
