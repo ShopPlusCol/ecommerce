@@ -1,5 +1,6 @@
 import { integer, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { idColumn, timestampColumns } from "./_helpers";
+import { orders } from "./orders";
 
 /** Configuración general editable (sección 25), clave/valor tipado por JSON. */
 export const settings = sqliteTable(
@@ -68,17 +69,31 @@ export const analyticsEvents = sqliteTable(
   ],
 );
 
-export const consentRecords = sqliteTable("consent_records", {
-  id: idColumn(),
-  subjectId: text("subject_id"),
-  necessary: integer("necessary", { mode: "boolean" }).notNull().default(true),
-  analytics: integer("analytics", { mode: "boolean" }).notNull().default(false),
-  marketing: integer("marketing", { mode: "boolean" }).notNull().default(false),
-  policyVersion: text("policy_version").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const consentRecords = sqliteTable(
+  "consent_records",
+  {
+    id: idColumn(),
+    subjectId: text("subject_id"),
+    // Vincula el registro a un pedido concreto cuando se conoce (checkout):
+    // permite consultar el consentimiento correspondiente a ESE pedido en
+    // vez de "el más reciente del cliente" o una fila arbitraria. Los
+    // registros históricos previos a esta columna quedan con orderId nulo.
+    orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
+    necessary: integer("necessary", { mode: "boolean" }).notNull().default(true),
+    analytics: integer("analytics", { mode: "boolean" }).notNull().default(false),
+    // null = la casilla no se mostró (campo desactivado en configuración);
+    // no equivale a "el cliente dijo que no".
+    marketing: integer("marketing", { mode: "boolean" }),
+    policyVersion: text("policy_version").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("consent_records_order_idx").on(table.orderId),
+    index("consent_records_subject_created_idx").on(table.subjectId, table.createdAt),
+  ],
+);
 
 /** Sección 30.3: auditoría de acciones sensibles. */
 export const auditLogs = sqliteTable(

@@ -42,6 +42,21 @@ import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository
 import { getBrandSettings } from "@/modules/settings/brand";
 import { ConfiguredNotificationProvider } from "@/infrastructure/notifications/configured-notification-provider";
 import { buildOrderConfirmationEmail } from "@/modules/notifications/order-confirmation-email";
+import { getCheckoutFieldsSettings } from "@/modules/settings/checkout-fields";
+import { LOCKED_CHECKOUT_FIELDS, NO_REQUIRED_TOGGLE_FIELDS, type CheckoutFieldId } from "@/modules/checkout/checkout-fields";
+import { claimCouponRedemption } from "@/modules/promotions/coupon-redemptions";
+
+/** Se lanza cuando un cupón, validado momentos antes de escribir el pedido,
+ * pierde su cupo por una redención concurrente entre esa validación y el
+ * reclamo atómico — la única forma de perder la carrera de verdad tarde en
+ * el proceso. Señala al llamador que debe deshacer todo y decirle al
+ * cliente que el cupón dejó de ser válido, nunca cobrar de más en silencio. */
+class CouponRaceLostError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CouponRaceLostError";
+  }
+}
 
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
@@ -84,7 +99,10 @@ const createOrderSchema = z.object({
     addressComplement: z.string(),
     deliveryInstructions: z.string(),
   }),
-  consent: z.object({ terms: z.boolean(), marketing: z.boolean(), analytics: z.boolean() }),
+  // marketing: null = la casilla no se mostró (campo desactivado en
+  // configuración). El servidor igual re-deriva el valor autoritativo de
+  // la configuración vigente más abajo — esto es solo la forma de entrada.
+  consent: z.object({ terms: z.boolean(), marketing: z.boolean().nullable(), analytics: z.boolean() }),
 });
 
 /** Valida un cupón en servidor (autoritativo, sección 13). */
@@ -172,6 +190,50 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   if (!data.consent.terms) {
     return { ok: false, error: "Debes aceptar los términos y la política de privacidad." };
   }
+
+  // Formulario de checkout autoritativo (sección de configuración de
+  // campos): el navegador ya usa esta misma configuración para mostrar,
+  // ocultar y marcar campos obligatorios, pero eso es solo UX — el
+  // servidor la vuelve a cargar y decide qué exige y qué descarta,
+  // aunque la petición haya sido manipulada a mano.
+  const fieldConfig = await getCheckoutFieldsSettings();
+  const fieldsById = new Map(fieldConfig.map((field) => [field.id, field]));
+  const isFieldEnabled = (id: CheckoutFieldId) =>
+    LOCKED_CHECKOUT_FIELDS.includes(id) ? true : (fieldsById.get(id)?.enabled ?? true);
+  const isFieldRequired = (id: CheckoutFieldId) =>
+    LOCKED_CHECKOUT_FIELDS.includes(id)
+      ? true
+      : NO_REQUIRED_TOGGLE_FIELDS.includes(id)
+        ? false
+        : (fieldsById.get(id)?.required ?? false);
+
+  if (isFieldEnabled("email") && isFieldRequired("email") && !data.contact.email.trim()) {
+    return { ok: false, error: "El correo es obligatorio." };
+  }
+  if (isFieldEnabled("addressComplement") && isFieldRequired("addressComplement") && !data.contact.addressComplement.trim()) {
+    return { ok: false, error: "Completa el campo de apartamento, torre o bloque." };
+  }
+  if (isFieldEnabled("deliveryInstructions") && isFieldRequired("deliveryInstructions") && !data.contact.deliveryInstructions.trim()) {
+    return { ok: false, error: "Completa las indicaciones de entrega." };
+  }
+
+  // Normaliza: un campo desactivado nunca guarda lo que haya enviado el
+  // cliente (manipulado o no) — se descarta a cadena vacía, el valor
+  // apropiado para estas columnas de texto opcional.
+  const normalizedContact = {
+    ...data.contact,
+    email: isFieldEnabled("email") ? data.contact.email.trim() : "",
+    addressComplement: isFieldEnabled("addressComplement") ? data.contact.addressComplement.trim() : "",
+    deliveryInstructions: isFieldEnabled("deliveryInstructions") ? data.contact.deliveryInstructions.trim() : "",
+  };
+
+  // Consentimiento de marketing con tres estados (sección de
+  // consentimientos): si la casilla está desactivada en configuración, la
+  // opción nunca se presentó — el servidor ignora lo que haya mandado el
+  // cliente para este campo y lo trata como "no presentado" (null), nunca
+  // como una revocación real.
+  const marketingConsentPresented = isFieldEnabled("marketingConsent");
+  const marketingConsentValue: boolean | null = marketingConsentPresented ? (data.consent.marketing ?? false) : null;
 
   // Reconstrucción autoritativa del carrito desde el catálogo.
   const products = await catalogRepository.getProductsByIds(data.items.map((i) => i.productId));

@@ -85,7 +85,9 @@ export const orders = sqliteTable(
     utmLastAttribution: text("utm_last_attribution", { mode: "json" }).$type<Record<string, string>>(),
 
     termsVersionAccepted: text("terms_version_accepted"),
-    marketingConsent: integer("marketing_consent", { mode: "boolean" }).notNull().default(false),
+    // null = la casilla de novedades/promociones no se mostró en este
+    // pedido (campo desactivado en configuración); no equivale a "no".
+    marketingConsent: integer("marketing_consent", { mode: "boolean" }),
     internalNotes: text("internal_notes"),
     cancelledReason: text("cancelled_reason"),
 

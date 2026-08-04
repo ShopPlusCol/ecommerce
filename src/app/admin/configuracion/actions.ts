@@ -9,7 +9,14 @@ import { auditLogs, settings } from "@/infrastructure/db/schema";
 import { actionError, type AdminActionState } from "@/modules/admin/action-state";
 import type { PaymentMethodsSettings } from "@/modules/settings/payment-methods";
 import type { SiteTextsSettings } from "@/modules/settings/site-texts";
-import { LOCKED_CHECKOUT_FIELDS, NO_REQUIRED_TOGGLE_FIELDS, type CheckoutFieldConfig, type CheckoutFieldId } from "@/modules/checkout/checkout-fields";
+import {
+  CHECKOUT_FIELD_ID_VALUES,
+  LOCKED_CHECKOUT_FIELDS,
+  NO_REQUIRED_TOGGLE_FIELDS,
+  checkoutFieldsConfigSchema,
+  type CheckoutFieldConfig,
+  type CheckoutFieldId,
+} from "@/modules/checkout/checkout-fields";
 
 const optionalUrl = z.union([
   z.literal(""),
@@ -169,8 +176,6 @@ export async function saveSiteTextsSettingsAction(_state: AdminActionState, form
   }
 }
 
-const CHECKOUT_FIELD_IDS = ["fullName", "phone", "email", "location", "addressLine", "addressComplement", "deliveryInstructions", "marketingConsent"] as const;
-
 export async function saveCheckoutFieldsSettingsAction(_state: AdminActionState, formData: FormData): Promise<AdminActionState> {
   try {
     const session = await requirePermission("settings", "update");
@@ -181,8 +186,8 @@ export async function saveCheckoutFieldsSettingsAction(_state: AdminActionState,
     } catch {
       throw new Error("El orden de campos no es válido.");
     }
-    const order = z.array(z.enum(CHECKOUT_FIELD_IDS)).parse(parsedOrder);
-    if (order.length !== CHECKOUT_FIELD_IDS.length || new Set(order).size !== CHECKOUT_FIELD_IDS.length) {
+    const order = z.array(z.enum(CHECKOUT_FIELD_ID_VALUES)).parse(parsedOrder);
+    if (order.length !== CHECKOUT_FIELD_ID_VALUES.length || new Set(order).size !== CHECKOUT_FIELD_ID_VALUES.length) {
       throw new Error("El orden de campos no es válido.");
     }
     const fields: CheckoutFieldConfig[] = order.map((id, index) => {
@@ -192,6 +197,11 @@ export async function saveCheckoutFieldsSettingsAction(_state: AdminActionState,
       const required = locked ? true : noRequiredToggle ? false : formData.get(`${id}_required`) === "on";
       return { id, enabled, required, order: index };
     });
+    // Misma definición de validación que la lectura (getCheckoutFieldsSettings):
+    // si esto no pasa, es un bug en la construcción de arriba, no un dato de
+    // usuario — mejor fallar aquí que persistir algo que el checkout luego
+    // rechazaría de todas formas.
+    checkoutFieldsConfigSchema.parse(fields);
     const db = await getRuntimeDb();
     await db.insert(settings).values({ key: "checkout_fields", value: fields, updatedByUserId: session.user.id })
       .onConflictDoUpdate({ target: settings.key, set: { value: fields, updatedByUserId: session.user.id, updatedAt: new Date() } });

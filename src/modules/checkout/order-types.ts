@@ -21,7 +21,9 @@ export type CreateDemoOrderInput = {
   destination: ShippingDestination;
   paymentMethod: PaymentMethodId;
   contact: CheckoutContact;
-  consent: { terms: boolean; marketing: boolean; analytics: boolean };
+  // marketing: null = la casilla no se mostró (campo desactivado en
+  // configuración) — nunca se interpreta como "el cliente dijo que no".
+  consent: { terms: boolean; marketing: boolean | null; analytics: boolean };
 };
 
 export type DemoOrderItem = {
@@ -62,4 +64,11 @@ export type QuoteShippingResult =
 
 export type ValidateCouponResult = { ok: true; coupon: Coupon } | { ok: false; error: string };
 
-export type CreateDemoOrderResult = { ok: true; order: DemoOrder } | { ok: false; error: string };
+export type CreateDemoOrderResult =
+  | { ok: true; order: DemoOrder }
+  // couponInvalidated: el cupón que el cliente vio aplicado en el resumen
+  // dejó de ser válido justo al confirmar (límite alcanzado por otro pedido
+  // concurrente, expiró, etc.) — el cliente debe ver el nuevo total y
+  // confirmar de nuevo antes de reintentar, nunca se crea el pedido a un
+  // precio mayor sin que lo sepa.
+  | { ok: false; error: string; couponInvalidated?: boolean };

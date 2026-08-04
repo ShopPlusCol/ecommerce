@@ -57,7 +57,16 @@ export const couponRedemptions = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index("coupon_redemptions_coupon_idx").on(table.couponId)],
+  (table) => [
+    index("coupon_redemptions_coupon_idx").on(table.couponId),
+    // A lo sumo un canje por pedido: hace que el INSERT atómico de
+    // claimCouponRedemption sea naturalmente idempotente ante reintentos
+    // con el mismo pedido (segunda inserción = conflicto, no duplicado).
+    uniqueIndex("coupon_redemptions_order_idx").on(table.orderId),
+    // Soporta el conteo por-cliente dentro de la misma sentencia atómica
+    // de reclamo (sección de concurrencia de cupones).
+    index("coupon_redemptions_coupon_customer_idx").on(table.couponId, table.customerId),
+  ],
 );
 
 /**

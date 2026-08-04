@@ -46,7 +46,12 @@ export const inventoryReservations = sqliteTable(
       .references(() => inventoryItems.id, { onDelete: "cascade" }),
     orderId: text("order_id").notNull(),
     quantity: integer("quantity").notNull(),
-    status: text("status", { enum: ["active", "consumed", "released"] }).notNull().default("active"),
+    // "restocked": una reserva "consumed" (ya vendida) que se repuso a
+    // stock disponible al cancelar/devolver el pedido — estado final
+    // distinto de "released" (una reserva que nunca llegó a venderse), así
+    // restockOrderInventory() puede reclamar cada reserva UNA sola vez de
+    // forma idempotente vía UPDATE...WHERE condicional.
+    status: text("status", { enum: ["active", "consumed", "released", "restocked"] }).notNull().default("active"),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
     ...timestampColumns,
   },
