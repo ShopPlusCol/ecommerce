@@ -35,8 +35,17 @@ test("galería de producto: miniaturas, visor ampliado, teclado y arrastre (secc
     { name: "detalle-1.png", mimeType: "image/png", buffer: await syntheticPng(page, "#3f7a5a") },
     { name: "detalle-2.png", mimeType: "image/png", buffer: await syntheticPng(page, "#3a6d9a") },
   ]);
-  await expect(page.getByText("Imagen cargada y seleccionada.").last()).toBeVisible();
-  await page.getByRole("button", { name: "Guardar producto completo" }).click();
+  // El mensaje de confirmación es una región de estado única (no uno por
+  // archivo), así que no sirve para saber si terminaron las dos subidas.
+  // Lo que sí lo dice es la propia lista de imágenes del editor: se espera a
+  // que estén las 3 (la de partida + las 2 nuevas) y a que el botón de
+  // guardar vuelva a habilitarse — ahora se deshabilita mientras hay
+  // subidas en curso, justo para que no se pueda guardar a medias.
+  await expect(page.getByText("Imagen cargada y seleccionada.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mover imagen hacia arriba" })).toHaveCount(3);
+  const save = page.getByRole("button", { name: "Guardar producto completo" });
+  await expect(save).toBeEnabled();
+  await save.click();
   await expect(page.getByText("Producto, relaciones e imágenes guardados.")).toBeVisible();
 
   await page.goto("/productos/amazon-brown");
