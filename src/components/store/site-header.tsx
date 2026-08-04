@@ -28,7 +28,11 @@ export function SiteHeader({ brand, announcement }: { brand: BrandSettings; anno
   const { count: favoritesCount } = useFavorites();
 
   React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    // Umbral holgado y muy por encima de cualquier variación de layout: la
+    // versión anterior usaba 8px, exactamente la misma cantidad en que el
+    // encabezado encogía, así que encogerse volvía a cruzar el umbral y el
+    // encabezado oscilaba sin parar (ver comentario del contenedor).
+    const onScroll = () => setScrolled(window.scrollY > 48);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -48,12 +52,21 @@ export function SiteHeader({ brand, announcement }: { brand: BrandSettings; anno
         </p>
       </div>
 
-      <div
-        className={cn(
-          "mx-auto grid max-w-(--content-max-width) grid-cols-[1fr_auto_1fr] items-center px-[var(--content-padding-x)] transition-[height] duration-base",
-          scrolled ? "h-16" : "h-[72px]",
-        )}
-      >
+      {/*
+        Altura fija. Antes se encogía de 72px a 64px al pasar de 8px de
+        desplazamiento, y como el encabezado es `sticky` ocupa sitio en el
+        flujo: al encoger, el contenido subía 8px, lo que volvía a cruzar el
+        umbral y disparaba el cambio contrario. El resultado era una
+        vibración permanente de fracciones de píxel cerca del inicio de la
+        página — mala para CLS y para leer, y la causa de que el desplegable
+        de departamento del checkout nunca llegara a estar quieto (los E2E
+        de zonas de envío fallaban por "element is not stable", no por un
+        problema de las pruebas).
+
+        La señal de "página desplazada" se mantiene con la sombra, que no
+        afecta al layout y por tanto no puede realimentarse.
+      */}
+      <div className="mx-auto grid h-[72px] max-w-(--content-max-width) grid-cols-[1fr_auto_1fr] items-center px-[var(--content-padding-x)]">
         {/* Izquierda: nav (desktop) / menú (móvil) */}
         <div className="flex items-center">
           <button
