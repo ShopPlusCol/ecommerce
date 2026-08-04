@@ -1,8 +1,51 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { chromium } from "playwright";
+
+/**
+ * Ejecutable de Chrome para Lighthouse.
+ *
+ * El Chrome completo que instala Playwright no arranca en todas las
+ * máquinas Windows: si falta el runtime de Visual C++ correspondiente,
+ * `chrome.exe` falla con "la configuración en paralelo no es correcta" y
+ * `spawn` devuelve un `UNKNOWN` que no dice nada útil. El "headless shell"
+ * que Playwright instala junto a él no depende de eso y le sirve igual a
+ * Lighthouse, que solo necesita un Chrome con puerto de depuración.
+ *
+ * Orden: variable de entorno explícita › Chrome completo si arranca ›
+ * headless shell.
+ */
+function resolveChromeExecutable() {
+  if (process.env.LIGHTHOUSE_CHROME_PATH) return process.env.LIGHTHOUSE_CHROME_PATH;
+
+  const fullChrome = chromium.executablePath();
+  const canRun = spawnSync(fullChrome, ["--version"], { timeout: 20_000 });
+  if (canRun.status === 0) return fullChrome;
+
+  // .../chromium-1234/chrome-win64/chrome.exe
+  //   → .../chromium_headless_shell-1234/chrome-headless-shell-win64/chrome-headless-shell.exe
+  const shell = fullChrome
+    .replace(/chromium-(\d+)/, "chromium_headless_shell-$1")
+    .replace(/chrome-win64[\\/]chrome\.exe$/, "chrome-headless-shell-win64\\chrome-headless-shell.exe")
+    .replace(/chrome-linux[\\/]chrome$/, "chrome-headless-shell-linux64/chrome-headless-shell")
+    .replace(/chrome-mac[\\/]Chromium\.app.*$/, "chrome-headless-shell-mac/chrome-headless-shell");
+
+  if (existsSync(shell)) {
+    console.warn(
+      `[lighthouse] El Chrome completo no arranca en esta máquina; se usa el headless shell (${shell}). ` +
+        "Instálalo con `npx playwright install --only-shell chromium` si falta.",
+    );
+    return shell;
+  }
+
+  throw new Error(
+    `No hay un Chrome ejecutable para Lighthouse. Probado: ${fullChrome} (no arranca) y ${shell} (no existe). ` +
+      "Instala el shell con `npx playwright install --only-shell chromium` o define LIGHTHOUSE_CHROME_PATH.",
+  );
+}
 
 const workspace = process.cwd();
 const port = process.env.LIGHTHOUSE_PORT ?? "3200";
@@ -66,7 +109,7 @@ function runReport(name, route) {
 }
 
 const browser = spawn(
-  chromium.executablePath(),
+  resolveChromeExecutable(),
   [
     "--headless",
     "--no-sandbox",

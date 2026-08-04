@@ -36,7 +36,12 @@ export default async function Page() {
         description="Archivar oculta la categoría sin romper productos relacionados."
         fields={categoryFields}
         records={categoryRows.map((row) => ({ ...row }))}
-        recordTitle={(record) => `${record.name} · ${record.slug}`}
+        // Aviso de contenido pendiente donde se edita: una categoría sin
+        // fotografía cae al respaldo genérico en la tienda y no ayuda a
+        // elegir tono.
+        recordTitle={(record) =>
+          `${record.name} · ${record.slug}${record.imageUrl ? "" : " · ⚠ sin foto"}`
+        }
       />
       <AdminEntitySection
         entity="colorFamily"

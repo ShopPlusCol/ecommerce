@@ -11,6 +11,7 @@ import { productMedia, products } from "@/infrastructure/db/schema";
 import { createProductAction, updateProductStatusAction } from "../actions";
 import { CsvImportForm } from "./csv-import-form";
 import { isVideoUrl } from "@/lib/media-type";
+import { isPlaceholderMedia } from "@/lib/placeholder-media";
 
 export const metadata: Metadata = { title: "Productos" };
 
@@ -44,6 +45,11 @@ export default async function AdminProductsPage({
   for (const image of imageRows) {
     if (!coverByProduct.has(image.productId)) coverByProduct.set(image.productId, image.url);
   }
+  // Una misma portada en varios productos casi siempre significa que faltan
+  // fotos reales, y en un catálogo de tonos impide compararlos.
+  const coverUsage = new Map<string, number>();
+  for (const url of coverByProduct.values()) coverUsage.set(url, (coverUsage.get(url) ?? 0) + 1);
+  const duplicatedCovers = new Set([...coverUsage].filter(([, count]) => count > 1).map(([url]) => url));
   const urlParams = new URLSearchParams(Object.entries(params).filter(([key, value]) => key !== "page" && value).map(([key, value]) => [key, value!]));
 
   return (
@@ -101,7 +107,22 @@ export default async function AdminProductsPage({
                               <Image src={cover} alt="" width={44} height={44} unoptimized className="h-11 w-11 object-cover" />
                             ) : null}
                           </div>
-                          <Link href={`/admin/productos/${row.id}`} className="font-semibold text-brand hover:underline">{row.name}</Link>
+                          <div className="flex min-w-0 flex-col">
+                            <Link href={`/admin/productos/${row.id}`} className="font-semibold text-brand hover:underline">{row.name}</Link>
+                            {/* Avisos de contenido: el mismo criterio que
+                                `scripts/audit-content.mjs`, visible donde se
+                                trabaja en vez de solo en un informe. */}
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {!cover ? (
+                                <span className="rounded bg-danger-soft px-1.5 py-0.5 text-[11px] font-semibold text-danger">Sin imagen</span>
+                              ) : isPlaceholderMedia(cover) ? (
+                                <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[11px] font-semibold text-warning">Foto de ejemplo</span>
+                              ) : null}
+                              {cover && duplicatedCovers.has(cover) ? (
+                                <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[11px] font-semibold text-warning">Imagen repetida</span>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="p-3 text-text-muted">{row.sku}</td>
