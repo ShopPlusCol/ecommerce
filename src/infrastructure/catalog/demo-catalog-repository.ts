@@ -139,6 +139,10 @@ export class DemoCatalogRepository implements CatalogRepository {
     return collections.find((c) => c.slug === slug) ?? null;
   }
 
+  async listCollectionMembership(): Promise<Map<string, string[]>> {
+    return new Map(Object.entries(collectionMembership));
+  }
+
   async getRelatedProducts(productId: string, limit: number): Promise<Product[]> {
     const product = products.find((p) => p.id === productId);
     if (!product) return [];

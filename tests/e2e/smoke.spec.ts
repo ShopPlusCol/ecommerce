@@ -44,7 +44,10 @@ test.beforeEach(async ({ page }) => {
 test("navega del inicio al catálogo y a un producto", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.getByRole("link", { name: "Ver catálogo" }).first().click();
+  // Por destino, no por texto: el texto del botón del hero es editable desde
+  // el panel, así que fijarlo aquí hacía que la prueba se rompiera cada vez
+  // que se ajusta el copy comercial.
+  await page.locator('main a[href="/catalogo"]').first().click();
   await expect(page).toHaveURL(/\/catalogo$/);
   await page.locator("a:visible", { hasText: "Amazon Brown" }).first().click();
   await expect(page).toHaveURL(/\/productos\/amazon-brown$/);

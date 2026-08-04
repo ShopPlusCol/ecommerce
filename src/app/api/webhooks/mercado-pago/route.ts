@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { MercadoPagoProvider } from "@/infrastructure/payments/mercado-pago-provider";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import {
@@ -6,12 +6,11 @@ import {
   inventoryMovements,
   inventoryReservations,
   orders,
-  analyticsEvents,
   consentRecords,
   payments,
   webhookEvents,
 } from "@/infrastructure/db/schema";
-import { MetaConversionsProvider } from "@/infrastructure/analytics/meta-conversions-provider";
+import { emitPurchaseEventOnce } from "@/modules/analytics/purchase-event";
 
 export async function POST(request: Request) {
   const token = process.env.MERCADO_PAGO_ACCESS_TOKEN;
@@ -43,12 +42,28 @@ export async function POST(request: Request) {
     const mapped = authoritative.status === "approved" ? "approved"
       : authoritative.status === "rejected" ? "rejected"
       : authoritative.status === "in_process" ? "in_process" : "pending";
-    const newlyApproved = mapped === "approved" && payment.status !== "approved";
-    await db.update(payments).set({
-      providerPaymentId: String(authoritative.id),
-      status: mapped,
-      updatedAt: new Date(),
-    }).where(eq(payments.id, payment.id));
+    // Reclama la transición a "approved" con un UPDATE condicionado al estado
+    // actual en base de datos (no al valor leído en memoria), para que dos
+    // entregas concurrentes del mismo webhook nunca reconcilien inventario y
+    // analítica dos veces (sección 12, integridad de pagos).
+    let claimedApproval: { id: string } | undefined;
+    if (mapped === "approved") {
+      [claimedApproval] = await db.update(payments).set({
+        providerPaymentId: String(authoritative.id),
+        status: mapped,
+        updatedAt: new Date(),
+      }).where(and(eq(payments.id, payment.id), sql`${payments.status} != 'approved'`)).returning({ id: payments.id });
+      if (!claimedApproval) {
+        await db.update(payments).set({ providerPaymentId: String(authoritative.id), updatedAt: new Date() }).where(eq(payments.id, payment.id));
+      }
+    } else {
+      await db.update(payments).set({
+        providerPaymentId: String(authoritative.id),
+        status: mapped,
+        updatedAt: new Date(),
+      }).where(eq(payments.id, payment.id));
+    }
+    const newlyApproved = Boolean(claimedApproval);
     if (newlyApproved) {
       const reservations = await db.select().from(inventoryReservations).where(eq(inventoryReservations.orderId, payment.orderId));
       for (const reservation of reservations.filter((item) => item.status === "active")) {
@@ -77,31 +92,26 @@ export async function POST(request: Request) {
       const [consent] = order?.customerId
         ? await db.select().from(consentRecords).where(eq(consentRecords.subjectId, order.customerId)).limit(1)
         : [];
-      const eventId = `purchase:${payment.id}`;
-      const meta = new MetaConversionsProvider();
-      let sentToServer = false;
-      if (order && consent?.analytics && meta.isEnabled()) {
-        await meta.trackServerEvent({
-          eventName: "Purchase",
-          eventId,
-          eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/checkout/confirmacion`,
-          value: order.total,
-          currency: "COP",
+      // El id del evento se ancla al pedido, no al pago: si un pedido
+      // tuviera más de un pago (reintento, pago parcial), seguiría siendo
+      // una sola compra. `emitPurchaseEventOnce` reclama el envío con el
+      // índice único de `analytics_events.event_id`, así que dos entregas
+      // concurrentes del mismo webhook no pueden reportarla dos veces.
+      //
+      // Meta es marketing, no analítica: se exige el consentimiento de
+      // marketing del pedido, no el de analítica.
+      if (order) {
+        await emitPurchaseEventOnce({
           orderId: order.id,
-          userData: { email: order.customerEmail ?? undefined, phone: order.customerPhone },
+          value: order.total,
+          eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmacion`,
+          email: order.customerEmail,
+          phone: order.customerPhone,
+          utmSource: order.utmSource,
+          utmCampaign: order.utmCampaign,
+          marketingConsent: consent?.marketing === true,
         });
-        sentToServer = true;
       }
-      await db.insert(analyticsEvents).values({
-        eventName: "Purchase",
-        eventId,
-        orderId: order?.id,
-        value: order?.total,
-        sentToServer,
-        sentToBrowser: false,
-        utmSource: order?.utmSource,
-        utmCampaign: order?.utmCampaign,
-      }).onConflictDoNothing();
     }
     await db.update(webhookEvents).set({ status: "processed", processedAt: new Date() }).where(eq(webhookEvents.id, claimed.id));
     return Response.json({ ok: true });

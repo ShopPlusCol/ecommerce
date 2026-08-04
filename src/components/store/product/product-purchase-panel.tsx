@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Heart, MessageCircle } from "lucide-react";
+import { Check, Heart, MessageCircle, X } from "lucide-react";
 import type { Product } from "@/domain/entities/catalog";
 import { Chip } from "@/components/ui/chip";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
@@ -18,7 +18,19 @@ import { formatMoney } from "@/domain/value-objects/money";
  * favorito y consulta por WhatsApp (sección 9). Registra ViewContent al
  * montar y sincroniza la cantidad elegida con el carrito.
  */
-export function ProductPurchasePanel({ product }: { product: Product }) {
+export function ProductPurchasePanel({
+  product,
+  texts,
+}: {
+  product: Product;
+  /** Textos comerciales editables desde Configuración → Textos del sitio. */
+  texts: {
+    productIncludes: string;
+    productExcludes: string;
+    productVariationNote: string;
+    whatsappProductTemplate: string;
+  };
+}) {
   const [quantity, setQuantity] = React.useState(1);
   const [whatsappNumber, setWhatsappNumber] = React.useState<string | undefined>(undefined);
   const { isFavorite, toggleFavorite, isHydrated } = useFavorites();
@@ -46,10 +58,18 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     };
   }, []);
 
-  const whatsappUrl = buildWhatsAppUrl(
-    `Hola, quiero preguntar por el lente ${product.name} (${formatMoney(product.price)}).`,
-    whatsappNumber,
-  );
+  // Mensaje con intención de compra, no una consulta abierta: incluye
+  // producto, cantidad, precio y qué incluye, y deja el hueco de la
+  // ubicación. Cuanto más resuelto llega el mensaje, menos ida y vuelta
+  // hace falta por WhatsApp para cerrar (o descartar) la venta.
+  const productUrl = typeof window === "undefined" ? "" : window.location.href;
+  const whatsappMessage = texts.whatsappProductTemplate
+    .replace("{producto}", product.name)
+    .replace("{precio}", formatMoney(product.price))
+    .replace("{cantidad}", String(quantity))
+    .replace("{incluye}", texts.productIncludes.replace(/\.$/, ""))
+    .replace("{url}", productUrl);
+  const whatsappUrl = buildWhatsAppUrl(whatsappMessage, whatsappNumber);
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,11 +110,43 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() =>
+          track("Contact", {
+            value: product.price.amount * quantity,
+            currency: "COP",
+            contentIds: [product.id],
+            quantities: [quantity],
+            contentType: "product",
+            extra: { source: "product" },
+          })
+        }
         className="inline-flex h-control-md items-center justify-center gap-2 rounded-md border border-[#25D366] text-sm font-medium text-[#0F7F43] transition-colors duration-fast hover:bg-[#25D366]/10"
       >
         <MessageCircle className="h-4 w-4" aria-hidden="true" />
-        Preguntar por WhatsApp
+        Comprar este tono por WhatsApp
       </a>
+
+      {/* Qué incluye, qué no y la variación real del resultado: las tres
+          dudas que hoy se resuelven una por una por WhatsApp. */}
+      <div className="rounded-lg border border-border bg-surface-sunken/60 p-4 text-sm">
+        <ul className="flex flex-col gap-2">
+          <li className="flex items-start gap-2">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+            <span>
+              <span className="font-medium text-text">Incluye:</span>{" "}
+              <span className="text-text-muted">{texts.productIncludes}</span>
+            </span>
+          </li>
+          <li className="flex items-start gap-2">
+            <X className="mt-0.5 h-4 w-4 shrink-0 text-text-subtle" aria-hidden="true" />
+            <span>
+              <span className="font-medium text-text">No incluye:</span>{" "}
+              <span className="text-text-muted">{texts.productExcludes}</span>
+            </span>
+          </li>
+        </ul>
+        <p className="mt-3 border-t border-border pt-3 text-xs text-text-subtle">{texts.productVariationNote}</p>
+      </div>
     </div>
   );
 }

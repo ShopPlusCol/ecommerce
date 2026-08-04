@@ -75,6 +75,7 @@ describe("computeSubtotal", () => {
 
 describe("computeCartTotals con cupón", () => {
   const activeCoupon: Coupon = {
+    id: "demo-coupon-bienvenida10",
     code: "BIENVENIDA10",
     discountType: "percentage",
     discountValue: 10,
@@ -82,6 +83,9 @@ describe("computeCartTotals con cupón", () => {
     endsAt: null,
     minPurchaseAmount: null,
     minQuantity: null,
+    usageLimitTotal: null,
+    usageLimitPerCustomer: null,
+    firstOrderOnly: false,
     status: "active",
   };
 

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { idColumn, timestampColumns } from "./_helpers";
 import { productVariants, products } from "./catalog";
 import { customers } from "./customers";
@@ -19,7 +19,7 @@ export const carts = sqliteTable("carts", {
   abandonedAt: integer("abandoned_at", { mode: "timestamp_ms" }),
   convertedOrderId: text("converted_order_id"),
   ...timestampColumns,
-});
+}, (table) => [index("carts_session_token_idx").on(table.sessionToken)]);
 
 export const cartItems = sqliteTable("cart_items", {
   id: idColumn(),

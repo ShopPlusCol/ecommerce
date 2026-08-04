@@ -21,6 +21,7 @@ import type {
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import {
   consentRecords,
+  couponRedemptions,
   customers,
   idempotencyKeys,
   inventoryItems,
@@ -39,8 +40,24 @@ import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit"
 import { resolveDestinationLabel, resolveRejectionMessage } from "@/domain/services/shipping";
 import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
 import { getBrandSettings } from "@/modules/settings/brand";
+import { emitPurchaseEventOnce } from "@/modules/analytics/purchase-event";
 import { ConfiguredNotificationProvider } from "@/infrastructure/notifications/configured-notification-provider";
 import { buildOrderConfirmationEmail } from "@/modules/notifications/order-confirmation-email";
+import { getCheckoutFieldsSettings } from "@/modules/settings/checkout-fields";
+import { LOCKED_CHECKOUT_FIELDS, NO_REQUIRED_TOGGLE_FIELDS, type CheckoutFieldId } from "@/modules/checkout/checkout-fields";
+import { claimCouponRedemption } from "@/modules/promotions/coupon-redemptions";
+
+/** Se lanza cuando un cupón, validado momentos antes de escribir el pedido,
+ * pierde su cupo por una redención concurrente entre esa validación y el
+ * reclamo atómico — la única forma de perder la carrera de verdad tarde en
+ * el proceso. Señala al llamador que debe deshacer todo y decirle al
+ * cliente que el cupón dejó de ser válido, nunca cobrar de más en silencio. */
+class CouponRaceLostError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CouponRaceLostError";
+  }
+}
 
 const destinationSchema = z.object({
   country: z.string().min(1).default("CO"),
@@ -83,19 +100,39 @@ const createOrderSchema = z.object({
     addressComplement: z.string(),
     deliveryInstructions: z.string(),
   }),
-  consent: z.object({ terms: z.boolean(), marketing: z.boolean(), analytics: z.boolean() }),
+  // marketing: null = la casilla no se mostró (campo desactivado en
+  // configuración). El servidor igual re-deriva el valor autoritativo de
+  // la configuración vigente más abajo — esto es solo la forma de entrada.
+  consent: z.object({ terms: z.boolean(), marketing: z.boolean().nullable(), analytics: z.boolean() }),
 });
 
 /** Valida un cupón en servidor (autoritativo, sección 13). */
 export async function validateCouponAction(input: unknown): Promise<ValidateCouponResult> {
+  try {
+    await enforceRateLimit("coupon_validate", 20, 60);
+  } catch (error) {
+    if (error instanceof RateLimitError) return { ok: false, error: error.message };
+    throw error;
+  }
   const parsed = couponSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Datos de cupón inválidos." };
 
   const coupon = await promotionsRepository.findCouponByCode(parsed.data.code);
+  // Límite total de usos: se puede comprobar aquí sin conocer todavía al
+  // cliente. El límite por cliente y "solo primera compra" solo se conocen
+  // con certeza en createDemoOrderAction (ahí sí es autoritativo); esta
+  // previsualización nunca es la última palabra.
+  let totalRedemptions: number | undefined;
+  if (coupon) {
+    const db = await getRuntimeDb();
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions).where(eq(couponRedemptions.couponId, coupon.id));
+    totalRedemptions = Number(row?.count ?? 0);
+  }
   const result = validateCoupon(coupon, {
     subtotal: money(parsed.data.subtotal),
     totalUnits: parsed.data.totalUnits,
     now: new Date(),
+    totalRedemptions,
   });
   if (!result.valid) return { ok: false, error: result.reason };
   return { ok: true, coupon: result.coupon };
@@ -115,6 +152,11 @@ export async function quoteShippingAction(input: unknown): Promise<QuoteShipping
   const parsed = quoteSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: "Datos de destino inválidos." };
 
+  // Se llama en cada cambio de dirección durante el checkout (mucho más
+  // frecuente que pedidos completados), así que libera reservas vencidas
+  // aquí también: reduce la ventana en la que stock reservado por un
+  // carrito abandonado queda bloqueado sin que nadie más complete un pedido.
+  await releaseExpiredReservations();
   const quote = await shippingResolver.resolve(parsed.data.destination, money(parsed.data.productsTotal));
   if (!quote) {
     return { ok: false, reason: await resolveNoCoverageMessage(parsed.data.destination) };
@@ -150,6 +192,50 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     return { ok: false, error: "Debes aceptar los términos y la política de privacidad." };
   }
 
+  // Formulario de checkout autoritativo (sección de configuración de
+  // campos): el navegador ya usa esta misma configuración para mostrar,
+  // ocultar y marcar campos obligatorios, pero eso es solo UX — el
+  // servidor la vuelve a cargar y decide qué exige y qué descarta,
+  // aunque la petición haya sido manipulada a mano.
+  const fieldConfig = await getCheckoutFieldsSettings();
+  const fieldsById = new Map(fieldConfig.map((field) => [field.id, field]));
+  const isFieldEnabled = (id: CheckoutFieldId) =>
+    LOCKED_CHECKOUT_FIELDS.includes(id) ? true : (fieldsById.get(id)?.enabled ?? true);
+  const isFieldRequired = (id: CheckoutFieldId) =>
+    LOCKED_CHECKOUT_FIELDS.includes(id)
+      ? true
+      : NO_REQUIRED_TOGGLE_FIELDS.includes(id)
+        ? false
+        : (fieldsById.get(id)?.required ?? false);
+
+  if (isFieldEnabled("email") && isFieldRequired("email") && !data.contact.email.trim()) {
+    return { ok: false, error: "El correo es obligatorio." };
+  }
+  if (isFieldEnabled("addressComplement") && isFieldRequired("addressComplement") && !data.contact.addressComplement.trim()) {
+    return { ok: false, error: "Completa el campo de apartamento, torre o bloque." };
+  }
+  if (isFieldEnabled("deliveryInstructions") && isFieldRequired("deliveryInstructions") && !data.contact.deliveryInstructions.trim()) {
+    return { ok: false, error: "Completa las indicaciones de entrega." };
+  }
+
+  // Normaliza: un campo desactivado nunca guarda lo que haya enviado el
+  // cliente (manipulado o no) — se descarta a cadena vacía, el valor
+  // apropiado para estas columnas de texto opcional.
+  const normalizedContact = {
+    ...data.contact,
+    email: isFieldEnabled("email") ? data.contact.email.trim() : "",
+    addressComplement: isFieldEnabled("addressComplement") ? data.contact.addressComplement.trim() : "",
+    deliveryInstructions: isFieldEnabled("deliveryInstructions") ? data.contact.deliveryInstructions.trim() : "",
+  };
+
+  // Consentimiento de marketing con tres estados (sección de
+  // consentimientos): si la casilla está desactivada en configuración, la
+  // opción nunca se presentó — el servidor ignora lo que haya mandado el
+  // cliente para este campo y lo trata como "no presentado" (null), nunca
+  // como una revocación real.
+  const marketingConsentPresented = isFieldEnabled("marketingConsent");
+  const marketingConsentValue: boolean | null = marketingConsentPresented ? (data.consent.marketing ?? false) : null;
+
   // Reconstrucción autoritativa del carrito desde el catálogo.
   const products = await catalogRepository.getProductsByIds(data.items.map((i) => i.productId));
   const lines: CartLine[] = [];
@@ -180,12 +266,34 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
   const cart: Cart = { lines: nonZeroLines, couponCode: data.couponCode };
   const subtotal = computeSubtotal(cart);
 
-  // Cupón (autoritativo).
+  // Cupón (autoritativo): límites de uso total/por cliente y "solo primera
+  // compra" se comprueban aquí, contra coupon_redemptions y orders reales
+  // — nunca solo en la previsualización del cliente (validateCouponAction).
   let coupon = null;
   if (data.couponCode) {
     const found = await promotionsRepository.findCouponByCode(data.couponCode);
-    const validation = validateCoupon(found, { subtotal, totalUnits: totalUnits(cart), now: new Date() });
-    if (validation.valid) coupon = validation.coupon;
+    if (found) {
+      const [existingCustomerForCoupon] = await db.select({ id: customers.id }).from(customers).where(eq(customers.phone, normalizedContact.phone)).limit(1);
+      const [totalRow] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions).where(eq(couponRedemptions.couponId, found.id));
+      let customerRedemptions = 0;
+      let isFirstOrder = true;
+      if (existingCustomerForCoupon) {
+        const [customerRow] = await db.select({ count: sql<number>`count(*)` }).from(couponRedemptions)
+          .where(and(eq(couponRedemptions.couponId, found.id), eq(couponRedemptions.customerId, existingCustomerForCoupon.id)));
+        customerRedemptions = Number(customerRow?.count ?? 0);
+        const [orderCountRow] = await db.select({ count: sql<number>`count(*)` }).from(orders).where(eq(orders.customerId, existingCustomerForCoupon.id));
+        isFirstOrder = Number(orderCountRow?.count ?? 0) === 0;
+      }
+      const validation = validateCoupon(found, {
+        subtotal,
+        totalUnits: totalUnits(cart),
+        now: new Date(),
+        totalRedemptions: Number(totalRow?.count ?? 0),
+        customerRedemptions,
+        isFirstOrder,
+      });
+      if (validation.valid) coupon = validation.coupon;
+    }
   }
 
   // Envío (se resuelve antes que las recompensas: el envío gratis puede
@@ -280,21 +388,25 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       if (updated) reserved.push({ id: updated.id, quantity: line.quantity });
     }
 
-    let [customer] = await db.select().from(customers).where(eq(customers.phone, data.contact.phone)).limit(1);
+    let [customer] = await db.select().from(customers).where(eq(customers.phone, normalizedContact.phone)).limit(1);
     if (!customer) {
       [customer] = await db.insert(customers).values({
-        fullName: data.contact.fullName,
-        phone: data.contact.phone,
-        email: data.contact.email || null,
-        marketingConsent: data.consent.marketing,
+        fullName: normalizedContact.fullName,
+        phone: normalizedContact.phone,
+        email: normalizedContact.email || null,
+        // El cliente no admite "no presentado": si la casilla no se mostró,
+        // el cliente nuevo arranca sin consentimiento de marketing.
+        marketingConsent: marketingConsentValue ?? false,
         firstOrderAt: new Date(),
         lastOrderAt: new Date(),
       }).returning();
     } else {
       await db.update(customers).set({
-        fullName: data.contact.fullName,
-        email: data.contact.email || customer.email,
-        marketingConsent: data.consent.marketing,
+        fullName: normalizedContact.fullName,
+        email: normalizedContact.email || customer.email,
+        // Si la casilla no se presentó en este pedido, se conserva la
+        // preferencia previa del cliente en vez de revocarla en silencio.
+        ...(marketingConsentValue === null ? {} : { marketingConsent: marketingConsentValue }),
         lastOrderAt: new Date(),
       }).where(eq(customers.id, customer.id));
     }
@@ -309,15 +421,15 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       paymentMethod: data.paymentMethod,
       lookupTokenHash,
       deliveryMethod: "delivery",
-      customerFullName: data.contact.fullName,
-      customerPhone: data.contact.phone,
-      customerEmail: data.contact.email || null,
+      customerFullName: normalizedContact.fullName,
+      customerPhone: normalizedContact.phone,
+      customerEmail: normalizedContact.email || null,
       shippingDepartment: data.destination.department,
       shippingCity: data.destination.city,
       shippingNeighborhood: data.destination.neighborhood,
-      shippingAddressLine: data.contact.addressLine,
-      shippingAddressComplement: data.contact.addressComplement,
-      deliveryInstructions: data.contact.deliveryInstructions,
+      shippingAddressLine: normalizedContact.addressLine,
+      shippingAddressComplement: normalizedContact.addressComplement,
+      deliveryInstructions: normalizedContact.deliveryInstructions,
       shippingRuleIdSnapshot: quote.ruleId,
       shippingRuleLevelSnapshot: quote.ruleLevel,
       subtotal: summary.subtotal.amount,
@@ -329,7 +441,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
       couponCode: coupon?.code ?? null,
       appliedPromotions: rewards.unlocked.map((reward) => reward.rule.name),
       termsVersionAccepted: "2026-07-29",
-      marketingConsent: data.consent.marketing,
+      marketingConsent: marketingConsentValue,
       utmSource: attribution.source,
       utmMedium: attribution.medium,
       utmCampaign: attribution.campaign,
@@ -393,6 +505,29 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     }).returning();
     createdConsentRecordId = consentRecord.id;
 
+    // Registra el uso del cupón con un reclamo atómico: los límites se
+    // evalúan dentro del mismo INSERT, así que dos pedidos simultáneos no
+    // pueden pasarse ambos del cupo. Un INSERT simple sí lo permitía,
+    // porque la validación previa ocurre bastantes líneas antes.
+    if (coupon) {
+      const claimed = await claimCouponRedemption(db, {
+        couponId: coupon.id,
+        orderId: order.id,
+        customerId: customer.id,
+        discountAmount: summary.couponDiscount.amount,
+        usageLimitTotal: coupon.usageLimitTotal,
+        usageLimitPerCustomer: coupon.usageLimitPerCustomer,
+        firstOrderOnly: coupon.firstOrderOnly,
+      });
+      if (!claimed) {
+        // Perdió la carrera: se deshace todo (lo maneja el catch) en vez de
+        // cobrar el pedido con un descuento al que ya no tiene derecho.
+        throw new CouponRaceLostError(
+          "El cupón dejó de estar disponible mientras confirmábamos tu pedido. Vuelve a intentarlo sin el cupón.",
+        );
+      }
+    }
+
     let checkoutUrl: string | null = null;
     if (data.paymentMethod === "mercado_pago") {
       const token = process.env.MERCADO_PAGO_ACCESS_TOKEN;
@@ -424,7 +559,7 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
         lookupToken,
         checkoutUrl,
         manualTransfer,
-        contact: data.contact,
+        contact: normalizedContact,
         destination: data.destination,
         paymentMethod: data.paymentMethod,
         quote,
@@ -445,18 +580,39 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
     // Correo de confirmación (sección 38, evento "order_created"): solo si
     // el cliente dejó su correo, y nunca a costa del pedido — si falla o
     // SMTP no está configurado, el pedido ya se confirmó igual.
-    if (data.contact.email) {
+    if (normalizedContact.email) {
       try {
         const brand = await getBrandSettings();
         const email = buildOrderConfirmationEmail(result.order, brand.name, process.env.NEXT_PUBLIC_SITE_URL ?? "");
         await new ConfiguredNotificationProvider().send({
           event: "order_created",
-          to: data.contact.email,
+          to: normalizedContact.email,
           subject: email.subject,
           data: { html: email.html, text: email.text },
         });
       } catch {
         // Nunca rompe el pedido ya confirmado.
+      }
+    }
+
+    // Purchase solo cuando el pedido ya quedó confirmado sin pago pendiente
+    // (p. ej. contra entrega). Si queda esperando pago, la compra la reporta
+    // el webhook al aprobarse — nunca las dos. `emitPurchaseEventOnce`
+    // garantiza además que solo se envíe una vez por pedido.
+    if (order.status === "confirmed") {
+      try {
+        await emitPurchaseEventOnce({
+          orderId: order.id,
+          value: summary.total.amount,
+          eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmacion`,
+          email: normalizedContact.email || null,
+          phone: normalizedContact.phone,
+          utmSource: attribution.source ?? null,
+          utmCampaign: attribution.campaign ?? null,
+          marketingConsent: marketingConsentValue === true,
+        });
+      } catch {
+        // La analítica nunca rompe un pedido ya confirmado.
       }
     }
 

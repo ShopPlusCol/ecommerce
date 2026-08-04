@@ -37,6 +37,14 @@ const schemas = {
     ctaHref: link,
     secondaryLabel: z.string().trim().optional(),
     secondaryHref: link.optional(),
+    // Campos comerciales del primer pantallazo. Zod descarta las claves que
+    // no declara, así que omitirlos aquí los borraría en cada guardado
+    // desde el panel.
+    offerLabel: z.string().trim().optional(),
+    includesNote: z.string().trim().optional(),
+    excludesNote: z.string().trim().optional(),
+    imageUrl: z.string().trim().nullable().optional(),
+    imageAlt: z.string().trim().optional(),
   }),
   color_families: z.object({ title: z.string().trim().min(1) }),
   product_collection: z.object({
@@ -64,6 +72,12 @@ const schemas = {
       name: z.string().trim().min(1),
       city: z.string().trim(),
       quote: z.string().trim().min(1),
+      // Solo los verificados se publican en producción (ver
+      // TestimonialsBlock). Ausente = no verificado, que es el valor
+      // seguro por defecto.
+      verified: z.boolean().optional(),
+      product: z.string().trim().optional(),
+      date: z.string().trim().optional(),
     })).min(1).max(12),
   }),
   faq: z.object({

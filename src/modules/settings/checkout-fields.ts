@@ -1,16 +1,25 @@
 import { eq } from "drizzle-orm";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { settings } from "@/infrastructure/db/schema";
-import { DEFAULT_CHECKOUT_FIELDS, type CheckoutFieldConfig } from "@/modules/checkout/checkout-fields";
+import { parseCheckoutFieldsConfig, type CheckoutFieldConfig } from "@/modules/checkout/checkout-fields";
+import { logger } from "@/modules/observability/logger";
 
 export type { CheckoutFieldConfig, CheckoutFieldId } from "@/modules/checkout/checkout-fields";
 
+/**
+ * Única puerta de lectura de `checkout_fields`: valida con
+ * `parseCheckoutFieldsConfig` (el mismo esquema que usa el guardado) y cae
+ * a la configuración segura por defecto si el registro almacenado no
+ * calza — nunca deja que un JSON corrupto o de una versión anterior rompa
+ * el checkout o quede con reglas incoherentes.
+ */
 export async function getCheckoutFieldsSettings(): Promise<CheckoutFieldConfig[]> {
   const db = await getRuntimeDb();
   const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, "checkout_fields")).limit(1);
-  const stored = row?.value && Array.isArray(row.value) ? (row.value as CheckoutFieldConfig[]) : null;
-  if (!stored) return DEFAULT_CHECKOUT_FIELDS;
-  // Por si se agregan campos nuevos en el futuro que el registro guardado no conoce todavía.
-  const byId = new Map(stored.map((field) => [field.id, field]));
-  return DEFAULT_CHECKOUT_FIELDS.map((defaultField) => byId.get(defaultField.id) ?? defaultField).sort((a, b) => a.order - b.order);
+  if (!row?.value) return parseCheckoutFieldsConfig(undefined).fields;
+  const { fields, usedFallback, issues } = parseCheckoutFieldsConfig(row.value);
+  if (usedFallback) {
+    logger.warn("checkout_fields.settings.invalid", { issues, raw: row.value });
+  }
+  return fields;
 }

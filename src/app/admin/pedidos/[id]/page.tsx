@@ -7,7 +7,7 @@ import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { requirePermission } from "@/modules/auth/session";
 import { getRuntimeDb } from "@/infrastructure/db/client";
 import { orderAdjustments, orderItems, orders, orderStatusHistory, payments, shipments } from "@/infrastructure/db/schema";
-import { ORDER_STATUSES } from "@/infrastructure/db/schema/orders";
+import { ORDER_STATUS_TRANSITIONS, type OrderStatus } from "@/domain/services/order-status";
 import { adminStatusLabel } from "@/modules/admin/status-labels";
 import { changeOrderStatusAction } from "../../actions";
 
@@ -39,12 +39,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </section>
         <section className="rounded-xl border border-border bg-surface-raised p-5">
           <h2>Cambiar estado</h2>
-          <form action={changeOrderStatusAction} className="mt-4 grid gap-3">
-            <input type="hidden" name="id" value={order.id} />
-            <select name="status" defaultValue={order.status} className="h-10 rounded-md border px-3">{ORDER_STATUSES.map((status) => <option key={status} value={status}>{adminStatusLabel(status)}</option>)}</select>
-            <textarea name="note" required maxLength={500} placeholder="Motivo o nota operativa" className="min-h-20 rounded-md border p-3 text-sm" />
-            <button className="h-10 rounded-md bg-brand font-semibold text-white">Guardar estado</button>
-          </form>
+          {(() => {
+            const nextStatuses = ORDER_STATUS_TRANSITIONS[order.status as OrderStatus];
+            if (nextStatuses.length === 0) {
+              return <p className="mt-4 text-sm text-text-muted">Este pedido está en un estado final; no admite más cambios.</p>;
+            }
+            return (
+              <form action={changeOrderStatusAction} className="mt-4 grid gap-3">
+                <input type="hidden" name="id" value={order.id} />
+                <select name="status" defaultValue={nextStatuses[0]} className="h-10 rounded-md border px-3">
+                  {nextStatuses.map((status) => <option key={status} value={status}>{adminStatusLabel(status)}</option>)}
+                </select>
+                <textarea name="note" required maxLength={500} placeholder="Motivo o nota operativa" className="min-h-20 rounded-md border p-3 text-sm" />
+                <button className="h-10 rounded-md bg-brand font-semibold text-white">Guardar estado</button>
+              </form>
+            );
+          })()}
         </section>
       </div>
       <AdminRecordList title="Productos" description={`${items.length} líneas del pedido; son instantáneas y no cambian con el catálogo.`} columns={["Producto", "SKU", "Cantidad", "Precio", "Descuento"]} rows={items.map((item) => ({ id: item.id, values: [item.name, item.sku, item.quantity, `$${item.unitPrice.toLocaleString("es-CO")}`, `$${item.discount.toLocaleString("es-CO")}`] }))} />

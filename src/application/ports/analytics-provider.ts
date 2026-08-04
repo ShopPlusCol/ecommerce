@@ -11,6 +11,8 @@ export type ConversionEventName =
   | "AddToCart"
   | "InitiateCheckout"
   | "AddPaymentInfo"
+  /** Clic en WhatsApp: el canal por el que hoy entra la mayor parte de la demanda. */
+  | "Contact"
   | "Purchase";
 
 export type ConversionEvent = {

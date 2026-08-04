@@ -9,6 +9,7 @@ import type { Money } from "@/domain/value-objects/money";
 export type CouponDiscountType = "fixed" | "percentage" | "free_shipping" | "gift";
 
 export type Coupon = {
+  id: string;
   code: string;
   discountType: CouponDiscountType;
   /** Monto en COP para "fixed", porcentaje 0-100 para "percentage". */
@@ -17,6 +18,10 @@ export type Coupon = {
   endsAt: string | null;
   minPurchaseAmount: Money | null;
   minQuantity: number | null;
+  /** Límites de uso (sección 13): null = sin límite. Se validan de forma autoritativa en el servidor contra coupon_redemptions, nunca solo en la previsualización del cliente. */
+  usageLimitTotal: number | null;
+  usageLimitPerCustomer: number | null;
+  firstOrderOnly: boolean;
   status: "draft" | "scheduled" | "active" | "paused" | "expired";
 };
 

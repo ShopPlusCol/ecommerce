@@ -12,6 +12,7 @@ export class DrizzlePromotionsRepository implements PromotionsRepository {
     const [row] = await db.select().from(coupons).where(eq(coupons.code, normalizeCouponCode(code))).limit(1);
     if (!row) return null;
     return {
+      id: row.id,
       code: row.code,
       discountType: row.discountType,
       discountValue: row.discountValue,
@@ -19,6 +20,9 @@ export class DrizzlePromotionsRepository implements PromotionsRepository {
       endsAt: row.endsAt?.toISOString() ?? null,
       minPurchaseAmount: row.minPurchaseAmount === null ? null : money(row.minPurchaseAmount),
       minQuantity: row.minQuantity,
+      usageLimitTotal: row.usageLimitTotal,
+      usageLimitPerCustomer: row.usageLimitPerCustomer,
+      firstOrderOnly: row.firstOrderOnly,
       status: row.status,
     };
   }

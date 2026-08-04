@@ -530,3 +530,384 @@ restricción de la ronda anterior (la herramienta de automatización
 bloquea escribir contraseñas de administrador, incluso de una cuenta de
 prueba propia) — el propietario indicó que haría las pruebas manuales.
 No se aprueba producción ni se hace merge.
+
+# Mercado Pago, confirmaciones por correo, checkout configurable y
+# auditoría de pre-lanzamiento (2026-07-31 → 2026-08-01)
+
+## Configuración e integración de Mercado Pago
+
+Se acompañó al propietario paso a paso por el dashboard real de Mercado
+Pago (Checkout Pro, Access Token, evento de webhook "Pagos (legacy)",
+URL de webhook provisional) hasta dejar `MERCADO_PAGO_ACCESS_TOKEN` y
+`MERCADO_PAGO_WEBHOOK_SECRET` reales en `.env`. De paso, `/admin/
+integraciones` dejó de mostrar como "pendiente" integraciones que en
+realidad ya estaban configuradas (R2/D1 comprobaban variables de entorno
+que el proyecto no usa; ahora comprueban los bindings reales de
+Cloudflare) y ganó una guía "Cómo configurarlo" por integración.
+
+**Dos bugs reales de pago corregidos**, reproducidos primero contra la
+API real de Mercado Pago antes de tocar código:
+- **"Mercado Pago rechazó la preferencia (400)"**: `auto_return` exige un
+  `back_url.success` HTTPS real; con la URL provisional no-HTTPS de
+  pruebas, Mercado Pago rechazaba la preferencia completa. Ahora
+  `auto_return` solo se envía cuando la URL base es HTTPS.
+- **`UNIQUE constraint failed: payments.idempotency_key`** al reintentar
+  un pedido tras un fallo a mitad de camino: `createDemoOrderAction` no
+  deshacía el pedido/pago ya insertados antes de fallar, así que el
+  reintento con la misma clave de idempotencia chocaba. Se agregó
+  limpieza (rollback manual) de `orders`/`payments`/`consentRecords` en
+  el `catch`.
+
+Efecto secundario real encontrado al depurar: secretos reales de `.env`
+se filtraban al entorno aislado de `test:e2e` porque Next.js carga `.env`
+directamente del disco dentro de cada proceso hijo para cualquier
+variable no definida explícitamente — `scripts/e2e-server.mjs` ahora
+bloquea explícitamente (cadena vacía) las variables sensibles.
+
+## Correos de confirmación, salto al primer error, checkout configurable
+
+- **Correos de confirmación de pedido:** `ConfiguredNotificationProvider`
+  pasa de stub a envío real por SMTP (`nodemailer`); si el cliente dejó
+  correo, `createDemoOrderAction` envía una confirmación con los datos
+  reales del pedido sin bloquear la respuesta si el envío falla.
+- **Salto al primer campo con error:** al fallar la validación del
+  checkout, la página hace scroll y da foco al primer campo con error en
+  vez de dejar el mensaje fuera de vista. De paso se corrigió que
+  `errors.quote` (falta de cobertura de envío) nunca se mostraba en
+  pantalla.
+- **Formulario de checkout configurable:** cada campo (excepto
+  nombre/teléfono/ubicación/dirección, siempre obligatorios) puede
+  activarse/desactivarse, marcarse obligatorio u opcional, y reordenarse
+  desde Configuración → Formulario de checkout (`checkout_fields` en
+  `settings`, validado y forzado en servidor para los campos bloqueados).
+
+## Auditoría de pre-lanzamiento y correcciones (Fase E)
+
+A pedido del propietario ("Estoy a punto de lanzar... revisa
+exhaustivamente...") se hizo primero una auditoría de solo lectura (sin
+tocar código/datos) cruzando checkout, pagos, inventario, envíos,
+seguridad y configuración de producción, con hallazgos clasificados por
+severidad. El propietario autorizó corregir todo lo que no fuera "solo
+configurar un valor en el panel" (eso lo completa él mismo tras el
+lanzamiento). Se corrigió, cada pieza verificada con `typecheck`/`lint`/
+`test`/`build`/`cf:build` y su propio commit:
+
+- **Límites de uso de cupones:** `usageLimitTotal`, `usageLimitPerCustomer`
+  y `firstOrderOnly` existían en la tabla y el panel pero nunca se
+  validaban — cualquier cupón se podía usar un número ilimitado de veces.
+  Ahora `validateCoupon()` los evalúa contra `coupon_redemptions`
+  (autoritativo en `createDemoOrderAction`) y cada pedido registra su
+  canje.
+- **Transiciones de estado de pedido sin validar:** un pedido "entregado"
+  se podía regresar a "borrador" sin ninguna restricción. Se agregó una
+  matriz de transiciones válidas (`src/domain/services/order-status.ts`)
+  exigida en servidor y reflejada en los selectores del panel (detalle y
+  listado de pedidos).
+- **Inventario no se reponía al cancelar/devolver un pedido:** quedaba
+  bloqueado indefinidamente. `restockOrderInventory` libera reservas
+  activas y repone a stock disponible las ya vendidas, al entrar a
+  "cancelled"/"returned".
+- **Guard `newlyApproved` del webhook de Mercado Pago no era atómico:**
+  dos entregas concurrentes del mismo webhook podían descontar inventario
+  dos veces. Ahora la transición a "approved" se reclama con un
+  `UPDATE ... WHERE status != 'approved'`.
+- **`searchZonesAction` sin `requirePermission`:** cualquiera podía
+  invocar la server action y enumerar todo el árbol de zonas sin sesión
+  de admin. `validateCouponAction` no tenía límite de tasa (fuerza bruta
+  de cupones). Ambos corregidos.
+- **Reservas de inventario vencidas solo se liberaban al confirmar un
+  pedido:** un carrito abandonado bloqueaba stock hasta que otra persona
+  completara una compra. `quoteShippingAction` (mucho más frecuente,
+  cada cambio de dirección) también las libera ahora.
+- **Secretos horneados en el build de Cloudflare:** confirmado y
+  reproducido con un `cf:build` real — el Access Token y Webhook Secret
+  reales de Mercado Pago quedaban en texto plano en
+  `.open-next/cloudflare/next-env.mjs` (fallback que vuelca todo
+  `process.env` visto durante el build) y como copia literal de `.env`
+  en `.open-next/server-functions/default/.env` (trazado de archivos de
+  Next.js). Ambos quedan dentro de lo que `wrangler deploy` sube.
+  `scripts/run-cloudflare.mjs` ahora limpia esos valores después de cada
+  build; verificado con grep sobre `.open-next/` que no queda rastro del
+  secreto real.
+- **Catálogo se hidrataba 4-5 veces por vista de producto:** cada llamada
+  a `getProductBySlug`/`getRelatedProducts`/`getUpsellProducts`
+  relanzaba las mismas 5 consultas sobre el catálogo completo.
+  `React.cache()` las deduplica dentro de la misma petición de servidor.
+- **Listados admin sin paginación real:** `/admin/pedidos`,
+  `/admin/clientes`, `/admin/productos` y `/admin/pagos` hacían `SELECT`
+  sin límite (clientes, además, cargaba la tabla completa al navegador
+  para paginar ahí). Ahora los cuatro filtran y paginan con
+  `LIMIT`/`OFFSET` en el servidor, igual que `/admin/auditoria`.
+- **Índices de base de datos faltantes:** `audit_logs.created_at`,
+  `carts.session_token`, `order_items.order_id`,
+  `manual_transfer_proofs.payment_id`, `inventory_reservations.order_id`
+  y `(status, expires_at)`. Migración `0018`, generada con `drizzle-kit`
+  y aplicada/verificada sobre `local.db`.
+- **Montaje del checkout disparaba 4 fetches de cliente evitables**
+  (departamentos, copy de métodos de pago, textos del sitio, config de
+  campos): ninguno depende del carrito ni de la sesión, así que ahora se
+  resuelven en el server component antes de renderizar. Se marcó la ruta
+  `force-dynamic` explícitamente — sin eso, Next.js podía prerenderizar
+  esos valores administrables en build y congelarlos hasta el próximo
+  despliegue (se detectó porque `/checkout` seguía apareciendo como
+  ruta estática después del cambio).
+
+### Verificación
+
+- `typecheck`, `lint`, `test` (116/116 en 19 archivos, incluidas pruebas
+  nuevas para límites de cupón y transiciones de estado), build Next y
+  `cf:build`: correctos en cada commit de esta ronda.
+- `test:e2e`: 12-15/15 según la corrida — ver "Pendiente" abajo, un caso
+  puntual queda documentado como investigación separada, no oculto.
+- `cf:build` real ejecutado dos veces con los secretos reales del
+  propietario en `.env`; confirmado con `grep` que ninguno sobrevive en
+  `.open-next/` tras la limpieza.
+- Login de administrador vía navegador automatizado sigue bloqueado por
+  la misma política de esta sesión (no se escriben contraseñas, ni de
+  cuentas de prueba propias); las cuatro páginas de listado con
+  paginación nueva se verificaron por tipos/lint/build y por espejar
+  exactamente el patrón ya probado de `/admin/auditoria`, no con una
+  sesión de admin en vivo.
+
+### Pendiente
+
+- **`tests/e2e/shipping-zones.spec.ts:90` falla de forma consistente**
+  (4/4 corridas) contra el harness de E2E (build de producción + base
+  fresca), pero no se reproduce en el servidor de desarrollo normal.
+  Falla específicamente al seleccionar un departamento recién creado en
+  el mismo test serial; "Bogotá D.C." (departamento pre-sembrado) es
+  intermitente. Se investigó y descartó una hipótesis de doble
+  codificación UTF-8 (confirmada como artefacto de las herramientas de
+  inspección, no un bug real, con inspección directa del DOM). No se
+  encontró la causa raíz; no bloquea el resto de esta ronda pero sigue
+  abierto como investigación aparte.
+- **Cuenta de prueba con rol Propietario** (`auditoria-claude@
+  shoppluscol.local`, creada en una ronda anterior de esta sesión) sigue
+  en `.data/local.db`; el propietario prefirió eliminarla él mismo en
+  vez de que lo hiciera Claude.
+- **Dos cuentas de propietario** coexisten en `.data/local.db`:
+  `owner@shopluscol.local` (typo, nunca inició sesión) y
+  `owner@shoppluscol.local` (la que sí se usa). Señalado al propietario;
+  no se eliminó ninguna — es su decisión.
+- Todo lo explícitamente excluido por el propietario de esta ronda sigue
+  pendiente y es intencional, no un olvido: secretos/credenciales reales
+  (Mercado Pago producción, SMTP, `BETTER_AUTH_SECRET`), creación del D1
+  real y reemplazo del `database_id` placeholder en `wrangler.jsonc`,
+  activación de la zona "Resto de Colombia" y tarifas de departamentos
+  fuera de Antioquia, y cualquier otro ajuste que se hace desde el panel.
+- Esta ronda **no aprueba producción, no hace merge, no despliega y no
+  constituye autorización para lanzar**. Queda pendiente de revisión y
+  decisión del propietario.
+
+# Ronda de conversión, UX y analítica (2026-08-04)
+
+Rama `mejora-conversion-ecommerce-2026-08`, desde `5bee800`. Sin push, sin
+despliegue, sin aprobación de producción.
+
+## Punto de partida: la línea base venía rota
+
+El árbol de trabajo tenía cambios sin confirmar de una sesión previa
+(migración `0019` + canjes de cupón) a medio cablear: **2 errores de
+TypeScript y 1 prueba fallando**. Se preservaron primero en su propio commit
+(`3ce9912`) y en `git stash` como punto de recuperación, y luego se
+completaron:
+
+- `marketingConsentValue` (tres estados: null = la casilla no se presentó)
+  se calculaba pero los tres puntos de escritura usaban el valor crudo del
+  cliente.
+- `normalizedContact` descartaba los campos desactivados en configuración,
+  pero el pedido seguía guardando `data.contact` sin normalizar: un cliente
+  manipulado podía escribir en campos que el comercio tenía apagados.
+- `claimCouponRedemption` (reclamo atómico, ya escrito y probado) no estaba
+  conectado: dos pedidos simultáneos podían pasarse ambos del cupo del cupón.
+- `phase3-persistence.test.ts` mantenía a mano una lista de migraciones ya
+  desactualizada, lo que ocultaba el desajuste del esquema.
+
+## Entregado
+
+- **Hero comercial**: precio real del catálogo (marcador `{precio}`), qué
+  incluye/no incluye, soporte de fotografía real. Ver
+  `docs/CONVERSION_UX_AUDIT.md`.
+- **Promesas acotadas por datos**: `store-promise.ts` + `storefront/offer.ts`
+  — "mismo día" y "contra entrega" solo se muestran donde y cuando la
+  configuración real de zonas lo permite, con la misma herencia que usa el
+  checkout. Antes eran texto fijo en cuatro lugares.
+- **Testimonios**: solo se publican los verificados; sin ninguno, la sección
+  desaparece.
+- **Meta Pixel + Conversions API completos**: el píxel no existía en el
+  navegador. Nueve eventos, deduplicación por `event_id` compartido,
+  `Purchase` solo desde servidor con garantía de una vez por pedido vía el
+  índice único de `analytics_events.event_id`. Ver `docs/ANALYTICS_EVENTS.md`.
+- **Ficha de producto**: incluye/no incluye + WhatsApp con intención de
+  compra (producto, cantidad, precio, qué incluye, URL).
+- **Consentimiento**: aviso compacto con tres categorías separadas, que ya no
+  puede tapar el botón de confirmar del checkout.
+- **Auditoría de contenido**: `scripts/audit-content.mjs` detecta productos
+  sin foto real, imágenes reutilizadas, slugs inválidos, descuentos falsos y
+  desajustes nombre/familia. Ver `docs/CONTENT_REQUIRED.md`.
+
+## Verificación
+
+- `typecheck`, `lint`: limpios (0 errores, 0 avisos).
+- `test`: 135/135 en 22 archivos (11 nuevas).
+- `test:e2e`: 15 pasan, 2 fallan — ver "Pendiente".
+- `build` y `cf:build`: correctos.
+- `security:secrets`: 0 secretos en 478 archivos.
+
+### Incidencia de entorno: pnpm rompía el build de Cloudflare
+
+`cf:build` fallaba con "Acceso denegado" leyendo dentro de
+`node_modules/.pnpm/`: **`node_modules` estaba instalado con pnpm** aunque el
+proyecto declara npm (`package-lock.json` es el lockfile versionado).
+OpenNext no puede recorrer los enlaces de pnpm en Windows. Se reinstaló con
+`npm ci` y el build volvió a pasar. Quedan `pnpm-lock.yaml` y
+`pnpm-workspace.yaml` sin versionar en el repositorio: **si alguien vuelve a
+ejecutar `pnpm install`, el build de Cloudflare se rompe otra vez.**
+
+## Pendiente
+
+- **`shipping-zones.spec.ts:98` y `:120` siguen fallando** al seleccionar una
+  opción del combobox de departamento. Es el mismo fallo ya documentado en la
+  ronda anterior (`:90`, 4/4 corridas) y **no se investigó en esta ronda**;
+  ninguno de los archivos implicados (`SearchableSelect`, `checkout-client`,
+  zonas de envío) fue modificado aquí.
+- **No se rediseñaron catálogo, carrito ni checkout.** El encargo los
+  incluía; se priorizó lo que ataca directamente los 244 contactos de baja
+  calidad. Es la continuación natural.
+- **No hay capturas antes/después**: la sesión no tenía panel de navegador
+  visible. La verificación fue textual (DOM y árbol de accesibilidad).
+- **Sin sesión de administrador en navegador** (la herramienta no escribe
+  contraseñas): los cambios del panel se verificaron por tipos, lint, build y
+  pruebas.
+- Contenido real pendiente: ver `docs/CONTENT_REQUIRED.md`.
+- Esta ronda **no aprueba producción, no hace merge y no autoriza a
+  desplegar**.
+
+# Continuación: cierre de la ronda de conversión (2026-08-04, segunda parte)
+
+Continúa sobre `mejora-conversion-ecommerce-2026-08`. Se integró
+`origin/main` (merge `6ab3ef3`): su árbol es idéntico al de `8db5e7f`, ya
+ancestro de esta rama, así que no aportó cambios de contenido — solo deja la
+historia enlazada. Sin push, sin merge a main, sin despliegue.
+
+## Los dos E2E "preexistentes" tenían una causa real, y era un bug de la tienda
+
+No eran fallos de las pruebas. El encabezado es `sticky` (ocupa sitio en el
+flujo) y **encogía de 72px a 64px cuando `scrollY > 8`**: el umbral era
+exactamente igual al cambio de altura, así que encoger volvía a cruzar el
+umbral y disparaba el cambio contrario. La página vibraba de forma
+permanente cerca del inicio.
+
+Medido en navegador real: `window.scrollY` cambiaba en cada frame
+(13, 13, 12, 11, 9, 6…) y la caja de una opción del desplegable se movía
+~0,86px indefinidamente. Por eso Playwright fallaba con **"element is not
+stable"** y no con "not found". Explicaba además la inestabilidad
+intermitente de `product-gallery`.
+
+Altura fija + señal de desplazamiento solo en la sombra (no afecta al
+layout, no puede realimentarse). **`test:e2e` pasa 21/21 de forma
+consistente**; Lighthouse reporta ahora **CLS 0** en inicio y producto.
+
+## Analítica corregida
+
+- **PageView duplicado**: `MetaPixel` y `PageViewTracker` lo emitían ambos, y
+  el del píxel sin `event_id`. Ahora el píxel solo inicializa y hay una única
+  fuente. El efecto dependía de `consent.analytics`, así que aceptar solo
+  marketing no generaba ninguna vista y una preferencia guardada generaba dos
+  al hidratar. Decisión extraída a `shouldEmitPageView` (pura, 9 pruebas).
+- **Endpoint de reenvío endurecido**: origen acotado, límite de tasa por IP
+  hasheada, un solo uso por `event_id`, esquema estricto por tipo de evento
+  e **importe calculado en servidor** (el navegador ya no manda `value`).
+- **Purchase reintentable**: bandeja de salida con
+  `delivery_status`/`attempts`/`next_retry_at`/`last_error_code` (migración
+  `0020`, aditiva y con backfill). Antes, un fallo de Meta perdía la compra
+  para siempre. `recoverPendingPurchaseEvents` recupera lo pendiente.
+
+## Rediseño completado
+
+- **Catálogo**: filtros derivados de facetas reales con conteo (ya no se
+  ofrecen filtros que llevan a resultado vacío), filtro por colección, panel
+  inferior en móvil, objetivos táctiles de 44px.
+- **Tarjetas**: se corrigió un **descuento falso** (el precio anterior se
+  tachaba aunque no fuera mayor), etiqueta "Foto de ejemplo", "Lentes +
+  estuche", disponibilidad y selector de imagen usable en táctil.
+- **Carrito**: trampa de foco real y devolución del foco, familia y qué
+  incluye por línea, CTA "Finalizar por WhatsApp".
+- **Checkout**: barra fija inferior en móvil con total y confirmar, resumen
+  plegable. **El aviso de privacidad tapaba ese botón**: se reservaban 10rem
+  fijos y el aviso mide ~194px; ahora la altura se mide con `ResizeObserver`.
+
+## Verificación (todos los scripts reales del proyecto)
+
+| Comando | Resultado |
+| --- | --- |
+| `typecheck` | Limpio |
+| `lint` | Limpio (0 avisos) |
+| `test` | 162/162 en 24 archivos |
+| `test:e2e` | 21/21 |
+| `test:a11y` | 1/1, sin violaciones serias o críticas |
+| `test:responsive` | 2/2 |
+| `test:lighthouse` | Inicio 92/100/100/100 · Producto 91/100/100/100 · **CLS 0** |
+| `build` | Correcto |
+| `cf:build` | Correcto |
+| `security:secrets` | 0 secretos en 451 archivos |
+
+`test:lighthouse` **no se podía ejecutar** en esta máquina: el Chrome
+completo de Playwright falla con "la configuración en paralelo no es
+correcta" (falta el runtime de Visual C++). `resolveChromeExecutable` usa
+ahora el headless shell como respaldo.
+
+Capturas en `artifacts/ux-audit/` (10 archivos), generadas con
+`npx playwright test tests/e2e/ux-screenshots.spec.ts`. Excluidas del
+control de versiones y regenerables.
+
+## Pendiente real
+
+- **LCP 3,3-3,5 s**, por encima del objetivo de 2,5 s. No es una regresión
+  (venía igual de rondas anteriores) y está ligado a que el hero no tiene
+  fotografía real: hoy el elemento mayor es texto. Queda sin resolver.
+- **No hay planificador para reintentar compras pendientes.** La función
+  existe y es segura, pero hay que invocarla a mano tras una caída de Meta.
+- Contenido real pendiente: ver `docs/CONTENT_REQUIRED.md` (7 de 8 productos
+  sin foto propia; Alaska Gris con slug "21" y familia "Verde" pese a
+  llamarse "Gris" — **no se corrigió a propósito**, requiere tu confirmación).
+- Esta ronda **no aprueba producción, no hace merge y no autoriza a
+  desplegar**.
+
+## Investigación de `product-gallery.spec.ts` (intermitente, sin cerrar)
+
+Aislado con `--repeat-each` y `--trace=on`, según lo pedido.
+
+**Dos causas encontradas y corregidas:**
+
+1. **Defecto real del panel** (no de la prueba): el botón "Guardar producto
+   completo" solo se deshabilitaba durante el guardado (`pending`), no
+   mientras las imágenes seguían subiendo (`uploading`). Guardar en mitad de
+   una carga persistía solo las imágenes ya terminadas y **descartaba en
+   silencio las que seguían en vuelo**, sin ningún aviso.
+2. **Prueba no idempotente**: asumía que Amazon Brown empieza con exactamente
+   una imagen, pero ella misma le añade dos y no las quita. Reproducido:
+   **7 de 8 repeticiones fallaban** con "Expected 3, Received 5". Ahora todo
+   se mide en relación al número inicial.
+
+Efecto medido: de 1/8 a 8/10 y 10/10 en repeticiones aisladas.
+
+**Residuo sin cerrar.** En la suite completa sigue fallando de forma
+intermitente (aproximadamente 1 de cada 4-6 ejecuciones). Diagnóstico exacto
+de lo observado, sin conjeturas:
+
+- El fallo es siempre `Test timeout of 30000ms exceeded` **sin locator
+  atribuido** en el registro de llamadas — es decir, no se queda esperando un
+  selector concreto, que es lo que descarta un selector inestable.
+- Cuando pasa, el test tarda **1,2-2,3 s**; cuando falla, agota los 30 s.
+  No es una degradación gradual: algo se bloquea.
+- Aislado (`npx playwright test tests/e2e/product-gallery.spec.ts`) pasa
+  siempre. Solo aparece dentro de la suite completa, donde es el cuarto test.
+- Descartado: el bucle de realimentación del encabezado (corregido aparte,
+  ver arriba), la acumulación de imágenes (corregida), y el N+1 del catálogo
+  (corregido). Ninguno lo explica del todo.
+
+Trazas disponibles en `test-results/product-gallery-*/trace.zip`
+(`npx playwright show-trace <ruta>`), junto con vídeo y captura del fallo.
+
+**No se enmascaró subiendo el timeout ni con `retries`.** Queda abierto.

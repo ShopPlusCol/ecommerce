@@ -81,6 +81,13 @@ const FIELD_LABELS: Record<string, string> = {
   quote: "Testimonio",
   question: "Pregunta",
   answer: "Respuesta",
+  offerLabel: "Oferta destacada (usa {precio} para el precio real del catálogo)",
+  includesNote: "Qué incluye la compra",
+  excludesNote: "Qué NO incluye la compra",
+  imageAlt: "Descripción de la imagen (accesibilidad)",
+  verified: "Testimonio verificado (sin marcar no se publica)",
+  product: "Producto o tono",
+  date: "Fecha (AAAA-MM-DD)",
 };
 
 const ITEM_LABELS: Record<BlockType, string> = {
@@ -98,9 +105,11 @@ function humanizeKey(key: string) {
   return FIELD_LABELS[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 }
 
-function emptyItemFor(type: BlockType): Record<string, string> {
+function emptyItemFor(type: BlockType): Record<string, string | boolean> {
   if (type === "benefits") return { title: "", body: "" };
-  if (type === "testimonials") return { name: "", city: "", quote: "" };
+  // `verified: false` por defecto: un testimonio nuevo nace sin publicar
+  // hasta que alguien confirme que es real y autorizado.
+  if (type === "testimonials") return { name: "", city: "", quote: "", verified: false };
   if (type === "faq") return { question: "", answer: "" };
   return {};
 }
@@ -128,7 +137,9 @@ function BlockFields({
     <div className="grid gap-4">
       {entries.map(([key, value]) => {
         if (key === "items" && Array.isArray(value)) {
-          const items = value as Array<Record<string, string>>;
+          // Un elemento puede tener campos booleanos (p. ej. `verified` de
+          // un testimonio), no solo texto.
+          const items = value as Array<Record<string, string | boolean>>;
           return (
             <fieldset key={key} className="grid gap-3 rounded-lg border border-border p-3">
               <legend className="px-1 text-sm font-semibold">Elementos</legend>
@@ -148,9 +159,30 @@ function BlockFields({
                     </button>
                   </div>
                   {Object.entries(item).map(([itemKey, itemValue]) => (
-                    <label key={itemKey} className="grid gap-1 text-xs font-semibold">
+                    <label
+                      key={itemKey}
+                      className={
+                        typeof itemValue === "boolean"
+                          ? "flex items-center gap-2 text-xs font-semibold"
+                          : "grid gap-1 text-xs font-semibold"
+                      }
+                    >
+                      {typeof itemValue === "boolean" ? (
+                        /* `verified` de un testimonio: casilla, no texto — de
+                           lo contrario "false" se guardaría como cadena y
+                           un testimonio sin verificar parecería verificado. */
+                        <input
+                          type="checkbox"
+                          checked={itemValue}
+                          onChange={(event) => {
+                            const next = [...items];
+                            next[index] = { ...item, [itemKey]: event.target.checked };
+                            set("items", next);
+                          }}
+                        />
+                      ) : null}
                       {humanizeKey(itemKey)}
-                      {itemKey === "body" || itemKey === "quote" || itemKey === "answer" ? (
+                      {typeof itemValue === "boolean" ? null : itemKey === "body" || itemKey === "quote" || itemKey === "answer" ? (
                         <textarea
                           className={`${textarea} min-h-16 font-normal`}
                           value={itemValue}

@@ -23,6 +23,12 @@ export const payments = sqliteTable(
     verifiedByUserId: text("verified_by_user_id"),
     verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
     rejectionReason: text("rejection_reason"),
+    // Separado de `status`: `status = "approved"` es lo que informó el
+    // proveedor (Mercado Pago) o quien revisó el comprobante; `reconciledAt`
+    // marca que TODOS los efectos locales (inventario, pedido, analítica)
+    // ya se aplicaron con éxito. Un webhook o revisión puede reintentarse
+    // de forma segura mientras `reconciledAt` siga vacío.
+    reconciledAt: integer("reconciled_at", { mode: "timestamp_ms" }),
     ...timestampColumns,
   },
   (table) => [
@@ -73,4 +79,4 @@ export const manualTransferProofs = sqliteTable("manual_transfer_proofs", {
   reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }),
   rejectionReason: text("rejection_reason"),
   ...timestampColumns,
-});
+}, (table) => [index("manual_transfer_proofs_payment_idx").on(table.paymentId)]);

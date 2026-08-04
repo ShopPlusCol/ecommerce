@@ -1,5 +1,6 @@
 import { integer, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { idColumn, timestampColumns } from "./_helpers";
+import { orders } from "./orders";
 
 /** Configuración general editable (sección 25), clave/valor tipado por JSON. */
 export const settings = sqliteTable(
@@ -58,6 +59,23 @@ export const analyticsEvents = sqliteTable(
     utmCampaign: text("utm_campaign"),
     sentToServer: integer("sent_to_server", { mode: "boolean" }).notNull().default(false),
     sentToBrowser: integer("sent_to_browser", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Estado de entrega del evento de servidor (bandeja de salida). Antes
+     * bastaba con que la fila existiera para dar el evento por despachado,
+     * así que un fallo temporal de Meta perdía la compra para siempre:
+     * el reintento veía la fila y se retiraba. Con el estado explícito, una
+     * compra `pending`/`failed` se puede volver a intentar, y una `sent`
+     * nunca se reenvía.
+     */
+    deliveryStatus: text("delivery_status", { enum: ["pending", "sent", "failed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastAttemptAt: integer("last_attempt_at", { mode: "timestamp_ms" }),
+    /** Momento a partir del cual otro proceso puede reclamar el reintento. */
+    nextRetryAt: integer("next_retry_at", { mode: "timestamp_ms" }),
+    /** Motivo saneado del último fallo (código, nunca el cuerpo de la respuesta). */
+    lastErrorCode: text("last_error_code"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -65,20 +83,36 @@ export const analyticsEvents = sqliteTable(
   (table) => [
     uniqueIndex("analytics_events_event_id_idx").on(table.eventId),
     index("analytics_events_name_idx").on(table.eventName),
+    // Soporta la búsqueda de eventos pendientes vencidos sin recorrer la tabla.
+    index("analytics_events_delivery_idx").on(table.deliveryStatus, table.nextRetryAt),
   ],
 );
 
-export const consentRecords = sqliteTable("consent_records", {
-  id: idColumn(),
-  subjectId: text("subject_id"),
-  necessary: integer("necessary", { mode: "boolean" }).notNull().default(true),
-  analytics: integer("analytics", { mode: "boolean" }).notNull().default(false),
-  marketing: integer("marketing", { mode: "boolean" }).notNull().default(false),
-  policyVersion: text("policy_version").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const consentRecords = sqliteTable(
+  "consent_records",
+  {
+    id: idColumn(),
+    subjectId: text("subject_id"),
+    // Vincula el registro a un pedido concreto cuando se conoce (checkout):
+    // permite consultar el consentimiento correspondiente a ESE pedido en
+    // vez de "el más reciente del cliente" o una fila arbitraria. Los
+    // registros históricos previos a esta columna quedan con orderId nulo.
+    orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
+    necessary: integer("necessary", { mode: "boolean" }).notNull().default(true),
+    analytics: integer("analytics", { mode: "boolean" }).notNull().default(false),
+    // null = la casilla no se mostró (campo desactivado en configuración);
+    // no equivale a "el cliente dijo que no".
+    marketing: integer("marketing", { mode: "boolean" }),
+    policyVersion: text("policy_version").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("consent_records_order_idx").on(table.orderId),
+    index("consent_records_subject_created_idx").on(table.subjectId, table.createdAt),
+  ],
+);
 
 /** Sección 30.3: auditoría de acciones sensibles. */
 export const auditLogs = sqliteTable(
@@ -97,7 +131,10 @@ export const auditLogs = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index("audit_logs_entity_idx").on(table.entityType, table.entityId)],
+  (table) => [
+    index("audit_logs_entity_idx").on(table.entityType, table.entityId),
+    index("audit_logs_created_at_idx").on(table.createdAt),
+  ],
 );
 
 /** Idempotencia genérica para creación de pedidos, pagos y webhooks. */

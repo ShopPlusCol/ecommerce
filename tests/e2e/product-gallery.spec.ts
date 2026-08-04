@@ -30,18 +30,36 @@ test("galería de producto: miniaturas, visor ampliado, teclado y arrastre (secc
   await page.getByRole("link", { name: "Amazon Brown" }).click();
   await expect(page.getByRole("heading", { name: "Imágenes y SEO" })).toBeVisible();
 
+  // Cuántas imágenes tiene el producto ANTES de tocar nada. La prueba daba
+  // por hecho que Amazon Brown empieza con exactamente una, pero ella misma
+  // le añade dos y no las quita: repetida sobre la misma base fallaba
+  // siempre (7 de 8 repeticiones), y en la suite completa quedaba a merced
+  // de que nadie más hubiera tocado ese producto antes. Todo lo que sigue
+  // se mide en relación a este número.
+  const imageRows = page.getByRole("button", { name: "Mover imagen hacia arriba" });
+  const initialImages = await imageRows.count();
+
   const uploadInput = page.getByLabel("Subir imágenes o videos del producto");
   await uploadInput.setInputFiles([
     { name: "detalle-1.png", mimeType: "image/png", buffer: await syntheticPng(page, "#3f7a5a") },
     { name: "detalle-2.png", mimeType: "image/png", buffer: await syntheticPng(page, "#3a6d9a") },
   ]);
-  await expect(page.getByText("Imagen cargada y seleccionada.").last()).toBeVisible();
-  await page.getByRole("button", { name: "Guardar producto completo" }).click();
+  // El mensaje de confirmación es una región de estado única (no uno por
+  // archivo), así que no sirve para saber si terminaron las dos subidas.
+  // Lo que sí lo dice es la propia lista de imágenes del editor, y el botón
+  // de guardar, que se deshabilita mientras hay subidas en curso para que
+  // no se pueda guardar a medias.
+  await expect(page.getByText("Imagen cargada y seleccionada.")).toBeVisible();
+  await expect(imageRows).toHaveCount(initialImages + 2);
+  const save = page.getByRole("button", { name: "Guardar producto completo" });
+  await expect(save).toBeEnabled();
+  await save.click();
   await expect(page.getByText("Producto, relaciones e imágenes guardados.")).toBeVisible();
 
   await page.goto("/productos/amazon-brown");
   const gallery = page.getByRole("tablist", { name: "Elementos de la galería" });
-  await expect(gallery.getByRole("tab")).toHaveCount(3);
+  const totalItems = initialImages + 2;
+  await expect(gallery.getByRole("tab")).toHaveCount(totalItems);
 
   // Cambiar de elemento haciendo clic en una miniatura.
   await gallery.getByRole("tab").nth(1).click();
@@ -51,14 +69,14 @@ test("galería de producto: miniaturas, visor ampliado, teclado y arrastre (secc
   await page.getByRole("button", { name: /^Ampliar/ }).click();
   const lightbox = page.getByRole("dialog", { name: /Visor ampliado/ });
   await expect(lightbox).toBeVisible();
-  await expect(lightbox.getByText("2 / 3")).toBeVisible();
+  await expect(lightbox.getByText(`2 / ${totalItems}`)).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(lightbox.getByText("3 / 3")).toBeVisible();
+  await expect(lightbox.getByText(`3 / ${totalItems}`)).toBeVisible();
 
-  // Arrastrar hacia la izquierda debe avanzar de nuevo al primer elemento
-  // (círculo). Un solo salto grande basta: la lógica de arrastre solo
-  // necesita el último pointermove antes de pointerup para calcular el
-  // desplazamiento total.
+  // Arrastrar hacia la izquierda avanza un elemento, en círculo. Se calcula
+  // cuál toca en vez de fijar "1 / 3": con otro número de imágenes el
+  // avance desde la 3 no vuelve al principio.
+  const afterDrag = 3 + 1 > totalItems ? 1 : 4;
   const dragArea = lightbox.locator(".touch-pan-y");
   const box = (await dragArea.boundingBox())!;
   const centerX = box.x + box.width / 2;
@@ -67,7 +85,7 @@ test("galería de producto: miniaturas, visor ampliado, teclado y arrastre (secc
   await page.mouse.down();
   await page.mouse.move(centerX - 150, centerY);
   await page.mouse.up();
-  await expect(lightbox.getByText("1 / 3")).toBeVisible();
+  await expect(lightbox.getByText(`${afterDrag} / ${totalItems}`)).toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(lightbox).not.toBeVisible();

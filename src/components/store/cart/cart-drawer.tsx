@@ -20,19 +20,47 @@ import { WhatsAppCartButton } from "@/components/store/cart/whatsapp-cart-button
 export function CartDrawer() {
   const { drawerOpen, closeDrawer, lines, totals, rewards, canUndo, undoRemove } = useCart();
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     if (!drawerOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Se recuerda quién tenía el foco para devolvérselo al cerrar: sin esto
+    // el foco vuelve al principio del documento y quien navega con teclado
+    // pierde el sitio.
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeDrawer();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeDrawer();
+        return;
+      }
+      // Trampa de foco: el diálogo es modal, así que el tabulador no debe
+      // llevar a la página de detrás.
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusables = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      previouslyFocusedRef.current?.focus?.();
     };
   }, [drawerOpen, closeDrawer]);
 
@@ -52,6 +80,7 @@ export function CartDrawer() {
       />
 
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Carrito de compras"

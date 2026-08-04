@@ -5,6 +5,15 @@ export type CouponValidationContext = {
   subtotal: Money;
   totalUnits: number;
   now: Date;
+  /**
+   * Solo se conocen con certeza en el momento autoritativo (creación del
+   * pedido, donde ya se sabe quién es el cliente); en la previsualización
+   * del cliente antes de tener sus datos de contacto pueden omitirse y esos
+   * chequeos específicos simplemente se saltan (undefined = no evaluar).
+   */
+  totalRedemptions?: number;
+  customerRedemptions?: number;
+  isFirstOrder?: boolean;
 };
 
 export type CouponValidationResult =
@@ -35,6 +44,15 @@ export function validateCoupon(coupon: Coupon | null, ctx: CouponValidationConte
   }
   if (coupon.minQuantity && ctx.totalUnits < coupon.minQuantity) {
     return { valid: false, reason: "No alcanzas la cantidad mínima para este cupón." };
+  }
+  if (coupon.usageLimitTotal !== null && ctx.totalRedemptions !== undefined && ctx.totalRedemptions >= coupon.usageLimitTotal) {
+    return { valid: false, reason: "Este cupón alcanzó su límite de usos." };
+  }
+  if (coupon.usageLimitPerCustomer !== null && ctx.customerRedemptions !== undefined && ctx.customerRedemptions >= coupon.usageLimitPerCustomer) {
+    return { valid: false, reason: "Ya usaste este cupón el máximo de veces permitido." };
+  }
+  if (coupon.firstOrderOnly && ctx.isFirstOrder === false) {
+    return { valid: false, reason: "Este cupón es solo para tu primera compra." };
   }
   return { valid: true, coupon };
 }

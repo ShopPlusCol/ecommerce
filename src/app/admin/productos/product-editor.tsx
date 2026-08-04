@@ -179,7 +179,17 @@ export function ProductEditor({
         <label className="grid gap-1 text-sm font-medium">Título SEO<input className={input} name="seoTitle" maxLength={120} defaultValue={String(product.seoTitle ?? "")} /></label>
         <label className="grid gap-1 text-sm font-medium">Descripción SEO<textarea className="min-h-20 rounded-md border p-3" name="seoDescription" maxLength={240} defaultValue={String(product.seoDescription ?? "")} /></label>
       </section>
-      <button disabled={pending} className="h-12 rounded-md bg-brand px-6 font-semibold text-white disabled:opacity-60">{pending ? "Guardando…" : "Guardar producto completo"}</button>
+      {/* También se bloquea mientras hay imágenes subiendo: antes solo se
+          miraba `pending` (el guardado en sí), así que guardar en mitad de
+          una carga persistía únicamente las imágenes ya terminadas y
+          descartaba en silencio las que seguían en vuelo. Con varias
+          imágenes a la vez es fácil de provocar sin darse cuenta. */}
+      <button
+        disabled={pending || uploading}
+        className="h-12 rounded-md bg-brand px-6 font-semibold text-white disabled:opacity-60"
+      >
+        {pending ? "Guardando…" : uploading ? "Esperando a que terminen las imágenes…" : "Guardar producto completo"}
+      </button>
       {state.status !== "idle" ? <p role={state.status === "error" ? "alert" : "status"} className={state.status === "error" ? "text-danger" : "text-success"}>{state.message}</p> : null}
     </form>
   );

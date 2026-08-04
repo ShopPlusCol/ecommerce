@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Loader2, ShoppingBag } from "lucide-react";
+import { ChevronDown, Loader2, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,17 +12,14 @@ import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
 import { computeOrderSummary, computeSubtotal, totalUnits as sumUnits } from "@/domain/services/cart-pricing";
 import { evaluateRewards } from "@/domain/services/rewards";
-import { DEFAULT_PAYMENT_METHOD_COPY, type PaymentMethodId, type PaymentMethodCopy } from "@/domain/services/payments";
+import type { PaymentMethodId, PaymentMethodCopy } from "@/domain/services/payments";
 import { formatMoney } from "@/domain/value-objects/money";
 import type { ShippingQuote } from "@/application/ports/shipping-rate-resolver";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { quoteShippingAction, createDemoOrderAction } from "@/app/(store)/actions";
-import { listShippingCitiesAction, listShippingDepartmentsAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
-import { getPaymentMethodsCopyAction } from "@/app/(store)/payment-methods-actions";
-import { getStoreContentAction, getCheckoutFieldsAction } from "@/app/(store)/site-content-actions";
+import { listShippingCitiesAction, listShippingNeighborhoodsAction } from "@/app/(store)/shipping-location-actions";
 import { LAST_ORDER_KEY, resolveCheckoutDestination } from "@/modules/checkout/last-order";
 import {
-  DEFAULT_CHECKOUT_FIELDS,
   LOCKED_CHECKOUT_FIELDS,
   NO_REQUIRED_TOGGLE_FIELDS,
   type CheckoutFieldConfig,
@@ -74,7 +71,17 @@ const EMPTY_LOCATION: LocationForm = {
   deliveryInstructions: "",
 };
 
-export function CheckoutClient() {
+export function CheckoutClient({
+  initialDepartments,
+  initialPaymentMethodsCopy,
+  initialPaymentDisclaimer,
+  initialFieldConfig,
+}: {
+  initialDepartments: string[];
+  initialPaymentMethodsCopy: Record<PaymentMethodId, PaymentMethodCopy>;
+  initialPaymentDisclaimer: string;
+  initialFieldConfig: CheckoutFieldConfig[];
+}) {
   const { cart, lines, coupon, rewards, rewardRules, totals, clearCart, isHydrated } = useCart();
   const { track, consent: analyticsConsent } = useAnalytics();
   const idempotencyKey = React.useRef(crypto.randomUUID());
@@ -86,15 +93,18 @@ export function CheckoutClient() {
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId | null>(null);
   const [quoteStatus, setQuoteStatus] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = React.useState<string | null>(null);
-  const [paymentMethodsCopy, setPaymentMethodsCopy] = React.useState<Record<PaymentMethodId, PaymentMethodCopy>>(DEFAULT_PAYMENT_METHOD_COPY);
-  const [paymentDisclaimer, setPaymentDisclaimer] = React.useState("");
-  const [fieldConfig, setFieldConfig] = React.useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
-  const [departments, setDepartments] = React.useState<string[]>([]);
+  const paymentMethodsCopy = initialPaymentMethodsCopy;
+  const paymentDisclaimer = initialPaymentDisclaimer;
+  const fieldConfig = initialFieldConfig;
+  const departments = initialDepartments;
   const [cities, setCities] = React.useState<string[]>([]);
   const [configuredNeighborhoods, setConfiguredNeighborhoods] = React.useState<string[]>([]);
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
+  // El detalle del resumen arranca plegado en móvil (el total sigue visible
+  // en la barra inferior) y siempre desplegado desde `lg`.
+  const [summaryOpen, setSummaryOpen] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   const initiatedRef = React.useRef(false);
@@ -105,57 +115,11 @@ export function CheckoutClient() {
       value: totals.productsTotal.amount,
       currency: "COP",
       contentIds: lines.map((l) => l.productId),
+      quantities: lines.map((l) => l.quantity),
       contentType: "product",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length]);
-
-  // Departamentos configurados y activos (los 32 + Bogotá D.C. vienen
-  // precargados de fábrica, así que normalmente están todos desde el
-  // primer arranque).
-  React.useEffect(() => {
-    let cancelled = false;
-    listShippingDepartmentsAction().then((names) => {
-      if (!cancelled) setDepartments(names);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Nombre/descripción de cada método de pago, editables desde Configuración.
-  React.useEffect(() => {
-    let cancelled = false;
-    getPaymentMethodsCopyAction().then((copy) => {
-      if (!cancelled) setPaymentMethodsCopy(copy);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Aviso de pago, editable desde Configuración → Textos del sitio.
-  React.useEffect(() => {
-    let cancelled = false;
-    getStoreContentAction().then(({ texts }) => {
-      if (!cancelled) setPaymentDisclaimer(texts.checkoutPaymentDisclaimer);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Qué campos del formulario están activos/obligatorios y en qué orden,
-  // editable desde Configuración → Formulario de checkout.
-  React.useEffect(() => {
-    let cancelled = false;
-    getCheckoutFieldsAction().then((config) => {
-      if (!cancelled) setFieldConfig(config);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Ciudades/municipios configurados y activos para el departamento elegido
   // (sección 17.3): si el departamento no tiene ninguna, el checkout no pide
@@ -623,11 +587,30 @@ export function CheckoutClient() {
         </Card>
       </div>
 
-      {/* Resumen */}
-      <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
+      {/* Resumen. En móvil queda debajo del formulario y se puede plegar; el
+          total y el botón de confirmar viven además en una barra fija
+          inferior, para no obligar a recorrer todo el formulario hacia
+          abajo cada vez que se quiere ver cuánto se paga. */}
+      <aside className="flex flex-col gap-4 pb-28 lg:sticky lg:top-24 lg:self-start lg:pb-0">
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <h2 className="font-display text-md font-semibold text-text">Resumen del pedido</h2>
+            <button
+              type="button"
+              onClick={() => setSummaryOpen((open) => !open)}
+              aria-expanded={summaryOpen}
+              aria-controls="checkout-summary-detail"
+              className="flex items-center justify-between gap-2 text-left lg:pointer-events-none"
+            >
+              <h2 className="font-display text-md font-semibold text-text">Resumen del pedido</h2>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 text-text-muted transition-transform lg:hidden ${summaryOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              id="checkout-summary-detail"
+              className={`flex-col gap-4 ${summaryOpen ? "flex" : "hidden"} lg:flex`}
+            >
             <ul className="flex flex-col gap-2 text-sm">
               {lines.map((line) => (
                 <li key={`${line.productId}:${line.variantId ?? ""}`} className="flex justify-between gap-2">
@@ -647,12 +630,20 @@ export function CheckoutClient() {
                 </p>
               )}
             </div>
+            </div>
             {submitError ? (
               <p className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
                 {submitError}
               </p>
             ) : null}
-            <Button type="submit" size="lg" fullWidth isLoading={submitting} disabled={!summary}>
+            <Button
+              type="submit"
+              size="lg"
+              fullWidth
+              isLoading={submitting}
+              disabled={!summary}
+              className="hidden lg:inline-flex"
+            >
               Confirmar pedido
             </Button>
             <p className="text-center text-xs text-text-subtle">
@@ -661,6 +652,27 @@ export function CheckoutClient() {
           </CardContent>
         </Card>
       </aside>
+
+      {/* Barra fija de móvil. Se sitúa por encima del espacio que reserva el
+          aviso de privacidad, así que nunca queda tapada por él. */}
+      <div
+        className="fixed inset-x-0 z-30 border-t border-border bg-surface-raised/97 p-3 backdrop-blur lg:hidden"
+        style={{ bottom: "var(--consent-banner-space, 0px)" }}
+      >
+        <div className="mx-auto flex max-w-(--content-max-width) items-center gap-3 px-[var(--content-padding-x)]">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-text-muted">
+              {summary ? "Total del pedido" : "Falta tu dirección"}
+            </p>
+            <p className="truncate text-lg font-semibold tabular-nums text-text">
+              {summary ? formatMoney(summary.total) : "—"}
+            </p>
+          </div>
+          <Button type="submit" size="lg" isLoading={submitting} disabled={!summary} className="shrink-0">
+            Confirmar pedido
+          </Button>
+        </div>
+      </div>
     </form>
   );
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Camera } from "lucide-react";
 import type { ImageTextBlock as ImageTextBlockType } from "@/modules/page-builder/blocks";
@@ -12,15 +13,31 @@ export function ImageTextBlock({ config }: { config: ImageTextBlockType["config"
     <Section spacing="sm" tone="raised">
       <Container className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
         <Reveal className={cn(config.reverse && "lg:order-2")}>
-          {/* Zona de fotografía editorial (placeholder mientras no exista la imagen). */}
-          <div className="tk-photo-placeholder relative aspect-[5/4] w-full overflow-hidden rounded-[24px] border border-border shadow-sm">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-gradient-iris h-28 w-28 rounded-full opacity-90 ring-8 ring-surface/60" aria-hidden="true" />
-            </div>
-            <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-surface/80 px-3 py-2 backdrop-blur">
-              <Camera className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden="true" />
-              <span className="text-xs text-text-muted">Espacio para fotografía editorial</span>
-            </div>
+          {/* El bloque ya guardaba `imageUrl` desde el panel pero nunca lo
+              renderizaba: la fotografía subida por el administrador quedaba
+              siempre oculta tras el marcador. Ahora el marcador es solo el
+              respaldo para cuando de verdad no hay imagen. */}
+          <div className="relative aspect-[5/4] w-full overflow-hidden rounded-[24px] border border-border shadow-sm">
+            {config.imageUrl ? (
+              <Image
+                src={config.imageUrl}
+                alt={config.title}
+                fill
+                loading="lazy"
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-cover"
+              />
+            ) : (
+              <div className="tk-photo-placeholder absolute inset-0">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="bg-gradient-iris h-28 w-28 rounded-full opacity-90 ring-8 ring-surface/60" aria-hidden="true" />
+                </div>
+                <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-surface/80 px-3 py-2 backdrop-blur">
+                  <Camera className="h-4 w-4 shrink-0 text-text-subtle" aria-hidden="true" />
+                  <span className="text-xs text-text-muted">Espacio para fotografía editorial</span>
+                </div>
+              </div>
+            )}
           </div>
         </Reveal>
         <Reveal className="flex flex-col gap-4" delayMs={80}>

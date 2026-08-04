@@ -49,6 +49,8 @@ export interface CatalogRepository {
   listColorFamilies(): Promise<ColorFamily[]>;
   getColorFamilyBySlug(slug: string): Promise<ColorFamily | null>;
   listCollections(): Promise<Collection[]>;
+  /** Ids de producto por slug de colección, en una sola consulta. */
+  listCollectionMembership(): Promise<Map<string, string[]>>;
   getCollectionBySlug(slug: string): Promise<Collection | null>;
   getRelatedProducts(productId: string, limit: number): Promise<Product[]>;
   getUpsellProducts(productId: string, limit: number): Promise<Product[]>;
