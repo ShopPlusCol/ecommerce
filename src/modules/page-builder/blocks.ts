@@ -21,6 +21,22 @@ export type HeroBlock = BlockBase & {
     ctaHref: string;
     secondaryLabel?: string;
     secondaryHref?: string;
+    /**
+     * Campos comerciales del primer pantallazo. Todos opcionales: un hero
+     * guardado antes de existir estos campos sigue renderizando igual.
+     *
+     * `offerLabel` acepta el marcador `{precio}`, que se reemplaza por el
+     * precio real más bajo del catálogo — así el precio del hero no queda
+     * escrito a mano y no puede quedar desincronizado del catálogo.
+     */
+    offerLabel?: string;
+    /** Qué incluye la compra base (p. ej. "par de lentes + estuche"). */
+    includesNote?: string;
+    /** Qué no incluye (p. ej. "líquido y domicilio aparte"). */
+    excludesNote?: string;
+    /** Fotografía real de campaña; sin ella se mantiene el marcador visual. */
+    imageUrl?: string | null;
+    imageAlt?: string;
   };
 };
 
@@ -57,9 +73,26 @@ export type ImageTextBlock = BlockBase & {
   };
 };
 
+/**
+ * Un testimonio solo se publica si alguien lo marcó como verificado
+ * (`verified: true`), es decir: es de una clienta real y hay autorización
+ * para mostrar su nombre. Los testimonios sin verificar son contenido de
+ * ejemplo y nunca salen a producción — ver `TestimonialsBlock`.
+ */
+export type Testimonial = {
+  name: string;
+  city: string;
+  quote: string;
+  verified?: boolean;
+  /** Producto o tono al que se refiere, si se conoce. */
+  product?: string;
+  /** Fecha del testimonio en ISO (YYYY-MM-DD), para poder ordenarlos. */
+  date?: string;
+};
+
 export type TestimonialsBlock = BlockBase & {
   type: "testimonials";
-  config: { title: string; items: Array<{ name: string; city: string; quote: string }> };
+  config: { title: string; items: Testimonial[] };
 };
 
 export type FaqBlock = BlockBase & {
