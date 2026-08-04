@@ -19,11 +19,14 @@ const lines: CartLine[] = [
     name: "Amazon Brown",
     colorFamilyName: "Miel / Café",
     unitPrice: money(49000),
+    compareAtPrice: null,
     quantity: 2,
     imageUrl: null,
     isGift: false,
     allowBackorder: false,
-    stock: 10,
+    maxStock: 10,
+    categoryIds: [],
+    purchaseLimit: null,
   },
 ];
 
@@ -34,6 +37,7 @@ const totals: CartTotals = {
   rewardDiscount: money(0),
   productsTotal: money(98000),
   freeShipping: false,
+  couponError: null,
 };
 
 describe("mensaje de WhatsApp del carrito", () => {
