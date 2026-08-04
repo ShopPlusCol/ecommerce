@@ -931,8 +931,27 @@ un id fijo por módulo, `--repeat-each` hacía que todas las repeticiones
 compartieran producto: 4 de 5 fallaban por eso); y está dividida en seis
 `test.step()` para que un fallo diga en qué paso fue.
 
-**No se tocó ningún timeout.** Resultado: 5/5 aislado con `--repeat-each=5`
-y tiempos estables (1,4-1,8 s), y suite completa 21/21.
+**No se tocó ningún timeout.** Resultado: **5/5 aislado** con
+`--repeat-each=5` y tiempos estables (1,4-1,8 s).
+
+**Sigue intermitente dentro de la suite completa** (~1 de cada 3-5
+ejecuciones), aunque con mucha menos frecuencia que antes. Diagnóstico
+exacto de lo observado:
+
+- Siempre `Test timeout of 30000ms exceeded`, **sin locator ni paso
+  atribuido** pese a estar dividida en `test.step()`. Eso descarta un
+  selector inestable y apunta a que se bloquea antes de completar el primer
+  paso.
+- Cuando pasa tarda 1,4-1,8 s; cuando falla agota los 30 s. No es
+  degradación gradual.
+- Aislada pasa siempre, incluso repetida. Solo aparece en la suite
+  completa, donde es el cuarto test tras el login de `consent-meta`.
+- Ya descartados y corregidos: el bucle del encabezado, el estado
+  compartido del producto, y el N+1 del catálogo.
+
+Trazas en `test-results/product-gallery-*/trace.zip`
+(`npx playwright show-trace <ruta>`). **No se enmascaró con timeouts ni
+`retries`.** Queda abierto y no bloquea la validación manual.
 
 ## Entorno de pruebas
 
