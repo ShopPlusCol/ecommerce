@@ -21,6 +21,7 @@ export function ConsentBanner() {
   const [editing, setEditing] = React.useState(false);
   const [detailed, setDetailed] = React.useState(false);
   const [draft, setDraft] = React.useState({ analytics: false, marketing: false });
+  const cardRef = React.useRef<HTMLDivElement>(null);
 
   const visible = !consentDecided || editing;
 
@@ -31,13 +32,32 @@ export function ConsentBanner() {
     setDetailed(true);
   };
 
-  // Reserva espacio real mientras el aviso está en pantalla, en vez de
-  // dejarlo flotando encima del contenido.
+  // Reserva espacio real mientras el aviso está en pantalla.
+  //
+  // La altura se **mide**, no se estima: la primera versión reservaba 10rem
+  // fijos y el aviso ocupaba ~194px en móvil, así que la barra inferior del
+  // checkout quedaba parcialmente debajo del aviso. Con `ResizeObserver` el
+  // espacio se ajusta solo aunque cambie el texto o el tamaño de letra.
   React.useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty("--consent-banner-space", visible ? "10rem" : "0px");
-    return () => root.style.setProperty("--consent-banner-space", "0px");
-  }, [visible]);
+    if (!visible) {
+      root.style.setProperty("--consent-banner-space", "0px");
+      return;
+    }
+    const node = cardRef.current;
+    if (!node) return;
+    const apply = () => {
+      // Altura + el margen inferior (bottom-3 = 12px) + un respiro.
+      root.style.setProperty("--consent-banner-space", `${Math.ceil(node.offsetHeight) + 12 + 8}px`);
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      root.style.setProperty("--consent-banner-space", "0px");
+    };
+  }, [visible, detailed]);
 
   const close = () => {
     setEditing(false);
@@ -58,6 +78,7 @@ export function ConsentBanner() {
 
   return (
     <div
+      ref={cardRef}
       role="dialog"
       aria-modal="false"
       aria-label="Preferencias de privacidad"

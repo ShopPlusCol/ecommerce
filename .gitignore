@@ -68,3 +68,7 @@ docker-compose.override.yml
 .codebase-memory/
 
 graphify-out/
+
+# Capturas de la auditoría visual: se regeneran con
+# `npx playwright test tests/e2e/ux-screenshots.spec.ts`
+/artifacts/ux-audit/
