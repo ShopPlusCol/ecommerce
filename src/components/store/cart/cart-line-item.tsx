@@ -20,6 +20,8 @@ export function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate?
         onClick={onNavigate}
         className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-surface-sunken"
       >
+        {/* El contenedor tiene tamaño fijo (h-20 w-20), así que la imagen no
+            puede desplazar el layout mientras carga. */}
         {line.imageUrl && isVideoUrl(line.imageUrl) ? (
           <video src={line.imageUrl} muted playsInline preload="metadata" aria-label={line.name} className="h-full w-full object-cover" />
         ) : line.imageUrl ? (
@@ -37,8 +39,14 @@ export function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate?
             >
               {line.name}
             </Link>
+            {/* Familia y qué incluye: la misma aclaración que la ficha, para
+                que el carrito no sea el sitio donde reaparece la duda de si
+                el estuche viene o no. Un lente tiene familia de color; un
+                accesorio no. */}
             {line.colorFamilyName ? (
-              <p className="text-xs text-text-subtle">{line.colorFamilyName}</p>
+              <p className="text-xs text-text-subtle">
+                {line.colorFamilyName} · Lentes + estuche
+              </p>
             ) : null}
             {line.isGift ? <p className="text-xs font-medium text-success">Regalo</p> : null}
           </div>

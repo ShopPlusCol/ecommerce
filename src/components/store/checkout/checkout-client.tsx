@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Loader2, ShoppingBag } from "lucide-react";
+import { ChevronDown, Loader2, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,6 +102,9 @@ export function CheckoutClient({
   const [consent, setConsent] = React.useState({ terms: false, marketing: false });
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [submitting, setSubmitting] = React.useState(false);
+  // El detalle del resumen arranca plegado en móvil (el total sigue visible
+  // en la barra inferior) y siempre desplegado desde `lg`.
+  const [summaryOpen, setSummaryOpen] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   const initiatedRef = React.useRef(false);
@@ -584,11 +587,30 @@ export function CheckoutClient({
         </Card>
       </div>
 
-      {/* Resumen */}
-      <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
+      {/* Resumen. En móvil queda debajo del formulario y se puede plegar; el
+          total y el botón de confirmar viven además en una barra fija
+          inferior, para no obligar a recorrer todo el formulario hacia
+          abajo cada vez que se quiere ver cuánto se paga. */}
+      <aside className="flex flex-col gap-4 pb-28 lg:sticky lg:top-24 lg:self-start lg:pb-0">
         <Card>
           <CardContent className="flex flex-col gap-4">
-            <h2 className="font-display text-md font-semibold text-text">Resumen del pedido</h2>
+            <button
+              type="button"
+              onClick={() => setSummaryOpen((open) => !open)}
+              aria-expanded={summaryOpen}
+              aria-controls="checkout-summary-detail"
+              className="flex items-center justify-between gap-2 text-left lg:pointer-events-none"
+            >
+              <h2 className="font-display text-md font-semibold text-text">Resumen del pedido</h2>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 text-text-muted transition-transform lg:hidden ${summaryOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              id="checkout-summary-detail"
+              className={`flex-col gap-4 ${summaryOpen ? "flex" : "hidden"} lg:flex`}
+            >
             <ul className="flex flex-col gap-2 text-sm">
               {lines.map((line) => (
                 <li key={`${line.productId}:${line.variantId ?? ""}`} className="flex justify-between gap-2">
@@ -608,12 +630,20 @@ export function CheckoutClient({
                 </p>
               )}
             </div>
+            </div>
             {submitError ? (
               <p className="rounded-md bg-danger-soft p-3 text-sm text-danger" role="alert">
                 {submitError}
               </p>
             ) : null}
-            <Button type="submit" size="lg" fullWidth isLoading={submitting} disabled={!summary}>
+            <Button
+              type="submit"
+              size="lg"
+              fullWidth
+              isLoading={submitting}
+              disabled={!summary}
+              className="hidden lg:inline-flex"
+            >
               Confirmar pedido
             </Button>
             <p className="text-center text-xs text-text-subtle">
@@ -622,6 +652,27 @@ export function CheckoutClient({
           </CardContent>
         </Card>
       </aside>
+
+      {/* Barra fija de móvil. Se sitúa por encima del espacio que reserva el
+          aviso de privacidad, así que nunca queda tapada por él. */}
+      <div
+        className="fixed inset-x-0 z-30 border-t border-border bg-surface-raised/97 p-3 backdrop-blur lg:hidden"
+        style={{ bottom: "var(--consent-banner-space, 0px)" }}
+      >
+        <div className="mx-auto flex max-w-(--content-max-width) items-center gap-3 px-[var(--content-padding-x)]">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-text-muted">
+              {summary ? "Total del pedido" : "Falta tu dirección"}
+            </p>
+            <p className="truncate text-lg font-semibold tabular-nums text-text">
+              {summary ? formatMoney(summary.total) : "—"}
+            </p>
+          </div>
+          <Button type="submit" size="lg" isLoading={submitting} disabled={!summary} className="shrink-0">
+            Confirmar pedido
+          </Button>
+        </div>
+      </div>
     </form>
   );
 }

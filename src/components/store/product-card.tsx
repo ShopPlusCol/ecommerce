@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Product } from "@/domain/entities/catalog";
@@ -11,6 +12,7 @@ import { FavoriteButton } from "@/components/store/favorite-button";
 import { useCart } from "@/modules/cart/cart-context";
 import { useAnalytics } from "@/modules/analytics/analytics-context";
 import { isVideoUrl } from "@/lib/media-type";
+import { isPlaceholderMedia } from "@/lib/placeholder-media";
 
 const BADGE_LABEL: Record<Product["badges"][number], string> = {
   nuevo: "Nuevo",
@@ -33,10 +35,15 @@ function savingsPercent(product: Product): number | null {
 export function ProductCard({ product }: { product: Product }) {
   const { addItem, getQuantity, setLineQuantity } = useCart();
   const { track } = useAnalytics();
-  const cover = product.media[0];
+  const [mediaIndex, setMediaIndex] = React.useState(0);
+  const cover = product.media[mediaIndex] ?? product.media[0];
   const outOfStock = product.stock <= 0 && !product.allowBackorder;
   const quantity = getQuantity(product.id);
   const discount = savingsPercent(product);
+  const showPlaceholderNotice = isPlaceholderMedia(cover?.url);
+  // Un lente tiene familia de color; un accesorio no. Es el mismo
+  // discriminador que usa el precio "desde" del hero.
+  const isLens = product.colorFamily !== null;
 
   const onAdd = () => {
     addItem(product, 1);
@@ -73,8 +80,37 @@ export function ProductCard({ product }: { product: Product }) {
           ) : null}
         </Link>
 
-        <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5">
+        {/* Selector de imagen accesible sin hover: en táctil el hover no
+            existe, así que sin esto la segunda foto del tono era
+            inalcanzable desde el catálogo en móvil. */}
+        {product.media.length > 1 ? (
+          <div className="absolute inset-x-0 bottom-14 flex justify-center gap-1.5">
+            {product.media.slice(0, 5).map((media, index) => (
+              <button
+                key={media.id}
+                type="button"
+                onClick={() => setMediaIndex(index)}
+                aria-label={`Ver imagen ${index + 1} de ${product.name}`}
+                aria-current={index === mediaIndex}
+                className="flex h-11 w-6 items-center justify-center"
+              >
+                <span
+                  className={
+                    index === mediaIndex
+                      ? "block h-1.5 w-4 rounded-full bg-text shadow-sm"
+                      : "block h-1.5 w-1.5 rounded-full bg-text/40 shadow-sm"
+                  }
+                />
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-1.5">
           {discount ? <Chip variant="brand">−{discount}%</Chip> : null}
+          {/* Marca explícita de imagen de ejemplo: sin esto una foto demo se
+              presenta como si fuera el tono real del producto. */}
+          {showPlaceholderNotice ? <Chip variant="neutral">Foto de ejemplo</Chip> : null}
           {product.badges
             .filter((b) => b !== "promocion" || !discount)
             .map((badge) => (
@@ -128,10 +164,18 @@ export function ProductCard({ product }: { product: Product }) {
         </Link>
         <div className="mt-1 flex items-baseline gap-2">
           <span className="font-medium text-text">{formatMoney(product.price)}</span>
-          {product.compareAtPrice ? (
-            <span className="text-sm text-text-subtle line-through">{formatMoney(product.compareAtPrice)}</span>
+          {/* El precio anterior solo se muestra si de verdad es mayor que el
+              actual. Antes bastaba con que `compareAtPrice` existiera, así
+              que un valor igual o menor pintaba un descuento inexistente. */}
+          {discount ? (
+            <span className="text-sm text-text-subtle line-through">{formatMoney(product.compareAtPrice!)}</span>
           ) : null}
         </div>
+
+        <p className="mt-0.5 text-xs text-text-subtle">
+          {isLens ? "Lentes + estuche" : "Accesorio"}
+          {outOfStock ? " · Agotado" : product.stock > 0 && product.stock <= 5 ? " · Últimas unidades" : ""}
+        </p>
       </div>
     </div>
   );
