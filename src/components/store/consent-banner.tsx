@@ -24,9 +24,12 @@ export function ConsentBanner() {
 
   const visible = !consentDecided || editing;
 
-  React.useEffect(() => {
-    if (editing) setDraft({ analytics: consent.analytics, marketing: consent.marketing });
-  }, [editing, consent.analytics, consent.marketing]);
+  // El borrador se siembra al abrir el detalle, no desde un efecto: es una
+  // consecuencia directa de la interacción, no de un cambio de estado.
+  const openDetailed = () => {
+    setDraft({ analytics: consent.analytics, marketing: consent.marketing });
+    setDetailed(true);
+  };
 
   // Reserva espacio real mientras el aviso está en pantalla, en vez de
   // dejarlo flotando encima del contenido.
@@ -134,7 +137,7 @@ export function ConsentBanner() {
             >
               Rechazar opcionales
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setDetailed(true)}>
+            <Button variant="ghost" size="sm" onClick={openDetailed}>
               Configurar
             </Button>
           </>
