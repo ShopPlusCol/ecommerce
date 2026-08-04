@@ -40,6 +40,7 @@ import { enforceRateLimit, RateLimitError } from "@/modules/security/rate-limit"
 import { resolveDestinationLabel, resolveRejectionMessage } from "@/domain/services/shipping";
 import { loadShippingTree } from "@/infrastructure/shipping/zone-tree-repository";
 import { getBrandSettings } from "@/modules/settings/brand";
+import { emitPurchaseEventOnce } from "@/modules/analytics/purchase-event";
 import { ConfiguredNotificationProvider } from "@/infrastructure/notifications/configured-notification-provider";
 import { buildOrderConfirmationEmail } from "@/modules/notifications/order-confirmation-email";
 import { getCheckoutFieldsSettings } from "@/modules/settings/checkout-fields";
@@ -580,6 +581,27 @@ export async function createDemoOrderAction(input: CreateDemoOrderInput): Promis
         });
       } catch {
         // Nunca rompe el pedido ya confirmado.
+      }
+    }
+
+    // Purchase solo cuando el pedido ya quedó confirmado sin pago pendiente
+    // (p. ej. contra entrega). Si queda esperando pago, la compra la reporta
+    // el webhook al aprobarse — nunca las dos. `emitPurchaseEventOnce`
+    // garantiza además que solo se envíe una vez por pedido.
+    if (order.status === "confirmed") {
+      try {
+        await emitPurchaseEventOnce({
+          orderId: order.id,
+          value: summary.total.amount,
+          eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmacion`,
+          email: data.contact.email || null,
+          phone: data.contact.phone,
+          utmSource: attribution.source ?? null,
+          utmCampaign: attribution.campaign ?? null,
+          marketingConsent: marketingConsentValue === true,
+        });
+      } catch {
+        // La analítica nunca rompe un pedido ya confirmado.
       }
     }
 

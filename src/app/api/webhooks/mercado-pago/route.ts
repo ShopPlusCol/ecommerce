@@ -6,12 +6,11 @@ import {
   inventoryMovements,
   inventoryReservations,
   orders,
-  analyticsEvents,
   consentRecords,
   payments,
   webhookEvents,
 } from "@/infrastructure/db/schema";
-import { MetaConversionsProvider } from "@/infrastructure/analytics/meta-conversions-provider";
+import { emitPurchaseEventOnce } from "@/modules/analytics/purchase-event";
 
 export async function POST(request: Request) {
   const token = process.env.MERCADO_PAGO_ACCESS_TOKEN;
@@ -93,31 +92,26 @@ export async function POST(request: Request) {
       const [consent] = order?.customerId
         ? await db.select().from(consentRecords).where(eq(consentRecords.subjectId, order.customerId)).limit(1)
         : [];
-      const eventId = `purchase:${payment.id}`;
-      const meta = new MetaConversionsProvider();
-      let sentToServer = false;
-      if (order && consent?.analytics && meta.isEnabled()) {
-        await meta.trackServerEvent({
-          eventName: "Purchase",
-          eventId,
-          eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/checkout/confirmacion`,
-          value: order.total,
-          currency: "COP",
+      // El id del evento se ancla al pedido, no al pago: si un pedido
+      // tuviera más de un pago (reintento, pago parcial), seguiría siendo
+      // una sola compra. `emitPurchaseEventOnce` reclama el envío con el
+      // índice único de `analytics_events.event_id`, así que dos entregas
+      // concurrentes del mismo webhook no pueden reportarla dos veces.
+      //
+      // Meta es marketing, no analítica: se exige el consentimiento de
+      // marketing del pedido, no el de analítica.
+      if (order) {
+        await emitPurchaseEventOnce({
           orderId: order.id,
-          userData: { email: order.customerEmail ?? undefined, phone: order.customerPhone },
+          value: order.total,
+          eventSourceUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmacion`,
+          email: order.customerEmail,
+          phone: order.customerPhone,
+          utmSource: order.utmSource,
+          utmCampaign: order.utmCampaign,
+          marketingConsent: consent?.marketing === true,
         });
-        sentToServer = true;
       }
-      await db.insert(analyticsEvents).values({
-        eventName: "Purchase",
-        eventId,
-        orderId: order?.id,
-        value: order?.total,
-        sentToServer,
-        sentToBrowser: false,
-        utmSource: order?.utmSource,
-        utmCampaign: order?.utmCampaign,
-      }).onConflictDoNothing();
     }
     await db.update(webhookEvents).set({ status: "processed", processedAt: new Date() }).where(eq(webhookEvents.id, claimed.id));
     return Response.json({ ok: true });
