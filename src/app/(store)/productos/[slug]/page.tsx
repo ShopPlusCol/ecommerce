@@ -12,8 +12,10 @@ import { CartUpsells } from "@/components/store/cart/cart-upsells";
 import { TryOnLauncher } from "@/components/store/try-on/try-on-launcher";
 import { formatMoney } from "@/domain/value-objects/money";
 import { catalogRepository, tryOnRepository } from "@/lib/container";
-import { siteConfig } from "@/lib/site-config";
 import { productJsonLd } from "@/lib/seo";
+import { getSiteTextsSettings } from "@/modules/settings/site-texts";
+import { getBrandSettings } from "@/modules/settings/brand";
+import { getStoreOffer } from "@/modules/storefront/offer";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -43,9 +45,12 @@ export default async function ProductPage({ params }: Params) {
   const product = await catalogRepository.getProductBySlug(slug);
   if (!product) notFound();
 
-  const [related, upsells] = await Promise.all([
+  const [related, upsells, siteTexts, offer, brand] = await Promise.all([
     catalogRepository.getRelatedProducts(product.id, 4),
     catalogRepository.getUpsellProducts(product.id, 3),
+    getSiteTextsSettings(),
+    getStoreOffer(),
+    getBrandSettings(),
   ]);
   const tryOnProducts = [product, ...related].filter((item) => item.sku.startsWith("SPC-LEN"));
   const tryOnTextures = await tryOnRepository.listApprovedByProductIds(tryOnProducts.map((item) => item.id));
@@ -102,26 +107,49 @@ export default async function ProductPage({ params }: Params) {
               </div>
             </div>
 
-            <ProductPurchasePanel product={product} />
+            <ProductPurchasePanel
+              product={product}
+              texts={{
+                productIncludes: siteTexts.productIncludes,
+                productExcludes: siteTexts.productExcludes,
+                productVariationNote: siteTexts.productVariationNote,
+                whatsappProductTemplate: siteTexts.whatsappProductTemplate,
+              }}
+            />
 
             {product.sku.startsWith("SPC-LEN") ? (
               <TryOnLauncher products={tryOnProducts} textures={tryOnTextures} />
             ) : null}
 
-            {/* Envío y pagos, fácil de comprender (sección 9) */}
+            {/* Envío y pagos. Ambas promesas salen de la configuración real
+                de zonas: antes eran texto fijo que prometía mismo día y
+                contra entrega en Medellín pasara lo que pasara, incluso
+                fuera de la hora límite o con la zona desactivada. */}
             <div className="grid gap-3 rounded-xl border border-border p-4 text-sm sm:grid-cols-2">
               <div className="flex items-start gap-2.5">
                 <Truck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
                 <div>
-                  <p className="font-medium text-text">Envío el mismo día en Medellín</p>
-                  <p className="text-text-muted">A otras ciudades pagas el envío por anticipado.</p>
+                  <p className="font-medium text-text">
+                    {offer.sameDayLabel ?? "Envío según tu zona"}
+                  </p>
+                  <p className="text-text-muted">
+                    {offer.sameDayLabel
+                      ? "Según disponibilidad, día y hora del pedido. El costo se calcula con tu dirección en el checkout."
+                      : "El costo y el tiempo de entrega se calculan con tu dirección en el checkout."}
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-2.5">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
                 <div>
-                  <p className="font-medium text-text">Paga contra entrega</p>
-                  <p className="text-text-muted">En Medellín y Área Metropolitana, en efectivo o datáfono.</p>
+                  <p className="font-medium text-text">
+                    {offer.cashOnDeliveryCities.length ? "Paga contra entrega" : "Métodos de pago según tu zona"}
+                  </p>
+                  <p className="text-text-muted">
+                    {offer.cashOnDeliveryCities.length
+                      ? `Disponible en ${offer.cashOnDeliveryCities.join(", ")}. Verás cuánto pagas ahora y cuánto al recibir.`
+                      : "Al escribir tu dirección verás cuánto pagas ahora y cuánto al recibir."}
+                  </p>
                 </div>
               </div>
             </div>
@@ -159,9 +187,10 @@ export default async function ProductPage({ params }: Params) {
       ) : null}
 
       <ProductStickyBar product={product} />
-      <p className="sr-only">
-        ¿Dudas? Escríbenos por WhatsApp al {siteConfig.contact.whatsappNumber}.
-      </p>
+      {/* Número real de la marca (editable), no el de ejemplo de siteConfig:
+          este punto había quedado fuera de la corrección anterior y seguía
+          anunciando 573000000000. */}
+      <p className="sr-only">¿Dudas? Escríbenos por WhatsApp al {brand.whatsapp}.</p>
     </>
   );
 }

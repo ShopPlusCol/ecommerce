@@ -163,6 +163,16 @@ export async function saveSiteTextsSettingsAction(_state: AdminActionState, form
       shippingPageMedellinBody: z.string().trim().min(1, "Escribe un texto.").max(400),
       shippingPageRestBody: z.string().trim().min(1, "Escribe un texto.").max(400),
       shippingPageNote: z.string().trim().min(1, "Escribe un texto.").max(400),
+      productIncludes: z.string().trim().min(1, "Escribe un texto.").max(200),
+      productExcludes: z.string().trim().min(1, "Escribe un texto.").max(200),
+      productVariationNote: z.string().trim().min(1, "Escribe un texto.").max(400),
+      whatsappProductTemplate: z
+        .string()
+        .trim()
+        .min(1, "Escribe un texto.")
+        .max(400)
+        .refine((value) => value.includes("{producto}"), 'El mensaje debe incluir "{producto}".')
+        .refine((value) => value.includes("{precio}"), 'El mensaje debe incluir "{precio}".'),
     }).parse(Object.fromEntries(formData)) satisfies SiteTextsSettings;
     const db = await getRuntimeDb();
     await db.insert(settings).values({ key: "site_texts", value: parsed, updatedByUserId: session.user.id })

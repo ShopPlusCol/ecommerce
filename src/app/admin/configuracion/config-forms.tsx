@@ -168,6 +168,15 @@ const SITE_TEXT_FIELDS: Array<{ name: keyof SiteTextsSettings; label: string; hi
   { name: "shippingPageMedellinBody", label: '"/envíos" — texto de Medellín y Área Metropolitana', long: true },
   { name: "shippingPageRestBody", label: '"/envíos" — texto del resto de Colombia', long: true },
   { name: "shippingPageNote", label: '"/envíos" — nota al pie', long: true },
+  { name: "productIncludes", label: "Ficha de producto — qué incluye la compra", hint: "Se muestra en la ficha y se inserta en el mensaje de WhatsApp." },
+  { name: "productExcludes", label: "Ficha de producto — qué NO incluye" },
+  { name: "productVariationNote", label: "Ficha de producto — aclaración del resultado", long: true },
+  {
+    name: "whatsappProductTemplate",
+    label: "Mensaje de WhatsApp — comprar desde la ficha de producto",
+    hint: 'Debe incluir "{producto}" y "{precio}". También acepta {cantidad}, {incluye} y {url}.',
+    long: true,
+  },
 ];
 
 export function SiteTextsSettingsForm({
