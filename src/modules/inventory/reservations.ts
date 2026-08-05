@@ -35,6 +35,20 @@ export async function restockOrderInventory(orderId: string, reason: string, now
         reason,
       });
     } else if (reservation.status === "consumed") {
+      // Se reclama la reserva ANTES de devolver el stock, igual que en la
+      // rama "active". Antes esta rama sumaba `quantityOnHand` sin marcar la
+      // reserva, así que llamar dos veces a esta función por el mismo pedido
+      // devolvía el inventario dos veces. No era alcanzable mientras los
+      // estados avanzaban en secuencia, pero sí lo es en cuanto se permiten
+      // saltos directos (p. ej. cancelado → devuelto).
+      const [claimed] = await db.update(inventoryReservations).set({
+        status: "restocked",
+        updatedAt: now,
+      }).where(and(
+        eq(inventoryReservations.id, reservation.id),
+        eq(inventoryReservations.status, "consumed"),
+      )).returning({ id: inventoryReservations.id });
+      if (!claimed) continue;
       await db.update(inventoryItems).set({
         quantityOnHand: sql`${inventoryItems.quantityOnHand} + ${reservation.quantity}`,
         quantitySold: sql`max(0, ${inventoryItems.quantitySold} - ${reservation.quantity})`,
